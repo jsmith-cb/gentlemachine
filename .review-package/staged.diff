@@ -1,0 +1,400 @@
+diff --git a/src/pages/PlannerPage.ts b/src/pages/PlannerPage.ts
+index 6c6d462..27b5a6f 100644
+--- a/src/pages/PlannerPage.ts
++++ b/src/pages/PlannerPage.ts
+@@ -212,9 +212,10 @@ export function renderPlannerPage(
+             </section>
+         `;
+ 
+-        attachNavigationListeners();
+-        attachCalendarListeners();
+-        attachShiftEditorListeners();
++		attachNavigationListeners();
++		attachCalendarListeners();
++		attachShiftEditorListeners();
++		attachValidationFilterListeners();
+     }
+ 
+     function attachNavigationListeners(): void {
+@@ -370,6 +371,87 @@ export function renderPlannerPage(
+                 render();
+             },
+         );
++		
++		function attachValidationFilterListeners(): void {
++		    const filterButtons =
++		        container.querySelectorAll<HTMLButtonElement>(
++		            "[data-validation-filter]",
++		        );
++
++		    const issueElements =
++		        container.querySelectorAll<HTMLElement>(
++		            "[data-validation-issue]",
++		        );
++
++		    const resultCount =
++		        container.querySelector<HTMLElement>(
++		            "#validation-result-count",
++		        );
++
++		    for (
++		        const button
++		        of filterButtons
++		    ) {
++		        button.addEventListener(
++		            "click",
++		            () => {
++		                const filter =
++		                    button.dataset.validationFilter;
++
++		                if (!filter) {
++		                    return;
++		                }
++
++		                for (
++		                    const candidate
++		                    of filterButtons
++		                ) {
++		                    candidate.classList.toggle(
++		                        "validation-filter--active",
++		                        candidate === button,
++		                    );
++
++		                    candidate.setAttribute(
++		                        "aria-pressed",
++		                        candidate === button
++		                            ? "true"
++		                            : "false",
++		                    );
++		                }
++
++		                let visibleCount = 0;
++
++		                for (
++		                    const issueElement
++		                    of issueElements
++		                ) {
++		                    const severity =
++		                        issueElement.dataset.severity;
++
++		                    const category =
++		                        issueElement.dataset.category;
++
++		                    const visible =
++		                        filter === "all" ||
++		                        severity === filter ||
++		                        category === filter;
++
++		                    issueElement.hidden =
++		                        !visible;
++
++		                    if (visible) {
++		                        visibleCount += 1;
++		                    }
++		                }
++
++		                if (resultCount) {
++		                    resultCount.textContent =
++		                        `${visibleCount} issue${visibleCount === 1 ? "" : "s"}`;
++		                }
++		            },
++		        );
++		    }
++		}
+ 
+ 		deleteButton?.addEventListener(
+ 		    "click",
+@@ -568,10 +650,22 @@ function renderScheduleStatus(
+                 severity === "warning",
+         );
+ 
+-    const visibleIssues =
+-        issues.slice(
+-            0,
+-            12,
++    const coverage =
++        issues.filter(
++            ({ category }) =>
++                category === "coverage",
++        );
++
++    const hours =
++        issues.filter(
++            ({ category }) =>
++                category === "hours",
++        );
++
++    const availability =
++        issues.filter(
++            ({ category }) =>
++                category === "availability",
+         );
+ 
+     return `
+@@ -611,26 +705,80 @@ function renderScheduleStatus(
+                                 Show validation details
+                             </summary>
+ 
++                            <div class="validation-filter-bar">
++                                <button
++                                    class="validation-filter validation-filter--active"
++                                    data-validation-filter="all"
++                                    type="button"
++                                    aria-pressed="true"
++                                >
++                                    All
++                                    <span>${issues.length}</span>
++                                </button>
++
++                                <button
++                                    class="validation-filter"
++                                    data-validation-filter="error"
++                                    type="button"
++                                    aria-pressed="false"
++                                >
++                                    Errors
++                                    <span>${errors.length}</span>
++                                </button>
++
++                                <button
++                                    class="validation-filter"
++                                    data-validation-filter="warning"
++                                    type="button"
++                                    aria-pressed="false"
++                                >
++                                    Warnings
++                                    <span>${warnings.length}</span>
++                                </button>
++
++                                <button
++                                    class="validation-filter"
++                                    data-validation-filter="coverage"
++                                    type="button"
++                                    aria-pressed="false"
++                                >
++                                    Coverage
++                                    <span>${coverage.length}</span>
++                                </button>
++
++                                <button
++                                    class="validation-filter"
++                                    data-validation-filter="hours"
++                                    type="button"
++                                    aria-pressed="false"
++                                >
++                                    Hours
++                                    <span>${hours.length}</span>
++                                </button>
++
++                                <button
++                                    class="validation-filter"
++                                    data-validation-filter="availability"
++                                    type="button"
++                                    aria-pressed="false"
++                                >
++                                    Availability
++                                    <span>${availability.length}</span>
++                                </button>
++                            </div>
++
++                            <div class="validation-results-heading">
++                                <span id="validation-result-count">
++                                    ${issues.length} issues
++                                </span>
++                            </div>
++
+                             <div class="status-issues">
+-                                ${visibleIssues
++                                ${issues
+                                     .map(
+                                         renderScheduleIssue,
+                                     )
+                                     .join("")}
+-
+-                                ${
+-                                    issues.length >
+-                                    visibleIssues.length
+-                                        ? `
+-                                            <p class="more-issues">
+-                                                +${
+-                                                    issues.length -
+-                                                    visibleIssues.length
+-                                                } more issues
+-                                            </p>
+-                                        `
+-                                        : ""
+-                                }
+                             </div>
+ 
+                             <p class="coverage-note">
+@@ -648,7 +796,12 @@ function renderScheduleIssue(
+     issue: ValidationIssue,
+ ): string {
+     return `
+-        <div class="schedule-issue schedule-issue--${issue.severity}">
++        <div
++            class="schedule-issue schedule-issue--${issue.severity}"
++            data-validation-issue
++            data-severity="${issue.severity}"
++            data-category="${issue.category}"
++        >
+             <strong>
+                 ${
+                     issue.severity ===
+diff --git a/src/services/validationService.ts b/src/services/validationService.ts
+index 5fb48df..da46b9e 100644
+--- a/src/services/validationService.ts
++++ b/src/services/validationService.ts
+@@ -88,6 +88,7 @@ function validateShiftTime(
+     ) {
+         issues.push({
+             severity: "error",
++            category: "shift",
+             message:
+                 "Shift end time must be after the start time.",
+             employeeId:
+@@ -113,6 +114,7 @@ function validateEmployeeAvailability(
+     if (!employee) {
+         issues.push({
+             severity: "error",
++            category: "availability",
+             message:
+                 "Shift references an unknown employee.",
+             employeeId:
+@@ -136,6 +138,7 @@ function validateEmployeeAvailability(
+     ) {
+         issues.push({
+             severity: "error",
++            category: "availability",
+             message:
+                 `${employee.name} is not available on this day.`,
+             employeeId:
+@@ -160,6 +163,7 @@ function validateEmployeeAvailability(
+     ) {
+         issues.push({
+             severity: "error",
++            category: "availability",
+             message:
+                 `${employee.name} cannot start before ${earliestStart}.`,
+             employeeId:
+@@ -184,6 +188,7 @@ function validateEmployeeAvailability(
+     ) {
+         issues.push({
+             severity: "error",
++            category: "availability",
+             message:
+                 `${employee.name} cannot work after ${latestEnd}.`,
+             employeeId:
+@@ -234,6 +239,7 @@ function validateMaximumDaysPerWeek(
+             ) {
+                 issues.push({
+                     severity: "error",
++                    category: "hours",
+                     message:
+                         `${employee.name} works ${daysWorked} days ` +
+                         `during the week starting ${weekStart}. ` +
+@@ -312,6 +318,7 @@ function validateWeeklyTargets(
+ 
+         issues.push({
+             severity: "warning",
++            category: "hours",
+             message:
+                 `${employee.name} is ${formattedDifference} ${direction} ` +
+                 `their weekly target for ${summary.weekStart}–${summary.weekEnd}.`,
+@@ -336,6 +343,7 @@ function validateCoverage(
+     ) {
+         issues.push({
+             severity: "error",
++            category: "coverage",
+             message:
+                 `No store coverage ${gap.start}–${gap.end}.`,
+             date:
+diff --git a/src/styles.css b/src/styles.css
+index d168d7d..eb0c3bf 100644
+--- a/src/styles.css
++++ b/src/styles.css
+@@ -882,4 +882,58 @@ button {
+ 
+ .status-details .status-issues {
+     margin-top: 0;
++}
++
++.validation-filter-bar {
++    display: flex;
++    flex-wrap: wrap;
++    gap: 8px;
++    margin-bottom: 14px;
++}
++
++.validation-filter {
++    display: inline-flex;
++    align-items: center;
++    gap: 6px;
++    padding: 7px 10px;
++    color: #666662;
++    background: #f7f7f5;
++    border: 1px solid #dfdfdb;
++    border-radius: 999px;
++    font: inherit;
++    font-size: 0.75rem;
++    font-weight: 650;
++    cursor: pointer;
++}
++
++.validation-filter:hover {
++    color: #262624;
++    border-color: #bdbdb7;
++}
++
++.validation-filter--active {
++    color: #ffffff;
++    background: #2e2e2c;
++    border-color: #2e2e2c;
++}
++
++.validation-filter--active:hover {
++    color: #ffffff;
++    border-color: #2e2e2c;
++}
++
++.validation-filter span {
++    opacity: 0.7;
++    font-size: 0.68rem;
++}
++
++.validation-results-heading {
++    margin-bottom: 8px;
++    color: #858580;
++    font-size: 0.72rem;
++    font-weight: 650;
++}
++
++.schedule-issue[hidden] {
++    display: none;
+ }
+\ No newline at end of file
+diff --git a/src/types/planning.ts b/src/types/planning.ts
+index a607f7b..5698857 100644
+--- a/src/types/planning.ts
++++ b/src/types/planning.ts
+@@ -62,10 +62,19 @@ export interface CoverageGap {
+     end: string;
+ }
+ 
+-export type ValidationSeverity = "error" | "warning";
++export type ValidationSeverity =
++    | "error"
++    | "warning";
++
++export type ValidationCategory =
++    | "shift"
++    | "availability"
++    | "coverage"
++    | "hours";
+ 
+ export interface ValidationIssue {
+     severity: ValidationSeverity;
++    category: ValidationCategory;
+     message: string;
+     employeeId?: string;
+     date?: string;

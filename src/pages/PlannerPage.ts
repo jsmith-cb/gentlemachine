@@ -215,6 +215,7 @@ export function renderPlannerPage(
         attachNavigationListeners();
         attachCalendarListeners();
         attachShiftEditorListeners();
+        attachValidationFilterListeners();
     }
 
     function attachNavigationListeners(): void {
@@ -370,7 +371,7 @@ export function renderPlannerPage(
                 render();
             },
         );
-
+		
 		deleteButton?.addEventListener(
 		    "click",
 		    () => {
@@ -541,6 +542,87 @@ export function renderPlannerPage(
         );
     }
 
+    function attachValidationFilterListeners(): void {
+        const filterButtons =
+            container.querySelectorAll<HTMLButtonElement>(
+                "[data-validation-filter]",
+            );
+
+        const issueElements =
+            container.querySelectorAll<HTMLElement>(
+                "[data-validation-issue]",
+            );
+
+        const resultCount =
+            container.querySelector<HTMLElement>(
+                "#validation-result-count",
+            );
+
+        for (
+            const button
+            of filterButtons
+        ) {
+            button.addEventListener(
+                "click",
+                () => {
+                    const filter =
+                        button.dataset.validationFilter;
+
+                    if (!filter) {
+                        return;
+                    }
+
+                    for (
+                        const candidate
+                        of filterButtons
+                    ) {
+                        candidate.classList.toggle(
+                            "validation-filter--active",
+                            candidate === button,
+                        );
+
+                        candidate.setAttribute(
+                            "aria-pressed",
+                            candidate === button
+                                ? "true"
+                                : "false",
+                        );
+                    }
+
+                    let visibleCount = 0;
+
+                    for (
+                        const issueElement
+                        of issueElements
+                    ) {
+                        const severity =
+                            issueElement.dataset.severity;
+
+                        const category =
+                            issueElement.dataset.category;
+
+                        const visible =
+                            filter === "all" ||
+                            severity === filter ||
+                            category === filter;
+
+                        issueElement.hidden =
+                            !visible;
+
+                        if (visible) {
+                            visibleCount += 1;
+                        }
+                    }
+
+                    if (resultCount) {
+                        resultCount.textContent =
+                            `${visibleCount} issue${visibleCount === 1 ? "" : "s"}`;
+                    }
+                },
+            );
+        }
+    }
+
     function focusEmployeeField(): void {
         const employeeSelect =
             container.querySelector<HTMLSelectElement>(
@@ -568,10 +650,22 @@ function renderScheduleStatus(
                 severity === "warning",
         );
 
-    const visibleIssues =
-        issues.slice(
-            0,
-            12,
+    const coverage =
+        issues.filter(
+            ({ category }) =>
+                category === "coverage",
+        );
+
+    const hours =
+        issues.filter(
+            ({ category }) =>
+                category === "hours",
+        );
+
+    const availability =
+        issues.filter(
+            ({ category }) =>
+                category === "availability",
         );
 
     return `
@@ -611,26 +705,80 @@ function renderScheduleStatus(
                                 Show validation details
                             </summary>
 
+                            <div class="validation-filter-bar">
+                                <button
+                                    class="validation-filter validation-filter--active"
+                                    data-validation-filter="all"
+                                    type="button"
+                                    aria-pressed="true"
+                                >
+                                    All
+                                    <span>${issues.length}</span>
+                                </button>
+
+                                <button
+                                    class="validation-filter"
+                                    data-validation-filter="error"
+                                    type="button"
+                                    aria-pressed="false"
+                                >
+                                    Errors
+                                    <span>${errors.length}</span>
+                                </button>
+
+                                <button
+                                    class="validation-filter"
+                                    data-validation-filter="warning"
+                                    type="button"
+                                    aria-pressed="false"
+                                >
+                                    Warnings
+                                    <span>${warnings.length}</span>
+                                </button>
+
+                                <button
+                                    class="validation-filter"
+                                    data-validation-filter="coverage"
+                                    type="button"
+                                    aria-pressed="false"
+                                >
+                                    Coverage
+                                    <span>${coverage.length}</span>
+                                </button>
+
+                                <button
+                                    class="validation-filter"
+                                    data-validation-filter="hours"
+                                    type="button"
+                                    aria-pressed="false"
+                                >
+                                    Hours
+                                    <span>${hours.length}</span>
+                                </button>
+
+                                <button
+                                    class="validation-filter"
+                                    data-validation-filter="availability"
+                                    type="button"
+                                    aria-pressed="false"
+                                >
+                                    Availability
+                                    <span>${availability.length}</span>
+                                </button>
+                            </div>
+
+                            <div class="validation-results-heading">
+                                <span id="validation-result-count">
+                                    ${issues.length} issues
+                                </span>
+                            </div>
+
                             <div class="status-issues">
-                                ${visibleIssues
+                                ${issues
                                     .map(
                                         renderScheduleIssue,
                                     )
                                     .join("")}
-
-                                ${
-                                    issues.length >
-                                    visibleIssues.length
-                                        ? `
-                                            <p class="more-issues">
-                                                +${
-                                                    issues.length -
-                                                    visibleIssues.length
-                                                } more issues
-                                            </p>
-                                        `
-                                        : ""
-                                }
                             </div>
 
                             <p class="coverage-note">
@@ -648,7 +796,12 @@ function renderScheduleIssue(
     issue: ValidationIssue,
 ): string {
     return `
-        <div class="schedule-issue schedule-issue--${issue.severity}">
+        <div
+            class="schedule-issue schedule-issue--${issue.severity}"
+            data-validation-issue
+            data-severity="${issue.severity}"
+            data-category="${issue.category}"
+        >
             <strong>
                 ${
                     issue.severity ===

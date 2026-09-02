@@ -88,6 +88,7 @@ function validateShiftTime(
     ) {
         issues.push({
             severity: "error",
+            category: "shift",
             message:
                 "Shift end time must be after the start time.",
             employeeId:
@@ -113,6 +114,7 @@ function validateEmployeeAvailability(
     if (!employee) {
         issues.push({
             severity: "error",
+            category: "availability",
             message:
                 "Shift references an unknown employee.",
             employeeId:
@@ -136,6 +138,7 @@ function validateEmployeeAvailability(
     ) {
         issues.push({
             severity: "error",
+            category: "availability",
             message:
                 `${employee.name} is not available on this day.`,
             employeeId:
@@ -160,6 +163,7 @@ function validateEmployeeAvailability(
     ) {
         issues.push({
             severity: "error",
+            category: "availability",
             message:
                 `${employee.name} cannot start before ${earliestStart}.`,
             employeeId:
@@ -184,6 +188,7 @@ function validateEmployeeAvailability(
     ) {
         issues.push({
             severity: "error",
+            category: "availability",
             message:
                 `${employee.name} cannot work after ${latestEnd}.`,
             employeeId:
@@ -234,6 +239,7 @@ function validateMaximumDaysPerWeek(
             ) {
                 issues.push({
                     severity: "error",
+                    category: "hours",
                     message:
                         `${employee.name} works ${daysWorked} days ` +
                         `during the week starting ${weekStart}. ` +
@@ -312,6 +318,7 @@ function validateWeeklyTargets(
 
         issues.push({
             severity: "warning",
+            category: "hours",
             message:
                 `${employee.name} is ${formattedDifference} ${direction} ` +
                 `their weekly target for ${summary.weekStart}–${summary.weekEnd}.`,
@@ -336,6 +343,7 @@ function validateCoverage(
     ) {
         issues.push({
             severity: "error",
+            category: "coverage",
             message:
                 `No store coverage ${gap.start}–${gap.end}.`,
             date:

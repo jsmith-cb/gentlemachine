@@ -1,0 +1,10 @@
+2bdbb8b (HEAD -> main, origin/main) Add employee availability rules
+b0aa887 Add weekly hours and coverage validation
+65bc4e0 Add shift editing and validation
+07e095c Add shifts to monthly planner
+d13fde5 Convert planner to monthly schedule
+48469ba Add weekly planner shell
+624fe12 Add weekly planner shell
+b4db58b Add initial planning app structure
+d084768 Add initial planning app structure
+4c18d54 Add README.md

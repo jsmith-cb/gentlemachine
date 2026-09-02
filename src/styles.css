@@ -883,3 +883,57 @@ button {
 .status-details .status-issues {
     margin-top: 0;
 }
+
+.validation-filter-bar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 14px;
+}
+
+.validation-filter {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 7px 10px;
+    color: #666662;
+    background: #f7f7f5;
+    border: 1px solid #dfdfdb;
+    border-radius: 999px;
+    font: inherit;
+    font-size: 0.75rem;
+    font-weight: 650;
+    cursor: pointer;
+}
+
+.validation-filter:hover {
+    color: #262624;
+    border-color: #bdbdb7;
+}
+
+.validation-filter--active {
+    color: #ffffff;
+    background: #2e2e2c;
+    border-color: #2e2e2c;
+}
+
+.validation-filter--active:hover {
+    color: #ffffff;
+    border-color: #2e2e2c;
+}
+
+.validation-filter span {
+    opacity: 0.7;
+    font-size: 0.68rem;
+}
+
+.validation-results-heading {
+    margin-bottom: 8px;
+    color: #858580;
+    font-size: 0.72rem;
+    font-weight: 650;
+}
+
+.schedule-issue[hidden] {
+    display: none;
+}

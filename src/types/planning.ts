@@ -62,10 +62,19 @@ export interface CoverageGap {
     end: string;
 }
 
-export type ValidationSeverity = "error" | "warning";
+export type ValidationSeverity =
+    | "error"
+    | "warning";
+
+export type ValidationCategory =
+    | "shift"
+    | "availability"
+    | "coverage"
+    | "hours";
 
 export interface ValidationIssue {
     severity: ValidationSeverity;
+    category: ValidationCategory;
     message: string;
     employeeId?: string;
     date?: string;
