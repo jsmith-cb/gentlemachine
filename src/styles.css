@@ -37,8 +37,16 @@ textarea {
     font: inherit;
 }
 
+button {
+    cursor: pointer;
+}
+
 .app-shell {
-    width: min(1180px, calc(100% - 48px));
+    width: min(
+        1280px,
+        calc(100% - 48px)
+    );
+
     margin: 0 auto;
     padding: 56px 0 80px;
 }
@@ -50,95 +58,324 @@ textarea {
 .app-eyebrow,
 .section-label {
     margin: 0 0 8px;
+
     color: #737373;
+
     font-size: 0.75rem;
     font-weight: 700;
+
     letter-spacing: 0.12em;
     text-transform: uppercase;
 }
 
 .app-header h1 {
     margin: 0;
-    font-size: clamp(2.25rem, 5vw, 4rem);
+
+    font-size:
+        clamp(
+            2.25rem,
+            5vw,
+            4rem
+        );
+
     font-weight: 650;
+
     letter-spacing: -0.05em;
     line-height: 1;
 }
 
 .planner-intro {
     display: flex;
-    align-items: flex-end;
+
+    align-items: center;
     justify-content: space-between;
+
     gap: 32px;
-    margin-bottom: 24px;
+
+    margin-bottom: 20px;
 }
 
-.planner-intro h2 {
+.planner-intro h2,
+.employee-summary h2 {
     margin: 0;
+
     font-size: 1.75rem;
+
     letter-spacing: -0.035em;
+}
+
+.month-navigation {
+    display: flex;
+
+    align-items: center;
+
+    gap: 8px;
+}
+
+.month-button {
+    min-width: 44px;
+    min-height: 44px;
+
+    padding: 0 14px;
+
+    color: #1d1d1f;
+    background: #ffffff;
+
+    border: 1px solid #deded9;
+    border-radius: 10px;
+
+    font-weight: 650;
+}
+
+.month-button:hover {
+    background: #f0f0ed;
+}
+
+.month-button--today {
+    min-width: auto;
+}
+
+.planner-meta {
+    display: flex;
+
+    justify-content: space-between;
+    align-items: flex-end;
+
+    gap: 24px;
+
+    margin-bottom: 20px;
 }
 
 .store-hours {
     display: flex;
+
     flex-direction: column;
+
     gap: 4px;
+
     margin: 0;
+
     color: #737373;
+
     font-size: 0.8rem;
-    text-align: right;
 }
 
 .store-hours strong {
     color: #1d1d1f;
+
     font-size: 1rem;
 }
 
-.week-grid {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 16px;
-}
-
-.day-card {
-    min-height: 190px;
-    overflow: hidden;
-    background: #ffffff;
-    border: 1px solid #e3e3df;
-    border-radius: 14px;
-}
-
-.day-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 16px;
-    padding: 18px 20px;
-    border-bottom: 1px solid #eeeeeb;
-}
-
-.day-header h3 {
+.closed-note {
     margin: 0;
-    font-size: 1rem;
-}
 
-.day-header span {
-    color: #777773;
+    color: #858580;
+
     font-size: 0.8rem;
 }
 
-.day-empty {
+.calendar-scroll {
+    overflow-x: auto;
+
+    padding-bottom: 4px;
+}
+
+.calendar {
+    min-width: 820px;
+}
+
+.calendar-weekdays {
     display: grid;
-    min-height: 130px;
-    place-items: center;
-    padding: 24px;
-    color: #9a9a95;
-    font-size: 0.875rem;
+
+    grid-template-columns:
+        repeat(
+            6,
+            minmax(0, 1fr)
+        );
+
+    border:
+        1px solid
+        #e3e3df;
+
+    border-bottom: 0;
+
+    border-radius:
+        14px 14px 0 0;
+
+    overflow: hidden;
+}
+
+.weekday-label {
+    padding: 12px 14px;
+
+    color: #737373;
+    background: #f0f0ed;
+
+    border-right:
+        1px solid
+        #e3e3df;
+
+    font-size: 0.75rem;
+    font-weight: 700;
+
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.weekday-label:last-child {
+    border-right: 0;
+}
+
+.calendar-grid {
+    display: grid;
+
+    grid-template-columns:
+        repeat(
+            6,
+            minmax(0, 1fr)
+        );
+
+    background: #e3e3df;
+
+    border:
+        1px solid
+        #e3e3df;
+
+    border-radius:
+        0 0 14px 14px;
+
+    overflow: hidden;
+
+    gap: 1px;
+}
+
+.calendar-day {
+    min-height: 150px;
+
+    padding: 14px;
+
+    background: #ffffff;
+}
+
+.calendar-day--placeholder {
+    background: #f7f7f5;
+}
+
+.calendar-day-header {
+    display: flex;
+
+    align-items: center;
+    justify-content: space-between;
+
+    margin-bottom: 16px;
+}
+
+.calendar-day-header strong {
+    font-size: 0.9rem;
+}
+
+.calendar-day-content {
+    display: flex;
+
+    flex-direction: column;
+
+    gap: 6px;
+}
+
+.no-shifts {
+    color: #a0a09a;
+
+    font-size: 0.75rem;
+}
+
+.calendar-shift {
+    padding: 6px 8px;
+
+    background: #f0f0ed;
+
+    border-radius: 6px;
+
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+.employee-summary {
+    margin-top: 56px;
+}
+
+.summary-heading {
+    margin-bottom: 20px;
+}
+
+.summary-list {
+    overflow: hidden;
+
+    background: #ffffff;
+
+    border:
+        1px solid
+        #e3e3df;
+
+    border-radius: 14px;
+}
+
+.summary-row {
+    display: grid;
+
+    grid-template-columns:
+        minmax(180px, 1fr)
+        repeat(
+            3,
+            minmax(110px, auto)
+        );
+
+    align-items: center;
+
+    gap: 24px;
+
+    padding: 18px 20px;
+}
+
+.summary-row
+    + .summary-row {
+    border-top:
+        1px solid
+        #eeeeeb;
+}
+
+.employee-name,
+.summary-stat {
+    display: flex;
+
+    flex-direction: column;
+
+    gap: 3px;
+}
+
+.employee-name strong,
+.summary-stat strong {
+    font-size: 0.95rem;
+}
+
+.employee-name span,
+.summary-stat span {
+    color: #82827d;
+
+    font-size: 0.75rem;
+}
+
+.summary-stat {
+    text-align: right;
 }
 
 @media (max-width: 800px) {
     .app-shell {
-        width: min(100% - 32px, 1180px);
+        width:
+            min(
+                100% - 32px,
+                1280px
+            );
+
         padding-top: 32px;
     }
 
@@ -146,23 +383,56 @@ textarea {
         margin-bottom: 40px;
     }
 
-    .week-grid {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
+    .summary-row {
+        grid-template-columns:
+            minmax(
+                160px,
+                1fr
+            )
+            repeat(
+                2,
+                minmax(
+                    100px,
+                    auto
+                )
+            );
+    }
+
+    .summary-stat:last-child {
+        display: none;
     }
 }
 
 @media (max-width: 560px) {
     .planner-intro {
         align-items: flex-start;
+
         flex-direction: column;
-        gap: 16px;
+
+        gap: 18px;
     }
 
-    .store-hours {
-        text-align: left;
+    .planner-meta {
+        align-items: flex-start;
+
+        flex-direction: column;
+
+        gap: 8px;
     }
 
-    .week-grid {
-        grid-template-columns: 1fr;
+    .employee-summary {
+        margin-top: 40px;
+    }
+
+    .summary-row {
+        grid-template-columns:
+            1fr auto;
+
+        gap: 14px;
+    }
+
+    .summary-stat:nth-child(3),
+    .summary-stat:nth-child(4) {
+        display: none;
     }
 }

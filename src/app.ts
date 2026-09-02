@@ -1,12 +1,21 @@
-import { renderPlannerPage } from "./pages/PlannerPage";
+import {
+    renderPlannerPage,
+} from "./pages/PlannerPage";
 
-export function renderApp(root: HTMLElement): void {
+export function renderApp(
+    root: HTMLElement,
+): void {
     root.innerHTML = `
         <div class="app-shell">
             <header class="app-header">
                 <div>
-                    <p class="app-eyebrow">GentleMachine</p>
-                    <h1>Weekly Planner</h1>
+                    <p class="app-eyebrow">
+                        GentleMachine
+                    </p>
+
+                    <h1>
+                        Monthly Planner
+                    </h1>
                 </div>
             </header>
 
@@ -14,11 +23,18 @@ export function renderApp(root: HTMLElement): void {
         </div>
     `;
 
-    const pageContent = root.querySelector<HTMLElement>("#page-content");
+    const pageContent =
+        root.querySelector<HTMLElement>(
+            "#page-content",
+        );
 
     if (!pageContent) {
-        throw new Error("Page content element not found.");
+        throw new Error(
+            "Page content element not found.",
+        );
     }
 
-    renderPlannerPage(pageContent);
+    renderPlannerPage(
+        pageContent,
+    );
 }
