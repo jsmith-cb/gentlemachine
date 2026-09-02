@@ -1,10 +1,17 @@
 import {
     getDayOfWeek,
     getEmployeeDaysWorked,
+    getEmployeeWeekSummaries,
+    getMonthShifts,
     getShiftDurationMinutes,
     getWeekStartDate,
+    isDateInMonth,
     timeToMinutes,
 } from "./hoursService";
+
+import {
+    getCoverageGapsForMonth,
+} from "./coverageService";
 
 import type {
     PlannerState,
@@ -16,7 +23,8 @@ export function validateShift(
     state: PlannerState,
     shift: Shift,
 ): ValidationIssue[] {
-    const issues: ValidationIssue[] = [];
+    const issues:
+        ValidationIssue[] = [];
 
     validateShiftTime(
         shift,
@@ -41,8 +49,15 @@ export function validateShift(
 export function validatePlannerState(
     state: PlannerState,
 ): ValidationIssue[] {
+    const monthShifts =
+        getMonthShifts(
+            state.shifts,
+            state.selectedYear,
+            state.selectedMonth,
+        );
+
     const issues =
-        state.shifts.flatMap(
+        monthShifts.flatMap(
             (shift) =>
                 validateShift(
                     state,
@@ -51,6 +66,16 @@ export function validatePlannerState(
         );
 
     validateMaximumDaysPerWeek(
+        state,
+        issues,
+    );
+
+    validateWeeklyTargets(
+        state,
+        issues,
+    );
+
+    validateCoverage(
         state,
         issues,
     );
@@ -157,9 +182,18 @@ function validateMaximumDaysPerWeek(
     state: PlannerState,
     issues: ValidationIssue[],
 ): void {
+    const relevantShifts =
+        state.shifts.filter(
+            (shift) =>
+                weekIntersectsSelectedMonth(
+                    shift.date,
+                    state,
+                ),
+        );
+
     const weeks =
         groupShiftsByWeek(
-            state.shifts,
+            relevantShifts,
         );
 
     for (
@@ -185,10 +219,9 @@ function validateMaximumDaysPerWeek(
                 issues.push({
                     severity: "error",
                     message:
-                        `${employee.name} is scheduled ` +
-                        `${daysWorked} days during the week ` +
-                        `starting ${weekStart}. Maximum is ` +
-                        `${employee.maxDaysPerWeek}.`,
+                        `${employee.name} works ${daysWorked} days ` +
+                        `during the week starting ${weekStart}. ` +
+                        `Maximum is ${employee.maxDaysPerWeek}.`,
                     employeeId:
                         employee.id,
                 });
@@ -197,13 +230,115 @@ function validateMaximumDaysPerWeek(
     }
 }
 
+function validateWeeklyTargets(
+    state: PlannerState,
+    issues: ValidationIssue[],
+): void {
+    const summaries =
+        getEmployeeWeekSummaries(
+            state,
+        );
+
+    for (
+        const summary
+        of summaries
+    ) {
+        if (
+            summary.partialMonthWeek
+        ) {
+            continue;
+        }
+
+        const employee =
+            state.employees.find(
+                ({ id }) =>
+                    id ===
+                    summary.employeeId,
+            );
+
+        if (
+            !employee ||
+            employee.saturdayOnly
+        ) {
+            continue;
+        }
+
+        if (
+            summary.differenceMinutes ===
+            0
+        ) {
+            continue;
+        }
+
+        const direction =
+            summary.differenceMinutes <
+            0
+                ? "under"
+                : "over";
+
+        const difference =
+            Math.abs(
+                summary.differenceMinutes,
+            );
+
+        const hours =
+            Math.floor(
+                difference / 60,
+            );
+
+        const minutes =
+            difference % 60;
+
+        const formattedDifference =
+            `${hours}:${String(minutes).padStart(2, "0")}`;
+
+        issues.push({
+            severity: "warning",
+            message:
+                `${employee.name} is ${formattedDifference} ${direction} ` +
+                `their weekly target for ${summary.weekStart}–${summary.weekEnd}.`,
+            employeeId:
+                employee.id,
+        });
+    }
+}
+
+function validateCoverage(
+    state: PlannerState,
+    issues: ValidationIssue[],
+): void {
+    const gaps =
+        getCoverageGapsForMonth(
+            state,
+        );
+
+    for (
+        const gap
+        of gaps
+    ) {
+        issues.push({
+            severity: "error",
+            message:
+                `No store coverage ${gap.start}–${gap.end}.`,
+            date:
+                gap.date,
+        });
+    }
+}
+
 function groupShiftsByWeek(
     shifts: Shift[],
 ): Map<string, Shift[]> {
     const weeks =
-        new Map<string, Shift[]>();
+        new Map<
+            string,
+            Shift[]
+        >();
 
-    for (const shift of shifts) {
+    for (
+        const shift
+        of shifts
+    ) {
         const weekStart =
             getWeekStartDate(
                 shift.date,
@@ -225,4 +360,70 @@ function groupShiftsByWeek(
     }
 
     return weeks;
+}
+
+function weekIntersectsSelectedMonth(
+    date: string,
+    state: PlannerState,
+): boolean {
+    if (
+        isDateInMonth(
+            date,
+            state.selectedYear,
+            state.selectedMonth,
+        )
+    ) {
+        return true;
+    }
+
+    const weekStart =
+        getWeekStartDate(
+            date,
+        );
+
+    for (
+        let offset = 0;
+        offset < 6;
+        offset += 1
+    ) {
+        const value =
+            new Date(
+                `${weekStart}T00:00:00Z`,
+            );
+
+        value.setUTCDate(
+            value.getUTCDate() +
+                offset,
+        );
+
+        const candidate =
+            [
+                value.getUTCFullYear(),
+                String(
+                    value.getUTCMonth() +
+                        1,
+                ).padStart(
+                    2,
+                    "0",
+                ),
+                String(
+                    value.getUTCDate(),
+                ).padStart(
+                    2,
+                    "0",
+                ),
+            ].join("-");
+
+        if (
+            isDateInMonth(
+                candidate,
+                state.selectedYear,
+                state.selectedMonth,
+            )
+        ) {
+            return true;
+        }
+    }
+
+    return false;
 }

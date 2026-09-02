@@ -1,9 +1,12 @@
 import {
+    formatDifferenceMinutes,
     formatMinutes,
     getEmployeeMonthSummaries,
+    getEmployeeWeekSummaries,
 } from "../services/hoursService";
 
 import {
+    validatePlannerState,
     validateShift,
 } from "../services/validationService";
 
@@ -14,6 +17,7 @@ import {
 import type {
     Employee,
     EmployeeMonthSummary,
+    EmployeeWeekSummary,
     PlannerState,
     Shift,
     ValidationIssue,
@@ -64,8 +68,18 @@ export function renderPlannerPage(
         | null = null;
 
     function render(): void {
-        const summaries =
+        const monthSummaries =
             getEmployeeMonthSummaries(
+                state,
+            );
+
+        const weekSummaries =
+            getEmployeeWeekSummaries(
+                state,
+            );
+
+        const scheduleIssues =
+            validatePlannerState(
                 state,
             );
 
@@ -155,6 +169,15 @@ export function renderPlannerPage(
                         : ""
                 }
 
+                ${renderScheduleStatus(
+                    scheduleIssues,
+                )}
+
+                ${renderWeeklyHours(
+                    state,
+                    weekSummaries,
+                )}
+
                 <section class="employee-summary">
                     <div class="summary-heading">
                         <p class="section-label">
@@ -168,19 +191,21 @@ export function renderPlannerPage(
 
                     <div class="summary-list">
                         ${state.employees
-                            .map((employee) => {
-                                const summary =
-                                    summaries.find(
-                                        ({ employeeId }) =>
-                                            employeeId ===
-                                            employee.id,
-                                    );
+                            .map(
+                                (employee) => {
+                                    const summary =
+                                        monthSummaries.find(
+                                            ({ employeeId }) =>
+                                                employeeId ===
+                                                employee.id,
+                                        );
 
-                                return renderEmployeeSummary(
-                                    employee,
-                                    summary,
-                                );
-                            })
+                                    return renderEmployeeSummary(
+                                        employee,
+                                        summary,
+                                    );
+                                },
+                            )
                             .join("")}
                     </div>
                 </section>
@@ -249,7 +274,8 @@ export function renderPlannerPage(
                     selectedYear:
                         now.getFullYear(),
                     selectedMonth:
-                        now.getMonth() + 1,
+                        now.getMonth() +
+                        1,
                 };
 
                 editorMode = null;
@@ -341,37 +367,39 @@ export function renderPlannerPage(
             "click",
             () => {
                 editorMode = null;
-
                 render();
             },
         );
 
-        deleteButton?.addEventListener(
-            "click",
-            () => {
-                if (
-                    !editorMode ||
-                    editorMode.type !==
-                        "edit"
-                ) {
-                    return;
-                }
+		deleteButton?.addEventListener(
+		    "click",
+		    () => {
+		        if (
+		            !editorMode ||
+		            editorMode.type !==
+		                "edit"
+		        ) {
+		            return;
+		        }
 
-                state = {
-                    ...state,
-                    shifts:
-                        state.shifts.filter(
-                            ({ id }) =>
-                                id !==
-                                editorMode.shiftId,
-                        ),
-                };
+		        const shiftId =
+		            editorMode.shiftId;
 
-                editorMode = null;
+		        state = {
+		            ...state,
+		            shifts:
+		                state.shifts.filter(
+		                    ({ id }) =>
+		                        id !==
+		                        shiftId,
+		                ),
+		        };
 
-                render();
-            },
-        );
+		        editorMode = null;
+
+		        render();
+		    },
+		);
 
         if (!form) {
             return;
@@ -392,6 +420,11 @@ export function renderPlannerPage(
                         [],
                     );
 
+                    updateSaveButton(
+                        container,
+                        true,
+                    );
+
                     return [];
                 }
 
@@ -404,6 +437,15 @@ export function renderPlannerPage(
                 renderEditorIssues(
                     container,
                     issues,
+                );
+
+                updateSaveButton(
+                    container,
+                    issues.some(
+                        ({ severity }) =>
+                            severity ===
+                            "error",
+                    ),
                 );
 
                 return issues;
@@ -455,11 +497,6 @@ export function renderPlannerPage(
                         state,
                         shift,
                     );
-
-                renderEditorIssues(
-                    container,
-                    issues,
-                );
 
                 const hasErrors =
                     issues.some(
@@ -516,6 +553,250 @@ export function renderPlannerPage(
     render();
 }
 
+function renderScheduleStatus(
+    issues: ValidationIssue[],
+): string {
+    const errors =
+        issues.filter(
+            ({ severity }) =>
+                severity === "error",
+        );
+
+    const warnings =
+        issues.filter(
+            ({ severity }) =>
+                severity === "warning",
+        );
+
+    const visibleIssues =
+        issues.slice(
+            0,
+            12,
+        );
+
+    return `
+        <section class="schedule-status">
+            <div class="summary-heading">
+                <p class="section-label">
+                    Validation
+                </p>
+
+                <div class="status-heading-row">
+                    <h2>
+                        Schedule status
+                    </h2>
+
+                    <div class="status-counts">
+                        <span class="status-count status-count--error">
+                            ${errors.length} errors
+                        </span>
+
+                        <span class="status-count status-count--warning">
+                            ${warnings.length} warnings
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            ${
+                issues.length === 0
+                    ? `
+                        <div class="status-clear">
+                            No schedule issues found.
+                        </div>
+                    `
+                    : `
+                        <details class="status-details">
+                            <summary>
+                                Show validation details
+                            </summary>
+
+                            <div class="status-issues">
+                                ${visibleIssues
+                                    .map(
+                                        renderScheduleIssue,
+                                    )
+                                    .join("")}
+
+                                ${
+                                    issues.length >
+                                    visibleIssues.length
+                                        ? `
+                                            <p class="more-issues">
+                                                +${
+                                                    issues.length -
+                                                    visibleIssues.length
+                                                } more issues
+                                            </p>
+                                        `
+                                        : ""
+                                }
+                            </div>
+
+                            <p class="coverage-note">
+                                Coverage currently checks scheduled shift spans.
+                                Break coverage is not yet included.
+                            </p>
+                        </details>
+                    `
+            }
+        </section>
+    `;
+}
+
+function renderScheduleIssue(
+    issue: ValidationIssue,
+): string {
+    return `
+        <div class="schedule-issue schedule-issue--${issue.severity}">
+            <strong>
+                ${
+                    issue.severity ===
+                    "error"
+                        ? "Error"
+                        : "Warning"
+                }
+            </strong>
+
+            <span>
+                ${
+                    issue.date
+                        ? `${formatShortDate(issue.date)} · `
+                        : ""
+                }${issue.message}
+            </span>
+        </div>
+    `;
+}
+
+function renderWeeklyHours(
+    state: PlannerState,
+    summaries: EmployeeWeekSummary[],
+): string {
+    const weekStarts =
+        [
+            ...new Set(
+                summaries.map(
+                    ({ weekStart }) =>
+                        weekStart,
+                ),
+            ),
+        ];
+
+    return `
+        <section class="weekly-hours">
+            <div class="summary-heading">
+                <p class="section-label">
+                    Contract hours
+                </p>
+
+                <h2>
+                    Weekly overview
+                </h2>
+            </div>
+
+            <div class="week-list">
+                ${weekStarts
+                    .map(
+                        (weekStart) =>
+                            renderWeek(
+                                state,
+                                summaries,
+                                weekStart,
+                            ),
+                    )
+                    .join("")}
+            </div>
+        </section>
+    `;
+}
+
+function renderWeek(
+    state: PlannerState,
+    summaries: EmployeeWeekSummary[],
+    weekStart: string,
+): string {
+    const weekSummaries =
+        summaries.filter(
+            (summary) =>
+                summary.weekStart ===
+                weekStart,
+        );
+
+    const firstSummary =
+        weekSummaries[0];
+
+    if (!firstSummary) {
+        return "";
+    }
+
+    return `
+        <article class="week-card">
+            <div class="week-card-header">
+                <strong>
+                    ${formatShortDate(firstSummary.weekStart)}
+                    –
+                    ${formatShortDate(firstSummary.weekEnd)}
+                </strong>
+
+                ${
+                    firstSummary.partialMonthWeek
+                        ? `
+                            <span class="partial-week-label">
+                                Partial month week
+                            </span>
+                        `
+                        : ""
+                }
+            </div>
+
+            <div class="week-employees">
+                ${state.employees
+                    .map(
+                        (employee) => {
+                            const summary =
+                                weekSummaries.find(
+                                    ({ employeeId }) =>
+                                        employeeId ===
+                                        employee.id,
+                                );
+
+                            if (!summary) {
+                                return "";
+                            }
+
+                            return `
+                                <div class="week-employee">
+                                    <span>
+                                        ${employee.name}
+                                    </span>
+
+                                    <strong>
+                                        ${formatMinutes(summary.scheduledMinutes)}
+                                        / ${formatMinutes(summary.targetMinutes)}
+                                    </strong>
+
+                                    <small>
+                                        ${
+                                            employee.saturdayOnly
+                                                ? `${summary.daysWorked} day${summary.daysWorked === 1 ? "" : "s"}`
+                                                : firstSummary.partialMonthWeek
+                                                  ? "partial"
+                                                  : formatDifferenceMinutes(
+                                                        summary.differenceMinutes,
+                                                    )
+                                        }
+                                    </small>
+                                </div>
+                            `;
+                        },
+                    )
+                    .join("")}
+            </div>
+        </article>
+    `;
+}
+
 function renderCalendarDays(
     state: PlannerState,
     editorMode:
@@ -529,7 +810,8 @@ function renderCalendarDays(
             0,
         ).getDate();
 
-    const openDates: number[] = [];
+    const openDates:
+        number[] = [];
 
     for (
         let day = 1;
@@ -569,7 +851,8 @@ function renderCalendarDays(
         );
 
     const firstDayIndex =
-        firstDate.getDay() - 1;
+        firstDate.getDay() -
+        1;
 
     const placeholders =
         Array.from(
@@ -588,7 +871,8 @@ function renderCalendarDays(
             `,
         ).join("");
 
-    const days =
+    return (
+        placeholders +
         openDates
             .map(
                 (day) =>
@@ -598,11 +882,7 @@ function renderCalendarDays(
                         editorMode,
                     ),
             )
-            .join("");
-
-    return (
-        placeholders +
-        days
+            .join("")
     );
 }
 
@@ -641,19 +921,17 @@ function renderCalendarDay(
         );
 
     const selectedClass =
-        selectedDate === dateKey
+        selectedDate ===
+        dateKey
             ? " calendar-day--selected"
             : "";
 
     return `
-        <article
-            class="calendar-day${selectedClass}"
-        >
+        <article class="calendar-day${selectedClass}">
             <button
                 class="calendar-day-add"
                 data-add-date="${dateKey}"
                 type="button"
-                aria-label="Add shift for ${formatDateLabel(dateKey)}"
             >
                 <span class="calendar-day-number">
                     ${day}
@@ -715,7 +993,6 @@ function renderShift(
             class="calendar-shift${selectedClass}"
             data-edit-shift="${shift.id}"
             type="button"
-            aria-label="Edit ${employee?.name ?? shift.employeeId} shift"
         >
             <strong>
                 ${employee?.name ?? shift.employeeId}
@@ -781,11 +1058,7 @@ function renderShiftEditor(
             <div class="shift-editor-heading">
                 <div>
                     <p class="section-label">
-                        ${
-                            isEditing
-                                ? "Edit shift"
-                                : "Add shift"
-                        }
+                        ${isEditing ? "Edit shift" : "Add shift"}
                     </p>
 
                     <h2>
@@ -879,13 +1152,10 @@ function renderShiftEditor(
 
                     <button
                         class="primary-button"
+                        id="save-shift-button"
                         type="submit"
                     >
-                        ${
-                            isEditing
-                                ? "Save changes"
-                                : "Add shift"
-                        }
+                        ${isEditing ? "Save changes" : "Add shift"}
                     </button>
                 </div>
             </form>
@@ -987,9 +1257,7 @@ function renderEditorIssues(
             "#shift-validation",
         );
 
-    if (
-        !validationContainer
-    ) {
+    if (!validationContainer) {
         return;
     }
 
@@ -1012,21 +1280,28 @@ function renderEditorIssues(
         issues
             .map(
                 (issue) => `
-                    <p
-                        class="validation-message validation-message--${issue.severity}"
-                    >
-                        ${
-                            issue.severity ===
-                            "error"
-                                ? "Error:"
-                                : "Warning:"
-                        }
-
+                    <p class="validation-message validation-message--${issue.severity}">
+                        ${issue.severity === "error" ? "Error:" : "Warning:"}
                         ${issue.message}
                     </p>
                 `,
             )
             .join("");
+}
+
+function updateSaveButton(
+    container: HTMLElement,
+    disabled: boolean,
+): void {
+    const button =
+        container.querySelector<HTMLButtonElement>(
+            "#save-shift-button",
+        );
+
+    if (button) {
+        button.disabled =
+            disabled;
+    }
 }
 
 function renderEmployeeSummary(
@@ -1122,7 +1397,8 @@ function changeMonth(
     const date =
         new Date(
             state.selectedYear,
-            state.selectedMonth - 1 +
+            state.selectedMonth -
+                1 +
                 amount,
             1,
         );
@@ -1132,7 +1408,8 @@ function changeMonth(
         selectedYear:
             date.getFullYear(),
         selectedMonth:
-            date.getMonth() + 1,
+            date.getMonth() +
+            1,
     };
 }
 
@@ -1143,15 +1420,11 @@ function createDateKey(
 ): string {
     return [
         year,
-        String(
-            month,
-        ).padStart(
+        String(month).padStart(
             2,
             "0",
         ),
-        String(
-            day,
-        ).padStart(
+        String(day).padStart(
             2,
             "0",
         ),
@@ -1172,13 +1445,6 @@ function formatDateLabel(
                 Number,
             );
 
-    const value =
-        new Date(
-            year,
-            month - 1,
-            day,
-        );
-
     return new Intl.DateTimeFormat(
         "en",
         {
@@ -1188,7 +1454,40 @@ function formatDateLabel(
             year: "numeric",
         },
     ).format(
-        value,
+        new Date(
+            year,
+            month - 1,
+            day,
+        ),
+    );
+}
+
+function formatShortDate(
+    date: string,
+): string {
+    const [
+        year,
+        month,
+        day,
+    ] =
+        date
+            .split("-")
+            .map(
+                Number,
+            );
+
+    return new Intl.DateTimeFormat(
+        "en",
+        {
+            month: "short",
+            day: "numeric",
+        },
+    ).format(
+        new Date(
+            year,
+            month - 1,
+            day,
+        ),
     );
 }
 
@@ -1206,11 +1505,7 @@ function createShiftId(): string {
         "shift",
         Date.now(),
         Math.random()
-            .toString(
-                16,
-            )
-            .slice(
-                2,
-            ),
+            .toString(16)
+            .slice(2),
     ].join("-");
 }

@@ -39,6 +39,23 @@ export interface EmployeeMonthSummary {
     saturdaysWorked: number;
 }
 
+export interface EmployeeWeekSummary {
+    employeeId: string;
+    weekStart: string;
+    weekEnd: string;
+    scheduledMinutes: number;
+    targetMinutes: number;
+    differenceMinutes: number;
+    daysWorked: number;
+    partialMonthWeek: boolean;
+}
+
+export interface CoverageGap {
+    date: string;
+    start: string;
+    end: string;
+}
+
 export type ValidationSeverity = "error" | "warning";
 
 export interface ValidationIssue {
