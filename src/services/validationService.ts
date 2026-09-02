@@ -31,13 +31,7 @@ export function validateShift(
         issues,
     );
 
-    validateShiftStoreHours(
-        state,
-        shift,
-        issues,
-    );
-
-    validateSaturdayOnlyEmployee(
+    validateEmployeeAvailability(
         state,
         shift,
         issues,
@@ -104,51 +98,7 @@ function validateShiftTime(
     }
 }
 
-function validateShiftStoreHours(
-    state: PlannerState,
-    shift: Shift,
-    issues: ValidationIssue[],
-): void {
-    const storeOpenMinutes =
-        timeToMinutes(
-            state.storeHours.open,
-        );
-
-    const storeCloseMinutes =
-        timeToMinutes(
-            state.storeHours.close,
-        );
-
-    const shiftStartMinutes =
-        timeToMinutes(
-            shift.start,
-        );
-
-    const shiftEndMinutes =
-        timeToMinutes(
-            shift.end,
-        );
-
-    if (
-        shiftStartMinutes <
-            storeOpenMinutes ||
-        shiftEndMinutes >
-            storeCloseMinutes
-    ) {
-        issues.push({
-            severity: "warning",
-            message:
-                `Shift is outside store hours ` +
-                `${state.storeHours.open}–${state.storeHours.close}.`,
-            employeeId:
-                shift.employeeId,
-            date:
-                shift.date,
-        });
-    }
-}
-
-function validateSaturdayOnlyEmployee(
+function validateEmployeeAvailability(
     state: PlannerState,
     shift: Shift,
     issues: ValidationIssue[],
@@ -160,18 +110,84 @@ function validateSaturdayOnlyEmployee(
                 shift.employeeId,
         );
 
-    if (
-        employee?.saturdayOnly &&
+    if (!employee) {
+        issues.push({
+            severity: "error",
+            message:
+                "Shift references an unknown employee.",
+            employeeId:
+                shift.employeeId,
+            date:
+                shift.date,
+        });
+
+        return;
+    }
+
+    const dayOfWeek =
         getDayOfWeek(
             shift.date,
-        ) !== 6
+        );
+
+    if (
+        !employee.availability.days.includes(
+            dayOfWeek,
+        )
     ) {
         issues.push({
             severity: "error",
             message:
-                `${employee.name} may only be scheduled on Saturday.`,
+                `${employee.name} is not available on this day.`,
             employeeId:
-                shift.employeeId,
+                employee.id,
+            date:
+                shift.date,
+        });
+    }
+
+    const earliestStart =
+        employee.availability
+            .earliestStart;
+
+    if (
+        earliestStart &&
+        timeToMinutes(
+            shift.start,
+        ) <
+            timeToMinutes(
+                earliestStart,
+            )
+    ) {
+        issues.push({
+            severity: "error",
+            message:
+                `${employee.name} cannot start before ${earliestStart}.`,
+            employeeId:
+                employee.id,
+            date:
+                shift.date,
+        });
+    }
+
+    const latestEnd =
+        employee.availability
+            .latestEnd;
+
+    if (
+        latestEnd &&
+        timeToMinutes(
+            shift.end,
+        ) >
+            timeToMinutes(
+                latestEnd,
+            )
+    ) {
+        issues.push({
+            severity: "error",
+            message:
+                `${employee.name} cannot work after ${latestEnd}.`,
+            employeeId:
+                employee.id,
             date:
                 shift.date,
         });
@@ -258,7 +274,9 @@ function validateWeeklyTargets(
 
         if (
             !employee ||
-            employee.saturdayOnly
+            isSingleDayEmployee(
+                employee.availability.days,
+            )
         ) {
             continue;
         }
@@ -426,4 +444,10 @@ function weekIntersectsSelectedMonth(
     }
 
     return false;
+}
+
+function isSingleDayEmployee(
+    availableDays: number[],
+): boolean {
+    return availableDays.length === 1;
 }

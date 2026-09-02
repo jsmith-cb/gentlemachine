@@ -29,41 +29,70 @@ export const BREAK_RULES: BreakRule[] = [
     },
 ];
 
+const MONDAY_TO_SATURDAY = [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+];
+
+const MONDAY_TO_FRIDAY = [
+    1,
+    2,
+    3,
+    4,
+    5,
+];
+
 export const EMPLOYEES: Employee[] = [
     {
         id: "a",
         name: "Employee A",
         weeklyTargetMinutes: 35 * 60,
         maxDaysPerWeek: 5,
-        saturdayOnly: false,
+        availability: {
+            days: MONDAY_TO_SATURDAY,
+        },
     },
     {
         id: "b",
         name: "Employee B",
         weeklyTargetMinutes: 20 * 60,
         maxDaysPerWeek: 5,
-        saturdayOnly: false,
+        availability: {
+            days: MONDAY_TO_SATURDAY,
+        },
     },
     {
         id: "c",
         name: "Employee C",
         weeklyTargetMinutes: 15 * 60,
         maxDaysPerWeek: 5,
-        saturdayOnly: false,
+        availability: {
+            days: MONDAY_TO_FRIDAY,
+            earliestStart: "09:00",
+            latestEnd: "15:30",
+        },
     },
     {
         id: "d",
         name: "Employee D",
         weeklyTargetMinutes: 15 * 60,
         maxDaysPerWeek: 5,
-        saturdayOnly: false,
+        availability: {
+            days: MONDAY_TO_SATURDAY,
+        },
     },
     {
         id: "e",
         name: "Employee E",
         weeklyTargetMinutes: 5 * 60,
         maxDaysPerWeek: 1,
-        saturdayOnly: true,
+        availability: {
+            days: [6],
+        },
     },
 ];
 

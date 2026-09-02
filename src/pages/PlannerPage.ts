@@ -778,8 +778,8 @@ function renderWeek(
 
                                     <small>
                                         ${
-                                            employee.saturdayOnly
-                                                ? `${summary.daysWorked} day${summary.daysWorked === 1 ? "" : "s"}`
+											employee.availability.days.length === 1
+											    ? `${summary.daysWorked} day${summary.daysWorked === 1 ? "" : "s"}`
                                                 : firstSummary.partialMonthWeek
                                                   ? "partial"
                                                   : formatDifferenceMinutes(
@@ -1323,9 +1323,9 @@ function renderEmployeeSummary(
 
                 <span>
                     ${
-                        employee.saturdayOnly
-                            ? "Saturday only"
-                            : `Max ${employee.maxDaysPerWeek} days/week`
+						formatEmployeeAvailability(
+						    employee,
+						)
                     }
                 </span>
             </div>
@@ -1508,4 +1508,39 @@ function createShiftId(): string {
             .toString(16)
             .slice(2),
     ].join("-");
+}
+
+function formatEmployeeAvailability(
+    employee: Employee,
+): string {
+    const {
+        days,
+        earliestStart,
+        latestEnd,
+    } = employee.availability;
+
+    if (
+        days.length === 1 &&
+        days[0] === 6
+    ) {
+        return "Saturday only";
+    }
+
+    if (
+        days.length === 5 &&
+        !days.includes(6) &&
+        earliestStart &&
+        latestEnd
+    ) {
+        return `Mon–Fri · ${earliestStart}–${latestEnd}`;
+    }
+
+    if (
+        earliestStart &&
+        latestEnd
+    ) {
+        return `${earliestStart}–${latestEnd}`;
+    }
+
+    return `Max ${employee.maxDaysPerWeek} days/week`;
 }

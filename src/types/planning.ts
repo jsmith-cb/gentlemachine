@@ -3,12 +3,18 @@ export interface StoreHours {
     close: string;
 }
 
+export interface EmployeeAvailability {
+    days: number[];
+    earliestStart?: string;
+    latestEnd?: string;
+}
+
 export interface Employee {
     id: string;
     name: string;
     weeklyTargetMinutes: number;
     maxDaysPerWeek: number;
-    saturdayOnly: boolean;
+    availability: EmployeeAvailability;
 }
 
 export interface Shift {
