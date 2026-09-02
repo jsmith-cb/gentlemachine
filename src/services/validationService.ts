@@ -12,27 +12,45 @@ import type {
     ValidationIssue,
 } from "../types/planning";
 
-export function validatePlannerState(
+export function validateShift(
     state: PlannerState,
+    shift: Shift,
 ): ValidationIssue[] {
     const issues: ValidationIssue[] = [];
 
-    validateShiftTimes(
-        state,
+    validateShiftTime(
+        shift,
         issues,
     );
 
-    validateStoreHours(
+    validateShiftStoreHours(
         state,
+        shift,
         issues,
     );
+
+    validateSaturdayOnlyEmployee(
+        state,
+        shift,
+        issues,
+    );
+
+    return issues;
+}
+
+export function validatePlannerState(
+    state: PlannerState,
+): ValidationIssue[] {
+    const issues =
+        state.shifts.flatMap(
+            (shift) =>
+                validateShift(
+                    state,
+                    shift,
+                ),
+        );
 
     validateMaximumDaysPerWeek(
-        state,
-        issues,
-    );
-
-    validateSaturdayOnlyEmployees(
         state,
         issues,
     );
@@ -40,30 +58,30 @@ export function validatePlannerState(
     return issues;
 }
 
-function validateShiftTimes(
-    state: PlannerState,
+function validateShiftTime(
+    shift: Shift,
     issues: ValidationIssue[],
 ): void {
-    for (const shift of state.shifts) {
-        if (
-            getShiftDurationMinutes(
-                shift,
-            ) <= 0
-        ) {
-            issues.push({
-                severity: "error",
-                message:
-                    "Shift end time must be after start time.",
-                employeeId:
-                    shift.employeeId,
-                date: shift.date,
-            });
-        }
+    if (
+        getShiftDurationMinutes(
+            shift,
+        ) <= 0
+    ) {
+        issues.push({
+            severity: "error",
+            message:
+                "Shift end time must be after the start time.",
+            employeeId:
+                shift.employeeId,
+            date:
+                shift.date,
+        });
     }
 }
 
-function validateStoreHours(
+function validateShiftStoreHours(
     state: PlannerState,
+    shift: Shift,
     issues: ValidationIssue[],
 ): void {
     const storeOpenMinutes =
@@ -76,33 +94,62 @@ function validateStoreHours(
             state.storeHours.close,
         );
 
-    for (const shift of state.shifts) {
-        const shiftStartMinutes =
-            timeToMinutes(
-                shift.start,
-            );
+    const shiftStartMinutes =
+        timeToMinutes(
+            shift.start,
+        );
 
-        const shiftEndMinutes =
-            timeToMinutes(
-                shift.end,
-            );
+    const shiftEndMinutes =
+        timeToMinutes(
+            shift.end,
+        );
 
-        if (
-            shiftStartMinutes <
-                storeOpenMinutes ||
-            shiftEndMinutes >
-                storeCloseMinutes
-        ) {
-            issues.push({
-                severity: "warning",
-                message:
-                    `Shift falls outside store hours ` +
-                    `${state.storeHours.open}–${state.storeHours.close}.`,
-                employeeId:
-                    shift.employeeId,
-                date: shift.date,
-            });
-        }
+    if (
+        shiftStartMinutes <
+            storeOpenMinutes ||
+        shiftEndMinutes >
+            storeCloseMinutes
+    ) {
+        issues.push({
+            severity: "warning",
+            message:
+                `Shift is outside store hours ` +
+                `${state.storeHours.open}–${state.storeHours.close}.`,
+            employeeId:
+                shift.employeeId,
+            date:
+                shift.date,
+        });
+    }
+}
+
+function validateSaturdayOnlyEmployee(
+    state: PlannerState,
+    shift: Shift,
+    issues: ValidationIssue[],
+): void {
+    const employee =
+        state.employees.find(
+            ({ id }) =>
+                id ===
+                shift.employeeId,
+        );
+
+    if (
+        employee?.saturdayOnly &&
+        getDayOfWeek(
+            shift.date,
+        ) !== 6
+    ) {
+        issues.push({
+            severity: "error",
+            message:
+                `${employee.name} may only be scheduled on Saturday.`,
+            employeeId:
+                shift.employeeId,
+            date:
+                shift.date,
+        });
     }
 }
 
@@ -110,9 +157,10 @@ function validateMaximumDaysPerWeek(
     state: PlannerState,
     issues: ValidationIssue[],
 ): void {
-    const weeks = groupShiftsByWeek(
-        state.shifts,
-    );
+    const weeks =
+        groupShiftsByWeek(
+            state.shifts,
+        );
 
     for (
         const [
@@ -149,52 +197,6 @@ function validateMaximumDaysPerWeek(
     }
 }
 
-function validateSaturdayOnlyEmployees(
-    state: PlannerState,
-    issues: ValidationIssue[],
-): void {
-    const saturdayOnlyEmployeeIds =
-        new Set(
-            state.employees
-                .filter(
-                    (employee) =>
-                        employee.saturdayOnly,
-                )
-                .map(
-                    (employee) =>
-                        employee.id,
-                ),
-        );
-
-    for (const shift of state.shifts) {
-        if (
-            saturdayOnlyEmployeeIds.has(
-                shift.employeeId,
-            ) &&
-            getDayOfWeek(
-                shift.date,
-            ) !== 6
-        ) {
-            const employee =
-                state.employees.find(
-                    ({ id }) =>
-                        id ===
-                        shift.employeeId,
-                );
-
-            issues.push({
-                severity: "error",
-                message:
-                    `${employee?.name ?? "Employee"} ` +
-                    "may only be scheduled on Saturday.",
-                employeeId:
-                    shift.employeeId,
-                date: shift.date,
-            });
-        }
-    }
-}
-
 function groupShiftsByWeek(
     shifts: Shift[],
 ): Map<string, Shift[]> {
@@ -212,7 +214,9 @@ function groupShiftsByWeek(
                 weekStart,
             ) ?? [];
 
-        weekShifts.push(shift);
+        weekShifts.push(
+            shift,
+        );
 
         weeks.set(
             weekStart,

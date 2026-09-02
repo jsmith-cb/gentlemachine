@@ -4,6 +4,10 @@ import {
 } from "../services/hoursService";
 
 import {
+    validateShift,
+} from "../services/validationService";
+
+import {
     createInitialPlannerState,
 } from "../state/plannerState";
 
@@ -12,6 +16,7 @@ import type {
     EmployeeMonthSummary,
     PlannerState,
     Shift,
+    ValidationIssue,
 } from "../types/planning";
 
 const MONTH_NAMES = [
@@ -38,14 +43,25 @@ const OPEN_DAY_LABELS = [
     "Sat",
 ] as const;
 
+type EditorMode =
+    | {
+        type: "add";
+        date: string;
+    }
+    | {
+        type: "edit";
+        shiftId: string;
+    };
+
 export function renderPlannerPage(
     container: HTMLElement,
 ): void {
     let state =
         createInitialPlannerState();
 
-    let selectedDate: string | null =
-        null;
+    let editorMode:
+        | EditorMode
+        | null = null;
 
     function render(): void {
         const summaries =
@@ -124,17 +140,17 @@ export function renderPlannerPage(
                         <div class="calendar-grid">
                             ${renderCalendarDays(
                                 state,
-                                selectedDate,
+                                editorMode,
                             )}
                         </div>
                     </div>
                 </div>
 
                 ${
-                    selectedDate
-                        ? renderShiftForm(
+                    editorMode
+                        ? renderShiftEditor(
                             state,
-                            selectedDate,
+                            editorMode,
                         )
                         : ""
                 }
@@ -173,7 +189,7 @@ export function renderPlannerPage(
 
         attachNavigationListeners();
         attachCalendarListeners();
-        attachShiftFormListeners();
+        attachShiftEditorListeners();
     }
 
     function attachNavigationListeners(): void {
@@ -201,7 +217,7 @@ export function renderPlannerPage(
                         -1,
                     );
 
-                selectedDate = null;
+                editorMode = null;
 
                 render();
             },
@@ -216,7 +232,7 @@ export function renderPlannerPage(
                         1,
                     );
 
-                selectedDate = null;
+                editorMode = null;
 
                 render();
             },
@@ -232,12 +248,11 @@ export function renderPlannerPage(
                     ...state,
                     selectedYear:
                         now.getFullYear(),
-
                     selectedMonth:
                         now.getMonth() + 1,
                 };
 
-                selectedDate = null;
+                editorMode = null;
 
                 render();
             },
@@ -245,38 +260,68 @@ export function renderPlannerPage(
     }
 
     function attachCalendarListeners(): void {
-        const dayButtons =
+        const addButtons =
             container.querySelectorAll<HTMLButtonElement>(
-                "[data-date]",
+                "[data-add-date]",
             );
 
-        for (const button of dayButtons) {
+        for (
+            const button
+            of addButtons
+        ) {
             button.addEventListener(
                 "click",
                 () => {
                     const date =
-                        button.dataset.date;
+                        button.dataset.addDate;
 
                     if (!date) {
                         return;
                     }
 
-                    selectedDate = date;
+                    editorMode = {
+                        type: "add",
+                        date,
+                    };
 
                     render();
+                    focusEmployeeField();
+                },
+            );
+        }
 
-                    const employeeSelect =
-                        container.querySelector<HTMLSelectElement>(
-                            "#shift-employee",
-                        );
+        const shiftButtons =
+            container.querySelectorAll<HTMLButtonElement>(
+                "[data-edit-shift]",
+            );
 
-                    employeeSelect?.focus();
+        for (
+            const button
+            of shiftButtons
+        ) {
+            button.addEventListener(
+                "click",
+                () => {
+                    const shiftId =
+                        button.dataset.editShift;
+
+                    if (!shiftId) {
+                        return;
+                    }
+
+                    editorMode = {
+                        type: "edit",
+                        shiftId,
+                    };
+
+                    render();
+                    focusEmployeeField();
                 },
             );
         }
     }
 
-    function attachShiftFormListeners(): void {
+    function attachShiftEditorListeners(): void {
         const form =
             container.querySelector<HTMLFormElement>(
                 "#shift-form",
@@ -287,77 +332,185 @@ export function renderPlannerPage(
                 '[data-action="cancel-shift"]',
             );
 
+        const deleteButton =
+            container.querySelector<HTMLButtonElement>(
+                '[data-action="delete-shift"]',
+            );
+
         cancelButton?.addEventListener(
             "click",
             () => {
-                selectedDate = null;
+                editorMode = null;
 
                 render();
             },
         );
 
-        form?.addEventListener(
-            "submit",
-            (event) => {
-                event.preventDefault();
-
-                if (!selectedDate) {
-                    return;
-                }
-
-                const formData =
-                    new FormData(form);
-
-                const employeeId =
-                    String(
-                        formData.get(
-                            "employeeId",
-                        ) ?? "",
-                    );
-
-                const start =
-                    String(
-                        formData.get(
-                            "start",
-                        ) ?? "",
-                    );
-
-                const end =
-                    String(
-                        formData.get(
-                            "end",
-                        ) ?? "",
-                    );
-
+        deleteButton?.addEventListener(
+            "click",
+            () => {
                 if (
-                    !employeeId ||
-                    !start ||
-                    !end
+                    !editorMode ||
+                    editorMode.type !==
+                        "edit"
                 ) {
                     return;
                 }
 
-                const shift: Shift = {
-                    id: createShiftId(),
-                    employeeId,
-                    date: selectedDate,
-                    start,
-                    end,
-                };
-
                 state = {
                     ...state,
-                    shifts: [
-                        ...state.shifts,
-                        shift,
-                    ],
+                    shifts:
+                        state.shifts.filter(
+                            ({ id }) =>
+                                id !==
+                                editorMode.shiftId,
+                        ),
                 };
 
-                selectedDate = null;
+                editorMode = null;
 
                 render();
             },
         );
+
+        if (!form) {
+            return;
+        }
+
+        const updateValidation =
+            (): ValidationIssue[] => {
+                const draft =
+                    createShiftFromForm(
+                        form,
+                        editorMode,
+                        state,
+                    );
+
+                if (!draft) {
+                    renderEditorIssues(
+                        container,
+                        [],
+                    );
+
+                    return [];
+                }
+
+                const issues =
+                    validateShift(
+                        state,
+                        draft,
+                    );
+
+                renderEditorIssues(
+                    container,
+                    issues,
+                );
+
+                return issues;
+            };
+
+        const fields =
+            form.querySelectorAll<
+                HTMLInputElement |
+                HTMLSelectElement
+            >(
+                "input, select",
+            );
+
+        for (
+            const field
+            of fields
+        ) {
+            field.addEventListener(
+                "input",
+                updateValidation,
+            );
+
+            field.addEventListener(
+                "change",
+                updateValidation,
+            );
+        }
+
+        updateValidation();
+
+        form.addEventListener(
+            "submit",
+            (event) => {
+                event.preventDefault();
+
+                const shift =
+                    createShiftFromForm(
+                        form,
+                        editorMode,
+                        state,
+                    );
+
+                if (!shift) {
+                    return;
+                }
+
+                const issues =
+                    validateShift(
+                        state,
+                        shift,
+                    );
+
+                renderEditorIssues(
+                    container,
+                    issues,
+                );
+
+                const hasErrors =
+                    issues.some(
+                        ({ severity }) =>
+                            severity ===
+                            "error",
+                    );
+
+                if (hasErrors) {
+                    return;
+                }
+
+                if (
+                    editorMode?.type ===
+                    "edit"
+                ) {
+                    state = {
+                        ...state,
+                        shifts:
+                            state.shifts.map(
+                                (existingShift) =>
+                                    existingShift.id ===
+                                    shift.id
+                                        ? shift
+                                        : existingShift,
+                            ),
+                    };
+                } else {
+                    state = {
+                        ...state,
+                        shifts: [
+                            ...state.shifts,
+                            shift,
+                        ],
+                    };
+                }
+
+                editorMode = null;
+
+                render();
+            },
+        );
+    }
+
+    function focusEmployeeField(): void {
+        const employeeSelect =
+            container.querySelector<HTMLSelectElement>(
+                "#shift-employee",
+            );
+
+        employeeSelect?.focus();
     }
 
     render();
@@ -365,7 +518,9 @@ export function renderPlannerPage(
 
 function renderCalendarDays(
     state: PlannerState,
-    selectedDate: string | null,
+    editorMode:
+        | EditorMode
+        | null,
 ): string {
     const daysInMonth =
         new Date(
@@ -391,7 +546,9 @@ function renderCalendarDays(
         if (
             date.getDay() !== 0
         ) {
-            openDates.push(day);
+            openDates.push(
+                day,
+            );
         }
     }
 
@@ -433,22 +590,28 @@ function renderCalendarDays(
 
     const days =
         openDates
-            .map((day) =>
-                renderCalendarDay(
-                    state,
-                    day,
-                    selectedDate,
-                ),
+            .map(
+                (day) =>
+                    renderCalendarDay(
+                        state,
+                        day,
+                        editorMode,
+                    ),
             )
             .join("");
 
-    return placeholders + days;
+    return (
+        placeholders +
+        days
+    );
 }
 
 function renderCalendarDay(
     state: PlannerState,
     day: number,
-    selectedDate: string | null,
+    editorMode:
+        | EditorMode
+        | null,
 ): string {
     const dateKey =
         createDateKey(
@@ -471,47 +634,56 @@ function renderCalendarDay(
                     ),
             );
 
+    const selectedDate =
+        getEditorDate(
+            state,
+            editorMode,
+        );
+
     const selectedClass =
         selectedDate === dateKey
-            ? " calendar-day-button--selected"
+            ? " calendar-day--selected"
             : "";
 
     return `
-        <article class="calendar-day">
+        <article
+            class="calendar-day${selectedClass}"
+        >
             <button
-                class="calendar-day-button${selectedClass}"
-                data-date="${dateKey}"
+                class="calendar-day-add"
+                data-add-date="${dateKey}"
                 type="button"
                 aria-label="Add shift for ${formatDateLabel(dateKey)}"
             >
-                <div class="calendar-day-header">
-                    <strong>${day}</strong>
+                <span class="calendar-day-number">
+                    ${day}
+                </span>
 
-                    <span class="add-shift-label">
-                        + Shift
-                    </span>
-                </div>
-
-                <div class="calendar-day-content">
-                    ${
-                        shifts.length === 0
-                            ? `
-                                <span class="no-shifts">
-                                    No shifts
-                                </span>
-                            `
-                            : shifts
-                                .map(
-                                    (shift) =>
-                                        renderShift(
-                                            state,
-                                            shift,
-                                        ),
-                                )
-                                .join("")
-                    }
-                </div>
+                <span class="add-shift-label">
+                    + Shift
+                </span>
             </button>
+
+            <div class="calendar-day-content">
+                ${
+                    shifts.length === 0
+                        ? `
+                            <span class="no-shifts">
+                                No shifts
+                            </span>
+                        `
+                        : shifts
+                            .map(
+                                (shift) =>
+                                    renderShift(
+                                        state,
+                                        shift,
+                                        editorMode,
+                                    ),
+                            )
+                            .join("")
+                }
+            </div>
         </article>
     `;
 }
@@ -519,6 +691,9 @@ function renderCalendarDay(
 function renderShift(
     state: PlannerState,
     shift: Shift,
+    editorMode:
+        | EditorMode
+        | null,
 ): string {
     const employee =
         state.employees.find(
@@ -527,8 +702,21 @@ function renderShift(
                 shift.employeeId,
         );
 
+    const selectedClass =
+        editorMode?.type ===
+            "edit" &&
+        editorMode.shiftId ===
+            shift.id
+            ? " calendar-shift--selected"
+            : "";
+
     return `
-        <div class="calendar-shift">
+        <button
+            class="calendar-shift${selectedClass}"
+            data-edit-shift="${shift.id}"
+            type="button"
+            aria-label="Edit ${employee?.name ?? shift.employeeId} shift"
+        >
             <strong>
                 ${employee?.name ?? shift.employeeId}
             </strong>
@@ -536,20 +724,68 @@ function renderShift(
             <span>
                 ${shift.start}–${shift.end}
             </span>
-        </div>
+        </button>
     `;
 }
 
-function renderShiftForm(
+function renderShiftEditor(
     state: PlannerState,
-    date: string,
+    editorMode: EditorMode,
 ): string {
+    const existingShift =
+        editorMode.type ===
+            "edit"
+            ? state.shifts.find(
+                ({ id }) =>
+                    id ===
+                    editorMode.shiftId,
+            )
+            : undefined;
+
+    if (
+        editorMode.type ===
+            "edit" &&
+        !existingShift
+    ) {
+        return "";
+    }
+
+    const date =
+        existingShift?.date ??
+        (
+            editorMode.type ===
+                "add"
+                ? editorMode.date
+                : ""
+        );
+
+    const employeeId =
+        existingShift?.employeeId ??
+        state.employees[0]?.id ??
+        "";
+
+    const start =
+        existingShift?.start ??
+        state.storeHours.open;
+
+    const end =
+        existingShift?.end ??
+        state.storeHours.close;
+
+    const isEditing =
+        editorMode.type ===
+        "edit";
+
     return `
         <section class="shift-editor">
             <div class="shift-editor-heading">
                 <div>
                     <p class="section-label">
-                        Add shift
+                        ${
+                            isEditing
+                                ? "Edit shift"
+                                : "Add shift"
+                        }
                     </p>
 
                     <h2>
@@ -577,6 +813,12 @@ function renderShiftForm(
                                 (employee) => `
                                     <option
                                         value="${employee.id}"
+                                        ${
+                                            employee.id ===
+                                            employeeId
+                                                ? "selected"
+                                                : ""
+                                        }
                                     >
                                         ${employee.name}
                                     </option>
@@ -594,7 +836,7 @@ function renderShiftForm(
                     <input
                         name="start"
                         type="time"
-                        value="${state.storeHours.open}"
+                        value="${start}"
                         required
                     />
                 </label>
@@ -607,12 +849,26 @@ function renderShiftForm(
                     <input
                         name="end"
                         type="time"
-                        value="${state.storeHours.close}"
+                        value="${end}"
                         required
                     />
                 </label>
 
                 <div class="shift-form-actions">
+                    ${
+                        isEditing
+                            ? `
+                                <button
+                                    class="danger-button"
+                                    data-action="delete-shift"
+                                    type="button"
+                                >
+                                    Delete
+                                </button>
+                            `
+                            : ""
+                    }
+
                     <button
                         class="secondary-button"
                         data-action="cancel-shift"
@@ -625,12 +881,152 @@ function renderShiftForm(
                         class="primary-button"
                         type="submit"
                     >
-                        Add shift
+                        ${
+                            isEditing
+                                ? "Save changes"
+                                : "Add shift"
+                        }
                     </button>
                 </div>
             </form>
+
+            <div
+                id="shift-validation"
+                class="shift-validation"
+                aria-live="polite"
+            ></div>
         </section>
     `;
+}
+
+function createShiftFromForm(
+    form: HTMLFormElement,
+    editorMode:
+        | EditorMode
+        | null,
+    state: PlannerState,
+): Shift | null {
+    if (!editorMode) {
+        return null;
+    }
+
+    const formData =
+        new FormData(
+            form,
+        );
+
+    const employeeId =
+        String(
+            formData.get(
+                "employeeId",
+            ) ?? "",
+        );
+
+    const start =
+        String(
+            formData.get(
+                "start",
+            ) ?? "",
+        );
+
+    const end =
+        String(
+            formData.get(
+                "end",
+            ) ?? "",
+        );
+
+    if (
+        !employeeId ||
+        !start ||
+        !end
+    ) {
+        return null;
+    }
+
+    if (
+        editorMode.type ===
+        "edit"
+    ) {
+        const existingShift =
+            state.shifts.find(
+                ({ id }) =>
+                    id ===
+                    editorMode.shiftId,
+            );
+
+        if (!existingShift) {
+            return null;
+        }
+
+        return {
+            ...existingShift,
+            employeeId,
+            start,
+            end,
+        };
+    }
+
+    return {
+        id:
+            createShiftId(),
+        employeeId,
+        date:
+            editorMode.date,
+        start,
+        end,
+    };
+}
+
+function renderEditorIssues(
+    container: HTMLElement,
+    issues: ValidationIssue[],
+): void {
+    const validationContainer =
+        container.querySelector<HTMLElement>(
+            "#shift-validation",
+        );
+
+    if (
+        !validationContainer
+    ) {
+        return;
+    }
+
+    if (
+        issues.length === 0
+    ) {
+        validationContainer.innerHTML =
+            "";
+
+        validationContainer.hidden =
+            true;
+
+        return;
+    }
+
+    validationContainer.hidden =
+        false;
+
+    validationContainer.innerHTML =
+        issues
+            .map(
+                (issue) => `
+                    <p
+                        class="validation-message validation-message--${issue.severity}"
+                    >
+                        ${
+                            issue.severity ===
+                            "error"
+                                ? "Error:"
+                                : "Warning:"
+                        }
+
+                        ${issue.message}
+                    </p>
+                `,
+            )
+            .join("");
 }
 
 function renderEmployeeSummary(
@@ -692,6 +1088,33 @@ function renderEmployeeSummary(
     `;
 }
 
+function getEditorDate(
+    state: PlannerState,
+    editorMode:
+        | EditorMode
+        | null,
+): string | null {
+    if (!editorMode) {
+        return null;
+    }
+
+    if (
+        editorMode.type ===
+        "add"
+    ) {
+        return editorMode.date;
+    }
+
+    return (
+        state.shifts.find(
+            ({ id }) =>
+                id ===
+                editorMode.shiftId,
+        )?.date ??
+        null
+    );
+}
+
 function changeMonth(
     state: PlannerState,
     amount: number,
@@ -699,16 +1122,15 @@ function changeMonth(
     const date =
         new Date(
             state.selectedYear,
-            state.selectedMonth - 1 + amount,
+            state.selectedMonth - 1 +
+                amount,
             1,
         );
 
     return {
         ...state,
-
         selectedYear:
             date.getFullYear(),
-
         selectedMonth:
             date.getMonth() + 1,
     };
@@ -721,11 +1143,15 @@ function createDateKey(
 ): string {
     return [
         year,
-        String(month).padStart(
+        String(
+            month,
+        ).padStart(
             2,
             "0",
         ),
-        String(day).padStart(
+        String(
+            day,
+        ).padStart(
             2,
             "0",
         ),
@@ -739,9 +1165,12 @@ function formatDateLabel(
         year,
         month,
         day,
-    ] = date
-        .split("-")
-        .map(Number);
+    ] =
+        date
+            .split("-")
+            .map(
+                Number,
+            );
 
     const value =
         new Date(
@@ -758,13 +1187,17 @@ function formatDateLabel(
             day: "numeric",
             year: "numeric",
         },
-    ).format(value);
+    ).format(
+        value,
+    );
 }
 
 function createShiftId(): string {
     if (
-        typeof crypto !== "undefined" &&
-        "randomUUID" in crypto
+        typeof crypto !==
+            "undefined" &&
+        "randomUUID" in
+            crypto
     ) {
         return crypto.randomUUID();
     }
@@ -773,7 +1206,11 @@ function createShiftId(): string {
         "shift",
         Date.now(),
         Math.random()
-            .toString(16)
-            .slice(2),
+            .toString(
+                16,
+            )
+            .slice(
+                2,
+            ),
     ].join("-");
 }

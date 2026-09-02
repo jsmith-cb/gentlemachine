@@ -86,7 +86,6 @@ button {
 
 .planner-intro {
     display: flex;
-
     align-items: center;
     justify-content: space-between;
 
@@ -107,7 +106,6 @@ button {
 
 .month-navigation {
     display: flex;
-
     align-items: center;
 
     gap: 8px;
@@ -134,7 +132,6 @@ button {
 
 .planner-meta {
     display: flex;
-
     justify-content: space-between;
     align-items: flex-end;
 
@@ -145,7 +142,6 @@ button {
 
 .store-hours {
     display: flex;
-
     flex-direction: column;
 
     gap: 4px;
@@ -239,6 +235,8 @@ button {
     min-width: 0;
     min-height: 150px;
 
+    padding: 10px;
+
     background: #ffffff;
 }
 
@@ -246,11 +244,20 @@ button {
     background: #f7f7f5;
 }
 
-.calendar-day-button {
-    width: 100%;
-    min-height: 150px;
+.calendar-day--selected {
+    box-shadow:
+        inset 0 0 0 2px #1d1d1f;
+}
 
-    padding: 14px;
+.calendar-day-add {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+
+    width: 100%;
+    min-height: 34px;
+
+    padding: 2px 4px 8px;
 
     color: inherit;
     background: transparent;
@@ -260,24 +267,9 @@ button {
     text-align: left;
 }
 
-.calendar-day-button--selected {
-    box-shadow:
-        inset 0 0 0 2px #1d1d1f;
-}
-
-.calendar-day-header {
-    display: flex;
-
-    align-items: center;
-    justify-content: space-between;
-
-    gap: 8px;
-
-    margin-bottom: 16px;
-}
-
-.calendar-day-header strong {
+.calendar-day-number {
     font-size: 0.9rem;
+    font-weight: 700;
 }
 
 .add-shift-label {
@@ -289,13 +281,14 @@ button {
 
 .calendar-day-content {
     display: flex;
-
     flex-direction: column;
 
     gap: 6px;
 }
 
 .no-shifts {
+    padding: 4px;
+
     color: #a0a09a;
 
     font-size: 0.75rem;
@@ -303,18 +296,27 @@ button {
 
 .calendar-shift {
     display: flex;
-
     flex-direction: column;
+
+    width: 100%;
 
     gap: 2px;
 
     padding: 7px 8px;
 
+    color: #1d1d1f;
     background: #f0f0ed;
 
+    border: 1px solid transparent;
     border-radius: 7px;
 
     font-size: 0.75rem;
+
+    text-align: left;
+}
+
+.calendar-shift--selected {
+    border-color: #1d1d1f;
 }
 
 .calendar-shift strong {
@@ -359,7 +361,6 @@ button {
 
 .form-field {
     display: flex;
-
     flex-direction: column;
 
     gap: 7px;
@@ -388,6 +389,18 @@ button {
     font-size: 1rem;
 }
 
+.form-field select:focus,
+.form-field input:focus,
+.month-button:focus-visible,
+.calendar-day-add:focus-visible,
+.calendar-shift:focus-visible,
+.primary-button:focus-visible,
+.secondary-button:focus-visible,
+.danger-button:focus-visible {
+    outline: 2px solid #1d1d1f;
+    outline-offset: 2px;
+}
+
 .shift-form-actions {
     display: flex;
 
@@ -395,7 +408,8 @@ button {
 }
 
 .primary-button,
-.secondary-button {
+.secondary-button,
+.danger-button {
     min-height: 44px;
 
     padding: 0 16px;
@@ -412,11 +426,62 @@ button {
     border: 1px solid #1d1d1f;
 }
 
+.primary-button:disabled {
+    cursor: not-allowed;
+    opacity: 0.4;
+}
+
 .secondary-button {
     color: #1d1d1f;
     background: #ffffff;
 
     border: 1px solid #d7d7d2;
+}
+
+.danger-button {
+    color: #9c2f28;
+    background: #ffffff;
+
+    border: 1px solid #d7b7b4;
+}
+
+.shift-validation {
+    display: flex;
+    flex-direction: column;
+
+    gap: 8px;
+
+    margin-top: 18px;
+}
+
+.shift-validation:empty,
+.shift-validation[hidden] {
+    display: none;
+}
+
+.validation-message {
+    margin: 0;
+
+    padding: 10px 12px;
+
+    border-radius: 8px;
+
+    font-size: 0.8rem;
+    line-height: 1.4;
+}
+
+.validation-message--error {
+    color: #8a2722;
+    background: #f8e9e8;
+
+    border: 1px solid #edcfcc;
+}
+
+.validation-message--warning {
+    color: #72520b;
+    background: #faf3dc;
+
+    border: 1px solid #eadcae;
 }
 
 .employee-summary {
@@ -461,7 +526,6 @@ button {
 .employee-name,
 .summary-stat {
     display: flex;
-
     flex-direction: column;
 
     gap: 3px;
@@ -489,12 +553,20 @@ button {
         background: #f0f0ed;
     }
 
-    .calendar-day-button:hover {
+    .calendar-day-add:hover {
         background: #fafaf8;
     }
 
-    .primary-button:hover {
-        background: #353537;
+    .calendar-shift:hover {
+        background: #e7e7e3;
+    }
+
+	.primary-button:not(:disabled):hover {
+	    background: #353537;
+	}
+
+    .danger-button:hover {
+        background: #f8e9e8;
     }
 }
 
@@ -548,7 +620,6 @@ button {
 @media (max-width: 560px) {
     .planner-intro {
         align-items: flex-start;
-
         flex-direction: column;
 
         gap: 18px;
@@ -556,7 +627,6 @@ button {
 
     .planner-meta {
         align-items: flex-start;
-
         flex-direction: column;
 
         gap: 8px;
@@ -571,11 +641,12 @@ button {
     }
 
     .shift-form-actions {
-        justify-content: stretch;
+        flex-wrap: wrap;
     }
 
     .primary-button,
-    .secondary-button {
+    .secondary-button,
+    .danger-button {
         flex: 1;
     }
 
