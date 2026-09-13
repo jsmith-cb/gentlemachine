@@ -1,400 +1,1767 @@
+diff --git a/.review-package/README.md b/.review-package/README.md
+index 198692d..8f0afaf 100644
+--- a/.review-package/README.md
++++ b/.review-package/README.md
+@@ -1,9 +1,9 @@
+ # PricePocket Code Review Package
+ 
+-Generated: 2026-09-02 22:36:07 CEST
+-Repository: gentlemachine
+-Branch: main
+-Commit: 2bdbb8b8ca63d30006f10483bd741625aa18aed5
++Generated: 2026-09-13 11:08:30 CEST
++Repository: pp_crew
++Branch: 9b_initial_run
++Commit: 8d79ec22ed7ffebf99cac4acffdf93c3006916c3
+ 
+ ## Base Reference
+ 
+diff --git a/.review-package/changed-files.txt b/.review-package/changed-files.txt
+index 6d1b52a..b338205 100644
+--- a/.review-package/changed-files.txt
++++ b/.review-package/changed-files.txt
+@@ -1,4 +1,17 @@
++.review-package/README.md
++.review-package/branch-stat.txt
++.review-package/branch.diff
++.review-package/changed-files.txt
++.review-package/commits.txt
++.review-package/recent-history.txt
++.review-package/staged.diff
++.review-package/status.txt
++.review-package/untracked-files.txt
++.review-package/untracked/.review-package/README.md
++.review-package/untracked/.review-package/changed-files.txt
++.review-package/untracked/.review-package/status.txt
++.review-package/untracked/.review-package/untracked-files.txt
++.review-package/working-tree.diff
++pricepocket-review.zip
+ src/pages/PlannerPage.ts
+-src/services/validationService.ts
+-src/styles.css
+-src/types/planning.ts
++src/state/plannerState.ts
+diff --git a/.review-package/recent-history.txt b/.review-package/recent-history.txt
+index 1caa973..5e87fca 100644
+--- a/.review-package/recent-history.txt
++++ b/.review-package/recent-history.txt
+@@ -1,4 +1,7 @@
+-2bdbb8b (HEAD -> main, origin/main) Add employee availability rules
++8d79ec2 (HEAD -> 9b_initial_run, origin/main, main) Initial draft of AGENT instructions
++0bde916 Set up project for refinement
++279a0d6 Add validation filtering
++2bdbb8b Add employee availability rules
+ b0aa887 Add weekly hours and coverage validation
+ 65bc4e0 Add shift editing and validation
+ 07e095c Add shifts to monthly planner
+diff --git a/.review-package/staged.diff b/.review-package/staged.diff
+index f8fa88b..e69de29 100644
+--- a/.review-package/staged.diff
++++ b/.review-package/staged.diff
+@@ -1,400 +0,0 @@
+-diff --git a/src/pages/PlannerPage.ts b/src/pages/PlannerPage.ts
+-index 6c6d462..27b5a6f 100644
+---- a/src/pages/PlannerPage.ts
+-+++ b/src/pages/PlannerPage.ts
+-@@ -212,9 +212,10 @@ export function renderPlannerPage(
+-             </section>
+-         `;
+- 
+--        attachNavigationListeners();
+--        attachCalendarListeners();
+--        attachShiftEditorListeners();
+-+		attachNavigationListeners();
+-+		attachCalendarListeners();
+-+		attachShiftEditorListeners();
+-+		attachValidationFilterListeners();
+-     }
+- 
+-     function attachNavigationListeners(): void {
+-@@ -370,6 +371,87 @@ export function renderPlannerPage(
+-                 render();
+-             },
+-         );
+-+		
+-+		function attachValidationFilterListeners(): void {
+-+		    const filterButtons =
+-+		        container.querySelectorAll<HTMLButtonElement>(
+-+		            "[data-validation-filter]",
+-+		        );
+-+
+-+		    const issueElements =
+-+		        container.querySelectorAll<HTMLElement>(
+-+		            "[data-validation-issue]",
+-+		        );
+-+
+-+		    const resultCount =
+-+		        container.querySelector<HTMLElement>(
+-+		            "#validation-result-count",
+-+		        );
+-+
+-+		    for (
+-+		        const button
+-+		        of filterButtons
+-+		    ) {
+-+		        button.addEventListener(
+-+		            "click",
+-+		            () => {
+-+		                const filter =
+-+		                    button.dataset.validationFilter;
+-+
+-+		                if (!filter) {
+-+		                    return;
+-+		                }
+-+
+-+		                for (
+-+		                    const candidate
+-+		                    of filterButtons
+-+		                ) {
+-+		                    candidate.classList.toggle(
+-+		                        "validation-filter--active",
+-+		                        candidate === button,
+-+		                    );
+-+
+-+		                    candidate.setAttribute(
+-+		                        "aria-pressed",
+-+		                        candidate === button
+-+		                            ? "true"
+-+		                            : "false",
+-+		                    );
+-+		                }
+-+
+-+		                let visibleCount = 0;
+-+
+-+		                for (
+-+		                    const issueElement
+-+		                    of issueElements
+-+		                ) {
+-+		                    const severity =
+-+		                        issueElement.dataset.severity;
+-+
+-+		                    const category =
+-+		                        issueElement.dataset.category;
+-+
+-+		                    const visible =
+-+		                        filter === "all" ||
+-+		                        severity === filter ||
+-+		                        category === filter;
+-+
+-+		                    issueElement.hidden =
+-+		                        !visible;
+-+
+-+		                    if (visible) {
+-+		                        visibleCount += 1;
+-+		                    }
+-+		                }
+-+
+-+		                if (resultCount) {
+-+		                    resultCount.textContent =
+-+		                        `${visibleCount} issue${visibleCount === 1 ? "" : "s"}`;
+-+		                }
+-+		            },
+-+		        );
+-+		    }
+-+		}
+- 
+- 		deleteButton?.addEventListener(
+- 		    "click",
+-@@ -568,10 +650,22 @@ function renderScheduleStatus(
+-                 severity === "warning",
+-         );
+- 
+--    const visibleIssues =
+--        issues.slice(
+--            0,
+--            12,
+-+    const coverage =
+-+        issues.filter(
+-+            ({ category }) =>
+-+                category === "coverage",
+-+        );
+-+
+-+    const hours =
+-+        issues.filter(
+-+            ({ category }) =>
+-+                category === "hours",
+-+        );
+-+
+-+    const availability =
+-+        issues.filter(
+-+            ({ category }) =>
+-+                category === "availability",
+-         );
+- 
+-     return `
+-@@ -611,26 +705,80 @@ function renderScheduleStatus(
+-                                 Show validation details
+-                             </summary>
+- 
+-+                            <div class="validation-filter-bar">
+-+                                <button
+-+                                    class="validation-filter validation-filter--active"
+-+                                    data-validation-filter="all"
+-+                                    type="button"
+-+                                    aria-pressed="true"
+-+                                >
+-+                                    All
+-+                                    <span>${issues.length}</span>
+-+                                </button>
+-+
+-+                                <button
+-+                                    class="validation-filter"
+-+                                    data-validation-filter="error"
+-+                                    type="button"
+-+                                    aria-pressed="false"
+-+                                >
+-+                                    Errors
+-+                                    <span>${errors.length}</span>
+-+                                </button>
+-+
+-+                                <button
+-+                                    class="validation-filter"
+-+                                    data-validation-filter="warning"
+-+                                    type="button"
+-+                                    aria-pressed="false"
+-+                                >
+-+                                    Warnings
+-+                                    <span>${warnings.length}</span>
+-+                                </button>
+-+
+-+                                <button
+-+                                    class="validation-filter"
+-+                                    data-validation-filter="coverage"
+-+                                    type="button"
+-+                                    aria-pressed="false"
+-+                                >
+-+                                    Coverage
+-+                                    <span>${coverage.length}</span>
+-+                                </button>
+-+
+-+                                <button
+-+                                    class="validation-filter"
+-+                                    data-validation-filter="hours"
+-+                                    type="button"
+-+                                    aria-pressed="false"
+-+                                >
+-+                                    Hours
+-+                                    <span>${hours.length}</span>
+-+                                </button>
+-+
+-+                                <button
+-+                                    class="validation-filter"
+-+                                    data-validation-filter="availability"
+-+                                    type="button"
+-+                                    aria-pressed="false"
+-+                                >
+-+                                    Availability
+-+                                    <span>${availability.length}</span>
+-+                                </button>
+-+                            </div>
+-+
+-+                            <div class="validation-results-heading">
+-+                                <span id="validation-result-count">
+-+                                    ${issues.length} issues
+-+                                </span>
+-+                            </div>
+-+
+-                             <div class="status-issues">
+--                                ${visibleIssues
+-+                                ${issues
+-                                     .map(
+-                                         renderScheduleIssue,
+-                                     )
+-                                     .join("")}
+--
+--                                ${
+--                                    issues.length >
+--                                    visibleIssues.length
+--                                        ? `
+--                                            <p class="more-issues">
+--                                                +${
+--                                                    issues.length -
+--                                                    visibleIssues.length
+--                                                } more issues
+--                                            </p>
+--                                        `
+--                                        : ""
+--                                }
+-                             </div>
+- 
+-                             <p class="coverage-note">
+-@@ -648,7 +796,12 @@ function renderScheduleIssue(
+-     issue: ValidationIssue,
+- ): string {
+-     return `
+--        <div class="schedule-issue schedule-issue--${issue.severity}">
+-+        <div
+-+            class="schedule-issue schedule-issue--${issue.severity}"
+-+            data-validation-issue
+-+            data-severity="${issue.severity}"
+-+            data-category="${issue.category}"
+-+        >
+-             <strong>
+-                 ${
+-                     issue.severity ===
+-diff --git a/src/services/validationService.ts b/src/services/validationService.ts
+-index 5fb48df..da46b9e 100644
+---- a/src/services/validationService.ts
+-+++ b/src/services/validationService.ts
+-@@ -88,6 +88,7 @@ function validateShiftTime(
+-     ) {
+-         issues.push({
+-             severity: "error",
+-+            category: "shift",
+-             message:
+-                 "Shift end time must be after the start time.",
+-             employeeId:
+-@@ -113,6 +114,7 @@ function validateEmployeeAvailability(
+-     if (!employee) {
+-         issues.push({
+-             severity: "error",
+-+            category: "availability",
+-             message:
+-                 "Shift references an unknown employee.",
+-             employeeId:
+-@@ -136,6 +138,7 @@ function validateEmployeeAvailability(
+-     ) {
+-         issues.push({
+-             severity: "error",
+-+            category: "availability",
+-             message:
+-                 `${employee.name} is not available on this day.`,
+-             employeeId:
+-@@ -160,6 +163,7 @@ function validateEmployeeAvailability(
+-     ) {
+-         issues.push({
+-             severity: "error",
+-+            category: "availability",
+-             message:
+-                 `${employee.name} cannot start before ${earliestStart}.`,
+-             employeeId:
+-@@ -184,6 +188,7 @@ function validateEmployeeAvailability(
+-     ) {
+-         issues.push({
+-             severity: "error",
+-+            category: "availability",
+-             message:
+-                 `${employee.name} cannot work after ${latestEnd}.`,
+-             employeeId:
+-@@ -234,6 +239,7 @@ function validateMaximumDaysPerWeek(
+-             ) {
+-                 issues.push({
+-                     severity: "error",
+-+                    category: "hours",
+-                     message:
+-                         `${employee.name} works ${daysWorked} days ` +
+-                         `during the week starting ${weekStart}. ` +
+-@@ -312,6 +318,7 @@ function validateWeeklyTargets(
+- 
+-         issues.push({
+-             severity: "warning",
+-+            category: "hours",
+-             message:
+-                 `${employee.name} is ${formattedDifference} ${direction} ` +
+-                 `their weekly target for ${summary.weekStart}–${summary.weekEnd}.`,
+-@@ -336,6 +343,7 @@ function validateCoverage(
+-     ) {
+-         issues.push({
+-             severity: "error",
+-+            category: "coverage",
+-             message:
+-                 `No store coverage ${gap.start}–${gap.end}.`,
+-             date:
+-diff --git a/src/styles.css b/src/styles.css
+-index d168d7d..eb0c3bf 100644
+---- a/src/styles.css
+-+++ b/src/styles.css
+-@@ -882,4 +882,58 @@ button {
+- 
+- .status-details .status-issues {
+-     margin-top: 0;
+-+}
+-+
+-+.validation-filter-bar {
+-+    display: flex;
+-+    flex-wrap: wrap;
+-+    gap: 8px;
+-+    margin-bottom: 14px;
+-+}
+-+
+-+.validation-filter {
+-+    display: inline-flex;
+-+    align-items: center;
+-+    gap: 6px;
+-+    padding: 7px 10px;
+-+    color: #666662;
+-+    background: #f7f7f5;
+-+    border: 1px solid #dfdfdb;
+-+    border-radius: 999px;
+-+    font: inherit;
+-+    font-size: 0.75rem;
+-+    font-weight: 650;
+-+    cursor: pointer;
+-+}
+-+
+-+.validation-filter:hover {
+-+    color: #262624;
+-+    border-color: #bdbdb7;
+-+}
+-+
+-+.validation-filter--active {
+-+    color: #ffffff;
+-+    background: #2e2e2c;
+-+    border-color: #2e2e2c;
+-+}
+-+
+-+.validation-filter--active:hover {
+-+    color: #ffffff;
+-+    border-color: #2e2e2c;
+-+}
+-+
+-+.validation-filter span {
+-+    opacity: 0.7;
+-+    font-size: 0.68rem;
+-+}
+-+
+-+.validation-results-heading {
+-+    margin-bottom: 8px;
+-+    color: #858580;
+-+    font-size: 0.72rem;
+-+    font-weight: 650;
+-+}
+-+
+-+.schedule-issue[hidden] {
+-+    display: none;
+- }
+-\ No newline at end of file
+-diff --git a/src/types/planning.ts b/src/types/planning.ts
+-index a607f7b..5698857 100644
+---- a/src/types/planning.ts
+-+++ b/src/types/planning.ts
+-@@ -62,10 +62,19 @@ export interface CoverageGap {
+-     end: string;
+- }
+- 
+--export type ValidationSeverity = "error" | "warning";
+-+export type ValidationSeverity =
+-+    | "error"
+-+    | "warning";
+-+
+-+export type ValidationCategory =
+-+    | "shift"
+-+    | "availability"
+-+    | "coverage"
+-+    | "hours";
+- 
+- export interface ValidationIssue {
+-     severity: ValidationSeverity;
+-+    category: ValidationCategory;
+-     message: string;
+-     employeeId?: string;
+-     date?: string;
+diff --git a/.review-package/status.txt b/.review-package/status.txt
+index 6b68525..3e93f6e 100644
+--- a/.review-package/status.txt
++++ b/.review-package/status.txt
+@@ -1,6 +1,19 @@
+-## main...origin/main
+-M  src/pages/PlannerPage.ts
+-M  src/services/validationService.ts
+-M  src/styles.css
+-M  src/types/planning.ts
+-?? .review-package/
++## 9b_initial_run
++ M .review-package/README.md
++ D .review-package/branch-stat.txt
++ D .review-package/branch.diff
++ D .review-package/changed-files.txt
++ D .review-package/commits.txt
++ D .review-package/recent-history.txt
++ D .review-package/staged.diff
++ M .review-package/status.txt
++ D .review-package/untracked-files.txt
++ D .review-package/untracked/.review-package/README.md
++ D .review-package/untracked/.review-package/changed-files.txt
++ D .review-package/untracked/.review-package/status.txt
++ D .review-package/untracked/.review-package/untracked-files.txt
++ D .review-package/working-tree.diff
++ D pricepocket-review.zip
++ M src/pages/PlannerPage.ts
++ M src/state/plannerState.ts
++?? src/services/storageService.ts
+diff --git a/.review-package/untracked-files.txt b/.review-package/untracked-files.txt
+index ceef0fb..02545e0 100644
+--- a/.review-package/untracked-files.txt
++++ b/.review-package/untracked-files.txt
+@@ -1,4 +1 @@
+-.review-package/README.md
+-.review-package/changed-files.txt
+-.review-package/status.txt
+-.review-package/untracked-files.txt
++src/services/storageService.ts
+diff --git a/.review-package/untracked/.review-package/README.md b/.review-package/untracked/.review-package/README.md
+deleted file mode 100644
+index 198692d..0000000
+--- a/.review-package/untracked/.review-package/README.md
++++ /dev/null
+@@ -1,22 +0,0 @@
+-# PricePocket Code Review Package
+-
+-Generated: 2026-09-02 22:36:07 CEST
+-Repository: gentlemachine
+-Branch: main
+-Commit: 2bdbb8b8ca63d30006f10483bd741625aa18aed5
+-
+-## Base Reference
+-
+-origin/main
+-
+-## Contents
+-
+-- status.txt — current Git status
+-- changed-files.txt — all staged and unstaged changed file names
+-- untracked-files.txt — untracked file names
+-- working-tree.diff — unstaged changes
+-- staged.diff — staged changes
+-- branch.diff — committed branch changes compared with the base branch
+-- branch-stat.txt — branch diff summary
+-- commits.txt — commits ahead of the base branch
+-- recent-history.txt — recent repository history
+diff --git a/.review-package/untracked/.review-package/changed-files.txt b/.review-package/untracked/.review-package/changed-files.txt
+deleted file mode 100644
+index 6d1b52a..0000000
+--- a/.review-package/untracked/.review-package/changed-files.txt
++++ /dev/null
+@@ -1,4 +0,0 @@
+-src/pages/PlannerPage.ts
+-src/services/validationService.ts
+-src/styles.css
+-src/types/planning.ts
+diff --git a/.review-package/untracked/.review-package/status.txt b/.review-package/untracked/.review-package/status.txt
+deleted file mode 100644
+index 6b68525..0000000
+--- a/.review-package/untracked/.review-package/status.txt
++++ /dev/null
+@@ -1,6 +0,0 @@
+-## main...origin/main
+-M  src/pages/PlannerPage.ts
+-M  src/services/validationService.ts
+-M  src/styles.css
+-M  src/types/planning.ts
+-?? .review-package/
+diff --git a/.review-package/untracked/.review-package/untracked-files.txt b/.review-package/untracked/.review-package/untracked-files.txt
+deleted file mode 100644
+index ceef0fb..0000000
+--- a/.review-package/untracked/.review-package/untracked-files.txt
++++ /dev/null
+@@ -1,4 +0,0 @@
+-.review-package/README.md
+-.review-package/changed-files.txt
+-.review-package/status.txt
+-.review-package/untracked-files.txt
+diff --git a/.review-package/untracked/src/services/storageService.ts b/.review-package/untracked/src/services/storageService.ts
+new file mode 100644
+index 0000000..f24eec4
+--- /dev/null
++++ b/.review-package/untracked/src/services/storageService.ts
+@@ -0,0 +1,48 @@
++import type { Shift } from "../types/planning";
++
++export type StorageKey = "shifts";
++
++const STORAGE_KEYS: Record<StorageKey, string> = {
++    shifts: "@pp_crew_shifts",
++};
++
++export function getStoredShifts(): Shift[] {
++    try {
++        const raw = localStorage.getItem(STORAGE_KEYS.shifts);
++
++        if (!raw) {
++            return [];
++        }
++
++        const parsed = JSON.parse(raw);
++
++        if (!Array.isArray(parsed)) {
++            return [];
++        }
++
++        // Filter to only include shifts with valid structure
++        // (defensive: treat localStorage as untrusted)
++        return parsed.filter(
++            (item): item is Shift =>
++                typeof item === "object" &&
++                typeof item.id === "string" &&
++                typeof item.employeeId === "string" &&
++                typeof item.date === "string",
++        );
++    } catch {
++        // Malformed JSON or any other error — fallback to empty list
++        return [];
++    }
++}
++
++export function setStoredShifts(shifts: Shift[]): void {
++    try {
++        localStorage.setItem(
++            STORAGE_KEYS.shifts,
++            JSON.stringify(shifts),
++        );
++    } catch {
++        // Storage quota exceeded or write error — silently ignore
++        // Do not prevent the application from working
++    }
++}
+diff --git a/.review-package/working-tree.diff b/.review-package/working-tree.diff
+index e69de29..cb64249 100644
+--- a/.review-package/working-tree.diff
++++ b/.review-package/working-tree.diff
+@@ -0,0 +1,723 @@
++diff --git a/.review-package/README.md b/.review-package/README.md
++index 198692d..8f0afaf 100644
++--- a/.review-package/README.md
+++++ b/.review-package/README.md
++@@ -1,9 +1,9 @@
++ # PricePocket Code Review Package
++ 
++-Generated: 2026-09-02 22:36:07 CEST
++-Repository: gentlemachine
++-Branch: main
++-Commit: 2bdbb8b8ca63d30006f10483bd741625aa18aed5
+++Generated: 2026-09-13 11:08:30 CEST
+++Repository: pp_crew
+++Branch: 9b_initial_run
+++Commit: 8d79ec22ed7ffebf99cac4acffdf93c3006916c3
++ 
++ ## Base Reference
++ 
++diff --git a/.review-package/branch-stat.txt b/.review-package/branch-stat.txt
++deleted file mode 100644
++index e69de29..0000000
++diff --git a/.review-package/branch.diff b/.review-package/branch.diff
++deleted file mode 100644
++index e69de29..0000000
++diff --git a/.review-package/changed-files.txt b/.review-package/changed-files.txt
++index 6d1b52a..b338205 100644
++--- a/.review-package/changed-files.txt
+++++ b/.review-package/changed-files.txt
++@@ -1,4 +1,17 @@
+++.review-package/README.md
+++.review-package/branch-stat.txt
+++.review-package/branch.diff
+++.review-package/changed-files.txt
+++.review-package/commits.txt
+++.review-package/recent-history.txt
+++.review-package/staged.diff
+++.review-package/status.txt
+++.review-package/untracked-files.txt
+++.review-package/untracked/.review-package/README.md
+++.review-package/untracked/.review-package/changed-files.txt
+++.review-package/untracked/.review-package/status.txt
+++.review-package/untracked/.review-package/untracked-files.txt
+++.review-package/working-tree.diff
+++pricepocket-review.zip
++ src/pages/PlannerPage.ts
++-src/services/validationService.ts
++-src/styles.css
++-src/types/planning.ts
+++src/state/plannerState.ts
++diff --git a/.review-package/commits.txt b/.review-package/commits.txt
++deleted file mode 100644
++index e69de29..0000000
++diff --git a/.review-package/recent-history.txt b/.review-package/recent-history.txt
++deleted file mode 100644
++index 1caa973..0000000
++--- a/.review-package/recent-history.txt
+++++ /dev/null
++@@ -1,10 +0,0 @@
++-2bdbb8b (HEAD -> main, origin/main) Add employee availability rules
++-b0aa887 Add weekly hours and coverage validation
++-65bc4e0 Add shift editing and validation
++-07e095c Add shifts to monthly planner
++-d13fde5 Convert planner to monthly schedule
++-48469ba Add weekly planner shell
++-624fe12 Add weekly planner shell
++-b4db58b Add initial planning app structure
++-d084768 Add initial planning app structure
++-4c18d54 Add README.md
++diff --git a/.review-package/staged.diff b/.review-package/staged.diff
++deleted file mode 100644
++index f8fa88b..0000000
++--- a/.review-package/staged.diff
+++++ /dev/null
++@@ -1,400 +0,0 @@
++-diff --git a/src/pages/PlannerPage.ts b/src/pages/PlannerPage.ts
++-index 6c6d462..27b5a6f 100644
++---- a/src/pages/PlannerPage.ts
++-+++ b/src/pages/PlannerPage.ts
++-@@ -212,9 +212,10 @@ export function renderPlannerPage(
++-             </section>
++-         `;
++- 
++--        attachNavigationListeners();
++--        attachCalendarListeners();
++--        attachShiftEditorListeners();
++-+		attachNavigationListeners();
++-+		attachCalendarListeners();
++-+		attachShiftEditorListeners();
++-+		attachValidationFilterListeners();
++-     }
++- 
++-     function attachNavigationListeners(): void {
++-@@ -370,6 +371,87 @@ export function renderPlannerPage(
++-                 render();
++-             },
++-         );
++-+		
++-+		function attachValidationFilterListeners(): void {
++-+		    const filterButtons =
++-+		        container.querySelectorAll<HTMLButtonElement>(
++-+		            "[data-validation-filter]",
++-+		        );
++-+
++-+		    const issueElements =
++-+		        container.querySelectorAll<HTMLElement>(
++-+		            "[data-validation-issue]",
++-+		        );
++-+
++-+		    const resultCount =
++-+		        container.querySelector<HTMLElement>(
++-+		            "#validation-result-count",
++-+		        );
++-+
++-+		    for (
++-+		        const button
++-+		        of filterButtons
++-+		    ) {
++-+		        button.addEventListener(
++-+		            "click",
++-+		            () => {
++-+		                const filter =
++-+		                    button.dataset.validationFilter;
++-+
++-+		                if (!filter) {
++-+		                    return;
++-+		                }
++-+
++-+		                for (
++-+		                    const candidate
++-+		                    of filterButtons
++-+		                ) {
++-+		                    candidate.classList.toggle(
++-+		                        "validation-filter--active",
++-+		                        candidate === button,
++-+		                    );
++-+
++-+		                    candidate.setAttribute(
++-+		                        "aria-pressed",
++-+		                        candidate === button
++-+		                            ? "true"
++-+		                            : "false",
++-+		                    );
++-+		                }
++-+
++-+		                let visibleCount = 0;
++-+
++-+		                for (
++-+		                    const issueElement
++-+		                    of issueElements
++-+		                ) {
++-+		                    const severity =
++-+		                        issueElement.dataset.severity;
++-+
++-+		                    const category =
++-+		                        issueElement.dataset.category;
++-+
++-+		                    const visible =
++-+		                        filter === "all" ||
++-+		                        severity === filter ||
++-+		                        category === filter;
++-+
++-+		                    issueElement.hidden =
++-+		                        !visible;
++-+
++-+		                    if (visible) {
++-+		                        visibleCount += 1;
++-+		                    }
++-+		                }
++-+
++-+		                if (resultCount) {
++-+		                    resultCount.textContent =
++-+		                        `${visibleCount} issue${visibleCount === 1 ? "" : "s"}`;
++-+		                }
++-+		            },
++-+		        );
++-+		    }
++-+		}
++- 
++- 		deleteButton?.addEventListener(
++- 		    "click",
++-@@ -568,10 +650,22 @@ function renderScheduleStatus(
++-                 severity === "warning",
++-         );
++- 
++--    const visibleIssues =
++--        issues.slice(
++--            0,
++--            12,
++-+    const coverage =
++-+        issues.filter(
++-+            ({ category }) =>
++-+                category === "coverage",
++-+        );
++-+
++-+    const hours =
++-+        issues.filter(
++-+            ({ category }) =>
++-+                category === "hours",
++-+        );
++-+
++-+    const availability =
++-+        issues.filter(
++-+            ({ category }) =>
++-+                category === "availability",
++-         );
++- 
++-     return `
++-@@ -611,26 +705,80 @@ function renderScheduleStatus(
++-                                 Show validation details
++-                             </summary>
++- 
++-+                            <div class="validation-filter-bar">
++-+                                <button
++-+                                    class="validation-filter validation-filter--active"
++-+                                    data-validation-filter="all"
++-+                                    type="button"
++-+                                    aria-pressed="true"
++-+                                >
++-+                                    All
++-+                                    <span>${issues.length}</span>
++-+                                </button>
++-+
++-+                                <button
++-+                                    class="validation-filter"
++-+                                    data-validation-filter="error"
++-+                                    type="button"
++-+                                    aria-pressed="false"
++-+                                >
++-+                                    Errors
++-+                                    <span>${errors.length}</span>
++-+                                </button>
++-+
++-+                                <button
++-+                                    class="validation-filter"
++-+                                    data-validation-filter="warning"
++-+                                    type="button"
++-+                                    aria-pressed="false"
++-+                                >
++-+                                    Warnings
++-+                                    <span>${warnings.length}</span>
++-+                                </button>
++-+
++-+                                <button
++-+                                    class="validation-filter"
++-+                                    data-validation-filter="coverage"
++-+                                    type="button"
++-+                                    aria-pressed="false"
++-+                                >
++-+                                    Coverage
++-+                                    <span>${coverage.length}</span>
++-+                                </button>
++-+
++-+                                <button
++-+                                    class="validation-filter"
++-+                                    data-validation-filter="hours"
++-+                                    type="button"
++-+                                    aria-pressed="false"
++-+                                >
++-+                                    Hours
++-+                                    <span>${hours.length}</span>
++-+                                </button>
++-+
++-+                                <button
++-+                                    class="validation-filter"
++-+                                    data-validation-filter="availability"
++-+                                    type="button"
++-+                                    aria-pressed="false"
++-+                                >
++-+                                    Availability
++-+                                    <span>${availability.length}</span>
++-+                                </button>
++-+                            </div>
++-+
++-+                            <div class="validation-results-heading">
++-+                                <span id="validation-result-count">
++-+                                    ${issues.length} issues
++-+                                </span>
++-+                            </div>
++-+
++-                             <div class="status-issues">
++--                                ${visibleIssues
++-+                                ${issues
++-                                     .map(
++-                                         renderScheduleIssue,
++-                                     )
++-                                     .join("")}
++--
++--                                ${
++--                                    issues.length >
++--                                    visibleIssues.length
++--                                        ? `
++--                                            <p class="more-issues">
++--                                                +${
++--                                                    issues.length -
++--                                                    visibleIssues.length
++--                                                } more issues
++--                                            </p>
++--                                        `
++--                                        : ""
++--                                }
++-                             </div>
++- 
++-                             <p class="coverage-note">
++-@@ -648,7 +796,12 @@ function renderScheduleIssue(
++-     issue: ValidationIssue,
++- ): string {
++-     return `
++--        <div class="schedule-issue schedule-issue--${issue.severity}">
++-+        <div
++-+            class="schedule-issue schedule-issue--${issue.severity}"
++-+            data-validation-issue
++-+            data-severity="${issue.severity}"
++-+            data-category="${issue.category}"
++-+        >
++-             <strong>
++-                 ${
++-                     issue.severity ===
++-diff --git a/src/services/validationService.ts b/src/services/validationService.ts
++-index 5fb48df..da46b9e 100644
++---- a/src/services/validationService.ts
++-+++ b/src/services/validationService.ts
++-@@ -88,6 +88,7 @@ function validateShiftTime(
++-     ) {
++-         issues.push({
++-             severity: "error",
++-+            category: "shift",
++-             message:
++-                 "Shift end time must be after the start time.",
++-             employeeId:
++-@@ -113,6 +114,7 @@ function validateEmployeeAvailability(
++-     if (!employee) {
++-         issues.push({
++-             severity: "error",
++-+            category: "availability",
++-             message:
++-                 "Shift references an unknown employee.",
++-             employeeId:
++-@@ -136,6 +138,7 @@ function validateEmployeeAvailability(
++-     ) {
++-         issues.push({
++-             severity: "error",
++-+            category: "availability",
++-             message:
++-                 `${employee.name} is not available on this day.`,
++-             employeeId:
++-@@ -160,6 +163,7 @@ function validateEmployeeAvailability(
++-     ) {
++-         issues.push({
++-             severity: "error",
++-+            category: "availability",
++-             message:
++-                 `${employee.name} cannot start before ${earliestStart}.`,
++-             employeeId:
++-@@ -184,6 +188,7 @@ function validateEmployeeAvailability(
++-     ) {
++-         issues.push({
++-             severity: "error",
++-+            category: "availability",
++-             message:
++-                 `${employee.name} cannot work after ${latestEnd}.`,
++-             employeeId:
++-@@ -234,6 +239,7 @@ function validateMaximumDaysPerWeek(
++-             ) {
++-                 issues.push({
++-                     severity: "error",
++-+                    category: "hours",
++-                     message:
++-                         `${employee.name} works ${daysWorked} days ` +
++-                         `during the week starting ${weekStart}. ` +
++-@@ -312,6 +318,7 @@ function validateWeeklyTargets(
++- 
++-         issues.push({
++-             severity: "warning",
++-+            category: "hours",
++-             message:
++-                 `${employee.name} is ${formattedDifference} ${direction} ` +
++-                 `their weekly target for ${summary.weekStart}–${summary.weekEnd}.`,
++-@@ -336,6 +343,7 @@ function validateCoverage(
++-     ) {
++-         issues.push({
++-             severity: "error",
++-+            category: "coverage",
++-             message:
++-                 `No store coverage ${gap.start}–${gap.end}.`,
++-             date:
++-diff --git a/src/styles.css b/src/styles.css
++-index d168d7d..eb0c3bf 100644
++---- a/src/styles.css
++-+++ b/src/styles.css
++-@@ -882,4 +882,58 @@ button {
++- 
++- .status-details .status-issues {
++-     margin-top: 0;
++-+}
++-+
++-+.validation-filter-bar {
++-+    display: flex;
++-+    flex-wrap: wrap;
++-+    gap: 8px;
++-+    margin-bottom: 14px;
++-+}
++-+
++-+.validation-filter {
++-+    display: inline-flex;
++-+    align-items: center;
++-+    gap: 6px;
++-+    padding: 7px 10px;
++-+    color: #666662;
++-+    background: #f7f7f5;
++-+    border: 1px solid #dfdfdb;
++-+    border-radius: 999px;
++-+    font: inherit;
++-+    font-size: 0.75rem;
++-+    font-weight: 650;
++-+    cursor: pointer;
++-+}
++-+
++-+.validation-filter:hover {
++-+    color: #262624;
++-+    border-color: #bdbdb7;
++-+}
++-+
++-+.validation-filter--active {
++-+    color: #ffffff;
++-+    background: #2e2e2c;
++-+    border-color: #2e2e2c;
++-+}
++-+
++-+.validation-filter--active:hover {
++-+    color: #ffffff;
++-+    border-color: #2e2e2c;
++-+}
++-+
++-+.validation-filter span {
++-+    opacity: 0.7;
++-+    font-size: 0.68rem;
++-+}
++-+
++-+.validation-results-heading {
++-+    margin-bottom: 8px;
++-+    color: #858580;
++-+    font-size: 0.72rem;
++-+    font-weight: 650;
++-+}
++-+
++-+.schedule-issue[hidden] {
++-+    display: none;
++- }
++-\ No newline at end of file
++-diff --git a/src/types/planning.ts b/src/types/planning.ts
++-index a607f7b..5698857 100644
++---- a/src/types/planning.ts
++-+++ b/src/types/planning.ts
++-@@ -62,10 +62,19 @@ export interface CoverageGap {
++-     end: string;
++- }
++- 
++--export type ValidationSeverity = "error" | "warning";
++-+export type ValidationSeverity =
++-+    | "error"
++-+    | "warning";
++-+
++-+export type ValidationCategory =
++-+    | "shift"
++-+    | "availability"
++-+    | "coverage"
++-+    | "hours";
++- 
++- export interface ValidationIssue {
++-     severity: ValidationSeverity;
++-+    category: ValidationCategory;
++-     message: string;
++-     employeeId?: string;
++-     date?: string;
++diff --git a/.review-package/status.txt b/.review-package/status.txt
++index 6b68525..3e93f6e 100644
++--- a/.review-package/status.txt
+++++ b/.review-package/status.txt
++@@ -1,6 +1,19 @@
++-## main...origin/main
++-M  src/pages/PlannerPage.ts
++-M  src/services/validationService.ts
++-M  src/styles.css
++-M  src/types/planning.ts
++-?? .review-package/
+++## 9b_initial_run
+++ M .review-package/README.md
+++ D .review-package/branch-stat.txt
+++ D .review-package/branch.diff
+++ D .review-package/changed-files.txt
+++ D .review-package/commits.txt
+++ D .review-package/recent-history.txt
+++ D .review-package/staged.diff
+++ M .review-package/status.txt
+++ D .review-package/untracked-files.txt
+++ D .review-package/untracked/.review-package/README.md
+++ D .review-package/untracked/.review-package/changed-files.txt
+++ D .review-package/untracked/.review-package/status.txt
+++ D .review-package/untracked/.review-package/untracked-files.txt
+++ D .review-package/working-tree.diff
+++ D pricepocket-review.zip
+++ M src/pages/PlannerPage.ts
+++ M src/state/plannerState.ts
+++?? src/services/storageService.ts
++diff --git a/.review-package/untracked-files.txt b/.review-package/untracked-files.txt
++index ceef0fb..02545e0 100644
++--- a/.review-package/untracked-files.txt
+++++ b/.review-package/untracked-files.txt
++@@ -1,4 +1 @@
++-.review-package/README.md
++-.review-package/changed-files.txt
++-.review-package/status.txt
++-.review-package/untracked-files.txt
+++src/services/storageService.ts
++diff --git a/.review-package/untracked/.review-package/README.md b/.review-package/untracked/.review-package/README.md
++deleted file mode 100644
++index 198692d..0000000
++--- a/.review-package/untracked/.review-package/README.md
+++++ /dev/null
++@@ -1,22 +0,0 @@
++-# PricePocket Code Review Package
++-
++-Generated: 2026-09-02 22:36:07 CEST
++-Repository: gentlemachine
++-Branch: main
++-Commit: 2bdbb8b8ca63d30006f10483bd741625aa18aed5
++-
++-## Base Reference
++-
++-origin/main
++-
++-## Contents
++-
++-- status.txt — current Git status
++-- changed-files.txt — all staged and unstaged changed file names
++-- untracked-files.txt — untracked file names
++-- working-tree.diff — unstaged changes
++-- staged.diff — staged changes
++-- branch.diff — committed branch changes compared with the base branch
++-- branch-stat.txt — branch diff summary
++-- commits.txt — commits ahead of the base branch
++-- recent-history.txt — recent repository history
++diff --git a/.review-package/untracked/.review-package/changed-files.txt b/.review-package/untracked/.review-package/changed-files.txt
++deleted file mode 100644
++index 6d1b52a..0000000
++--- a/.review-package/untracked/.review-package/changed-files.txt
+++++ /dev/null
++@@ -1,4 +0,0 @@
++-src/pages/PlannerPage.ts
++-src/services/validationService.ts
++-src/styles.css
++-src/types/planning.ts
++diff --git a/.review-package/untracked/.review-package/status.txt b/.review-package/untracked/.review-package/status.txt
++deleted file mode 100644
++index 6b68525..0000000
++--- a/.review-package/untracked/.review-package/status.txt
+++++ /dev/null
++@@ -1,6 +0,0 @@
++-## main...origin/main
++-M  src/pages/PlannerPage.ts
++-M  src/services/validationService.ts
++-M  src/styles.css
++-M  src/types/planning.ts
++-?? .review-package/
++diff --git a/.review-package/untracked/.review-package/untracked-files.txt b/.review-package/untracked/.review-package/untracked-files.txt
++deleted file mode 100644
++index ceef0fb..0000000
++--- a/.review-package/untracked/.review-package/untracked-files.txt
+++++ /dev/null
++@@ -1,4 +0,0 @@
++-.review-package/README.md
++-.review-package/changed-files.txt
++-.review-package/status.txt
++-.review-package/untracked-files.txt
++diff --git a/pricepocket-review.zip b/pricepocket-review.zip
++deleted file mode 100644
++index 138e2b82c04ea837c1fac16628d60902a37485ac..0000000000000000000000000000000000000000
++GIT binary patch
++literal 0
++HcmV?d00001
++
++literal 7417
++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
++
++diff --git a/src/pages/PlannerPage.ts b/src/pages/PlannerPage.ts
++index 22a5ce3..1defced 100644
++--- a/src/pages/PlannerPage.ts
+++++ b/src/pages/PlannerPage.ts
++@@ -10,6 +10,8 @@ import {
++     validateShift,
++ } from "../services/validationService";
++ 
+++import { getStoredShifts, setStoredShifts } from "../services/storageService";
+++
++ import {
++     createInitialPlannerState,
++ } from "../state/plannerState";
++@@ -60,8 +62,12 @@ type EditorMode =
++ export function renderPlannerPage(
++     container: HTMLElement,
++ ): void {
+++    const storedShifts = getStoredShifts();
+++
++     let state =
++-        createInitialPlannerState();
+++        createInitialPlannerState(storedShifts);
+++
+++    setStoredShifts(state.shifts);
++ 
++     let editorMode:
++         | EditorMode
++diff --git a/src/state/plannerState.ts b/src/state/plannerState.ts
++index 3b17e7d..76ad55b 100644
++--- a/src/state/plannerState.ts
+++++ b/src/state/plannerState.ts
++@@ -2,6 +2,7 @@ import type {
++     BreakRule,
++     Employee,
++     PlannerState,
+++    Shift,
++     StoreHours,
++ } from "../types/planning";
++ 
++@@ -96,7 +97,9 @@ export const EMPLOYEES: Employee[] = [
++     },
++ ];
++ 
++-export function createInitialPlannerState(): PlannerState {
+++export function createInitialPlannerState(
+++    providedShifts?: Shift[],
+++): PlannerState {
++     const now = new Date();
++ 
++     return {
++@@ -104,6 +107,6 @@ export function createInitialPlannerState(): PlannerState {
++         selectedMonth: now.getMonth() + 1,
++         storeHours: STORE_HOURS,
++         employees: EMPLOYEES,
++-        shifts: [],
+++        shifts: providedShifts ?? [],
++     };
++ }
++\ No newline at end of file
+diff --git a/pricepocket-review.zip b/pricepocket-review.zip
+index 138e2b82c04ea837c1fac16628d60902a37485ac..86d2e289490a2cd099b183504a933fe7df38997e 100644
+GIT binary patch
+literal 13663
+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
+
+literal 7417
+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
+
 diff --git a/src/pages/PlannerPage.ts b/src/pages/PlannerPage.ts
-index 6c6d462..27b5a6f 100644
+index 22a5ce3..1defced 100644
 --- a/src/pages/PlannerPage.ts
 +++ b/src/pages/PlannerPage.ts
-@@ -212,9 +212,10 @@ export function renderPlannerPage(
-             </section>
-         `;
+@@ -10,6 +10,8 @@ import {
+     validateShift,
+ } from "../services/validationService";
  
--        attachNavigationListeners();
--        attachCalendarListeners();
--        attachShiftEditorListeners();
-+		attachNavigationListeners();
-+		attachCalendarListeners();
-+		attachShiftEditorListeners();
-+		attachValidationFilterListeners();
-     }
++import { getStoredShifts, setStoredShifts } from "../services/storageService";
++
+ import {
+     createInitialPlannerState,
+ } from "../state/plannerState";
+@@ -60,8 +62,12 @@ type EditorMode =
+ export function renderPlannerPage(
+     container: HTMLElement,
+ ): void {
++    const storedShifts = getStoredShifts();
++
+     let state =
+-        createInitialPlannerState();
++        createInitialPlannerState(storedShifts);
++
++    setStoredShifts(state.shifts);
  
-     function attachNavigationListeners(): void {
-@@ -370,6 +371,87 @@ export function renderPlannerPage(
-                 render();
-             },
-         );
-+		
-+		function attachValidationFilterListeners(): void {
-+		    const filterButtons =
-+		        container.querySelectorAll<HTMLButtonElement>(
-+		            "[data-validation-filter]",
-+		        );
+     let editorMode:
+         | EditorMode
+diff --git a/src/services/storageService.ts b/src/services/storageService.ts
+new file mode 100644
+index 0000000..f24eec4
+--- /dev/null
++++ b/src/services/storageService.ts
+@@ -0,0 +1,48 @@
++import type { Shift } from "../types/planning";
 +
-+		    const issueElements =
-+		        container.querySelectorAll<HTMLElement>(
-+		            "[data-validation-issue]",
-+		        );
++export type StorageKey = "shifts";
 +
-+		    const resultCount =
-+		        container.querySelector<HTMLElement>(
-+		            "#validation-result-count",
-+		        );
++const STORAGE_KEYS: Record<StorageKey, string> = {
++    shifts: "@pp_crew_shifts",
++};
 +
-+		    for (
-+		        const button
-+		        of filterButtons
-+		    ) {
-+		        button.addEventListener(
-+		            "click",
-+		            () => {
-+		                const filter =
-+		                    button.dataset.validationFilter;
++export function getStoredShifts(): Shift[] {
++    try {
++        const raw = localStorage.getItem(STORAGE_KEYS.shifts);
 +
-+		                if (!filter) {
-+		                    return;
-+		                }
++        if (!raw) {
++            return [];
++        }
 +
-+		                for (
-+		                    const candidate
-+		                    of filterButtons
-+		                ) {
-+		                    candidate.classList.toggle(
-+		                        "validation-filter--active",
-+		                        candidate === button,
-+		                    );
++        const parsed = JSON.parse(raw);
 +
-+		                    candidate.setAttribute(
-+		                        "aria-pressed",
-+		                        candidate === button
-+		                            ? "true"
-+		                            : "false",
-+		                    );
-+		                }
++        if (!Array.isArray(parsed)) {
++            return [];
++        }
 +
-+		                let visibleCount = 0;
-+
-+		                for (
-+		                    const issueElement
-+		                    of issueElements
-+		                ) {
-+		                    const severity =
-+		                        issueElement.dataset.severity;
-+
-+		                    const category =
-+		                        issueElement.dataset.category;
-+
-+		                    const visible =
-+		                        filter === "all" ||
-+		                        severity === filter ||
-+		                        category === filter;
-+
-+		                    issueElement.hidden =
-+		                        !visible;
-+
-+		                    if (visible) {
-+		                        visibleCount += 1;
-+		                    }
-+		                }
-+
-+		                if (resultCount) {
-+		                    resultCount.textContent =
-+		                        `${visibleCount} issue${visibleCount === 1 ? "" : "s"}`;
-+		                }
-+		            },
-+		        );
-+		    }
-+		}
- 
- 		deleteButton?.addEventListener(
- 		    "click",
-@@ -568,10 +650,22 @@ function renderScheduleStatus(
-                 severity === "warning",
-         );
- 
--    const visibleIssues =
--        issues.slice(
--            0,
--            12,
-+    const coverage =
-+        issues.filter(
-+            ({ category }) =>
-+                category === "coverage",
++        // Filter to only include shifts with valid structure
++        // (defensive: treat localStorage as untrusted)
++        return parsed.filter(
++            (item): item is Shift =>
++                typeof item === "object" &&
++                typeof item.id === "string" &&
++                typeof item.employeeId === "string" &&
++                typeof item.date === "string",
 +        );
++    } catch {
++        // Malformed JSON or any other error — fallback to empty list
++        return [];
++    }
++}
 +
-+    const hours =
-+        issues.filter(
-+            ({ category }) =>
-+                category === "hours",
++export function setStoredShifts(shifts: Shift[]): void {
++    try {
++        localStorage.setItem(
++            STORAGE_KEYS.shifts,
++            JSON.stringify(shifts),
 +        );
-+
-+    const availability =
-+        issues.filter(
-+            ({ category }) =>
-+                category === "availability",
-         );
++    } catch {
++        // Storage quota exceeded or write error — silently ignore
++        // Do not prevent the application from working
++    }
++}
+diff --git a/src/state/plannerState.ts b/src/state/plannerState.ts
+index 3b17e7d..76ad55b 100644
+--- a/src/state/plannerState.ts
++++ b/src/state/plannerState.ts
+@@ -2,6 +2,7 @@ import type {
+     BreakRule,
+     Employee,
+     PlannerState,
++    Shift,
+     StoreHours,
+ } from "../types/planning";
  
-     return `
-@@ -611,26 +705,80 @@ function renderScheduleStatus(
-                                 Show validation details
-                             </summary>
+@@ -96,7 +97,9 @@ export const EMPLOYEES: Employee[] = [
+     },
+ ];
  
-+                            <div class="validation-filter-bar">
-+                                <button
-+                                    class="validation-filter validation-filter--active"
-+                                    data-validation-filter="all"
-+                                    type="button"
-+                                    aria-pressed="true"
-+                                >
-+                                    All
-+                                    <span>${issues.length}</span>
-+                                </button>
-+
-+                                <button
-+                                    class="validation-filter"
-+                                    data-validation-filter="error"
-+                                    type="button"
-+                                    aria-pressed="false"
-+                                >
-+                                    Errors
-+                                    <span>${errors.length}</span>
-+                                </button>
-+
-+                                <button
-+                                    class="validation-filter"
-+                                    data-validation-filter="warning"
-+                                    type="button"
-+                                    aria-pressed="false"
-+                                >
-+                                    Warnings
-+                                    <span>${warnings.length}</span>
-+                                </button>
-+
-+                                <button
-+                                    class="validation-filter"
-+                                    data-validation-filter="coverage"
-+                                    type="button"
-+                                    aria-pressed="false"
-+                                >
-+                                    Coverage
-+                                    <span>${coverage.length}</span>
-+                                </button>
-+
-+                                <button
-+                                    class="validation-filter"
-+                                    data-validation-filter="hours"
-+                                    type="button"
-+                                    aria-pressed="false"
-+                                >
-+                                    Hours
-+                                    <span>${hours.length}</span>
-+                                </button>
-+
-+                                <button
-+                                    class="validation-filter"
-+                                    data-validation-filter="availability"
-+                                    type="button"
-+                                    aria-pressed="false"
-+                                >
-+                                    Availability
-+                                    <span>${availability.length}</span>
-+                                </button>
-+                            </div>
-+
-+                            <div class="validation-results-heading">
-+                                <span id="validation-result-count">
-+                                    ${issues.length} issues
-+                                </span>
-+                            </div>
-+
-                             <div class="status-issues">
--                                ${visibleIssues
-+                                ${issues
-                                     .map(
-                                         renderScheduleIssue,
-                                     )
-                                     .join("")}
--
--                                ${
--                                    issues.length >
--                                    visibleIssues.length
--                                        ? `
--                                            <p class="more-issues">
--                                                +${
--                                                    issues.length -
--                                                    visibleIssues.length
--                                                } more issues
--                                            </p>
--                                        `
--                                        : ""
--                                }
-                             </div>
+-export function createInitialPlannerState(): PlannerState {
++export function createInitialPlannerState(
++    providedShifts?: Shift[],
++): PlannerState {
+     const now = new Date();
  
-                             <p class="coverage-note">
-@@ -648,7 +796,12 @@ function renderScheduleIssue(
-     issue: ValidationIssue,
- ): string {
-     return `
--        <div class="schedule-issue schedule-issue--${issue.severity}">
-+        <div
-+            class="schedule-issue schedule-issue--${issue.severity}"
-+            data-validation-issue
-+            data-severity="${issue.severity}"
-+            data-category="${issue.category}"
-+        >
-             <strong>
-                 ${
-                     issue.severity ===
-diff --git a/src/services/validationService.ts b/src/services/validationService.ts
-index 5fb48df..da46b9e 100644
---- a/src/services/validationService.ts
-+++ b/src/services/validationService.ts
-@@ -88,6 +88,7 @@ function validateShiftTime(
-     ) {
-         issues.push({
-             severity: "error",
-+            category: "shift",
-             message:
-                 "Shift end time must be after the start time.",
-             employeeId:
-@@ -113,6 +114,7 @@ function validateEmployeeAvailability(
-     if (!employee) {
-         issues.push({
-             severity: "error",
-+            category: "availability",
-             message:
-                 "Shift references an unknown employee.",
-             employeeId:
-@@ -136,6 +138,7 @@ function validateEmployeeAvailability(
-     ) {
-         issues.push({
-             severity: "error",
-+            category: "availability",
-             message:
-                 `${employee.name} is not available on this day.`,
-             employeeId:
-@@ -160,6 +163,7 @@ function validateEmployeeAvailability(
-     ) {
-         issues.push({
-             severity: "error",
-+            category: "availability",
-             message:
-                 `${employee.name} cannot start before ${earliestStart}.`,
-             employeeId:
-@@ -184,6 +188,7 @@ function validateEmployeeAvailability(
-     ) {
-         issues.push({
-             severity: "error",
-+            category: "availability",
-             message:
-                 `${employee.name} cannot work after ${latestEnd}.`,
-             employeeId:
-@@ -234,6 +239,7 @@ function validateMaximumDaysPerWeek(
-             ) {
-                 issues.push({
-                     severity: "error",
-+                    category: "hours",
-                     message:
-                         `${employee.name} works ${daysWorked} days ` +
-                         `during the week starting ${weekStart}. ` +
-@@ -312,6 +318,7 @@ function validateWeeklyTargets(
- 
-         issues.push({
-             severity: "warning",
-+            category: "hours",
-             message:
-                 `${employee.name} is ${formattedDifference} ${direction} ` +
-                 `their weekly target for ${summary.weekStart}–${summary.weekEnd}.`,
-@@ -336,6 +343,7 @@ function validateCoverage(
-     ) {
-         issues.push({
-             severity: "error",
-+            category: "coverage",
-             message:
-                 `No store coverage ${gap.start}–${gap.end}.`,
-             date:
-diff --git a/src/styles.css b/src/styles.css
-index d168d7d..eb0c3bf 100644
---- a/src/styles.css
-+++ b/src/styles.css
-@@ -882,4 +882,58 @@ button {
- 
- .status-details .status-issues {
-     margin-top: 0;
-+}
-+
-+.validation-filter-bar {
-+    display: flex;
-+    flex-wrap: wrap;
-+    gap: 8px;
-+    margin-bottom: 14px;
-+}
-+
-+.validation-filter {
-+    display: inline-flex;
-+    align-items: center;
-+    gap: 6px;
-+    padding: 7px 10px;
-+    color: #666662;
-+    background: #f7f7f5;
-+    border: 1px solid #dfdfdb;
-+    border-radius: 999px;
-+    font: inherit;
-+    font-size: 0.75rem;
-+    font-weight: 650;
-+    cursor: pointer;
-+}
-+
-+.validation-filter:hover {
-+    color: #262624;
-+    border-color: #bdbdb7;
-+}
-+
-+.validation-filter--active {
-+    color: #ffffff;
-+    background: #2e2e2c;
-+    border-color: #2e2e2c;
-+}
-+
-+.validation-filter--active:hover {
-+    color: #ffffff;
-+    border-color: #2e2e2c;
-+}
-+
-+.validation-filter span {
-+    opacity: 0.7;
-+    font-size: 0.68rem;
-+}
-+
-+.validation-results-heading {
-+    margin-bottom: 8px;
-+    color: #858580;
-+    font-size: 0.72rem;
-+    font-weight: 650;
-+}
-+
-+.schedule-issue[hidden] {
-+    display: none;
+     return {
+@@ -104,6 +107,6 @@ export function createInitialPlannerState(): PlannerState {
+         selectedMonth: now.getMonth() + 1,
+         storeHours: STORE_HOURS,
+         employees: EMPLOYEES,
+-        shifts: [],
++        shifts: providedShifts ?? [],
+     };
  }
 \ No newline at end of file
-diff --git a/src/types/planning.ts b/src/types/planning.ts
-index a607f7b..5698857 100644
---- a/src/types/planning.ts
-+++ b/src/types/planning.ts
-@@ -62,10 +62,19 @@ export interface CoverageGap {
-     end: string;
- }
- 
--export type ValidationSeverity = "error" | "warning";
-+export type ValidationSeverity =
-+    | "error"
-+    | "warning";
-+
-+export type ValidationCategory =
-+    | "shift"
-+    | "availability"
-+    | "coverage"
-+    | "hours";
- 
- export interface ValidationIssue {
-     severity: ValidationSeverity;
-+    category: ValidationCategory;
-     message: string;
-     employeeId?: string;
-     date?: string;

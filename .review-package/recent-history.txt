@@ -1,4 +1,7 @@
-2bdbb8b (HEAD -> main, origin/main) Add employee availability rules
+8d79ec2 (HEAD -> 9b_initial_run, origin/main, main) Initial draft of AGENT instructions
+0bde916 Set up project for refinement
+279a0d6 Add validation filtering
+2bdbb8b Add employee availability rules
 b0aa887 Add weekly hours and coverage validation
 65bc4e0 Add shift editing and validation
 07e095c Add shifts to monthly planner

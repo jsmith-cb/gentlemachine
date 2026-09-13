@@ -10,6 +10,8 @@ import {
     validateShift,
 } from "../services/validationService";
 
+import { getStoredShifts, setStoredShifts } from "../services/storageService";
+
 import {
     createInitialPlannerState,
 } from "../state/plannerState";
@@ -60,8 +62,9 @@ type EditorMode =
 export function renderPlannerPage(
     container: HTMLElement,
 ): void {
-    let state =
-        createInitialPlannerState();
+    const storedShifts = getStoredShifts();
+
+    let state = createInitialPlannerState(storedShifts);
 
     let editorMode:
         | EditorMode
@@ -396,6 +399,7 @@ export function renderPlannerPage(
 		                ),
 		        };
 
+		        setStoredShifts(state.shifts);
 		        editorMode = null;
 
 		        render();
@@ -525,6 +529,8 @@ export function renderPlannerPage(
                                         : existingShift,
                             ),
                     };
+
+				setStoredShifts(state.shifts);
                 } else {
                     state = {
                         ...state,
@@ -533,6 +539,8 @@ export function renderPlannerPage(
                             shift,
                         ],
                     };
+
+				setStoredShifts(state.shifts);
                 }
 
                 editorMode = null;
