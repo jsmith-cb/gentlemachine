@@ -1,6 +1,0 @@
-## main...origin/main
-M  src/pages/PlannerPage.ts
-M  src/services/validationService.ts
-M  src/styles.css
-M  src/types/planning.ts
-?? .review-package/

@@ -2,6 +2,7 @@ import type {
     BreakRule,
     Employee,
     PlannerState,
+    Shift,
     StoreHours,
 } from "../types/planning";
 
@@ -96,7 +97,9 @@ export const EMPLOYEES: Employee[] = [
     },
 ];
 
-export function createInitialPlannerState(): PlannerState {
+export function createInitialPlannerState(
+    providedShifts?: Shift[],
+): PlannerState {
     const now = new Date();
 
     return {
@@ -104,6 +107,6 @@ export function createInitialPlannerState(): PlannerState {
         selectedMonth: now.getMonth() + 1,
         storeHours: STORE_HOURS,
         employees: EMPLOYEES,
-        shifts: [],
+        shifts: providedShifts ?? [],
     };
 }
