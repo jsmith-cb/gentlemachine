@@ -2,7 +2,7 @@ import type { Shift, Employee } from "../types/planning";
 
 export type StorageKey = "shifts" | "employees";
 
-export const STORAGE_KEYS: Record<StorageKey, string> = {
+const STORAGE_KEYS: Record<StorageKey, string> = {
     shifts: "@pp_crew_shifts",
     employees: "@pp_crew_employees",
 };
