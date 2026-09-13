@@ -99,6 +99,7 @@ export const EMPLOYEES: Employee[] = [
 
 export function createInitialPlannerState(
     providedShifts?: Shift[],
+    providedEmployees?: Employee[],
 ): PlannerState {
     const now = new Date();
 
@@ -106,7 +107,7 @@ export function createInitialPlannerState(
         selectedYear: now.getFullYear(),
         selectedMonth: now.getMonth() + 1,
         storeHours: STORE_HOURS,
-        employees: EMPLOYEES,
+        employees: providedEmployees ?? EMPLOYEES,
         shifts: providedShifts ?? [],
     };
 }

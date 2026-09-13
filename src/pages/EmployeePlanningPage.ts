@@ -8,7 +8,7 @@ import {
     isDateInMonth,
 } from "../services/hoursService";
 
-import { getStoredShifts } from "../services/storageService";
+import { getStoredShifts, getStoredEmployees } from "../services/storageService";
 
 import type { PlannerState } from "../types/planning";
 
@@ -19,8 +19,9 @@ export function renderEmployeePlanningPage(
     container: HTMLElement,
 ): void {
     const storedShifts = getStoredShifts();
+    const storedEmployees = getStoredEmployees();
 
-    state = createInitialPlannerState(storedShifts);
+    state = createInitialPlannerState(storedShifts, storedEmployees);
 
     // Default to the first employee if available
     if (state.employees.length > 0) {

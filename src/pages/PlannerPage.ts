@@ -10,7 +10,7 @@ import {
     validateShift,
 } from "../services/validationService";
 
-import { getStoredShifts, setStoredShifts } from "../services/storageService";
+import { getStoredShifts, setStoredShifts, getStoredEmployees } from "../services/storageService";
 
 import {
     createInitialPlannerState,
@@ -63,8 +63,9 @@ export function renderPlannerPage(
     container: HTMLElement,
 ): void {
     const storedShifts = getStoredShifts();
+    const storedEmployees = getStoredEmployees();
 
-    let state = createInitialPlannerState(storedShifts);
+    let state = createInitialPlannerState(storedShifts, storedEmployees);
 
     let editorMode:
         | EditorMode
