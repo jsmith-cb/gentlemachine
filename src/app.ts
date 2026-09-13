@@ -10,11 +10,11 @@ export function renderApp(
             <header class="app-header">
                 <div>
                     <p class="app-eyebrow">
-                        GentleMachine
+                        PricePocket
                     </p>
 
                     <h1>
-                        Monthly Planner
+                        CREW
                     </h1>
                 </div>
             </header>
