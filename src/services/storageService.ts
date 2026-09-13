@@ -2,7 +2,7 @@ import type { Shift, Employee } from "../types/planning";
 
 export type StorageKey = "shifts" | "employees";
 
-const STORAGE_KEYS: Record<StorageKey, string> = {
+export const STORAGE_KEYS: Record<StorageKey, string> = {
     shifts: "@pp_crew_shifts",
     employees: "@pp_crew_employees",
 };
@@ -125,7 +125,7 @@ export function getStoredEmployees(): Employee[] | undefined {
         // All entries valid — accept the entire list
         return parsed as Employee[];
     } catch {
-        // Malformed JSON or any other error — fallback to null
+        // Malformed JSON or any other error — fallback to defaults
         return undefined;
     }
 }
