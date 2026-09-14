@@ -32,3 +32,5 @@ pnpm-debug.log*
 
 # Local archives
 *.zip
+
+temp_styles/
