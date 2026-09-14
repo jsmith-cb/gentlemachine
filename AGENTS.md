@@ -366,6 +366,34 @@ If that happens, stop and explain the specific contradiction before changing dir
 
 For small, unambiguous tasks, implement directly unless planning was explicitly requested.
 
+## Repository Inspection
+
+Inspect only the files and directories relevant to the current task.
+
+Avoid broad recursive repository dumps such as:
+
+```bash
+ls -R
+```
+
+when targeted inspection is sufficient.
+
+Prefer focused commands such as:
+
+```bash
+find src -maxdepth 2 -type f
+find src/pages -maxdepth 1 -type f
+find src/services -maxdepth 1 -type f
+```
+
+or read the specific files identified by the task and architecture.
+
+Do not consume context by listing dependency directories, generated output, archives, temporary working directories, or unrelated project files unless they are relevant to the task.
+
+When inspecting reference material, start with the files most likely to contain the required information and expand the inspection only when necessary.
+
+Do not repeat directory listings or reread files unless the additional inspection serves a concrete purpose.
+
 # Scope Control
 
 Implement the requested task completely, but do not expand its scope.
