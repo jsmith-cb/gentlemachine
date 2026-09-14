@@ -96,10 +96,12 @@ src/
 ├── app.ts
 ├── main.ts
 ├── pages/
+│   ├── EmployeePlanningPage.ts
 │   └── PlannerPage.ts
 ├── services/
 │   ├── coverageService.ts
 │   ├── hoursService.ts
+│   ├── storageService.ts
 │   └── validationService.ts
 ├── state/
 │   └── plannerState.ts
@@ -107,6 +109,8 @@ src/
 │   └── planning.ts
 └── styles.css
 ```
+
+Automated tests are colocated with the code they exercise where appropriate.
 
 Respect the responsibility of each layer.
 
@@ -325,6 +329,43 @@ If the repository answers a question, use the repository as the source of truth.
 
 ---
 
+# Planning and Implementation
+
+For non-trivial changes, planning and implementation may be separate phases.
+
+## Planning phase
+
+When explicitly asked to plan:
+
+1. Inspect the relevant repository state.
+2. Trace the existing implementation and architecture.
+3. Identify the files and responsibilities affected.
+4. Propose the smallest coherent implementation.
+5. Identify genuine ambiguities, conflicts, or risks.
+6. Do not modify files.
+
+Finish the planning phase with a concrete implementation plan.
+
+Do not continue into implementation until explicitly instructed.
+
+## Approved implementation
+
+Once a plan has been approved, treat its decisions as settled.
+
+During implementation:
+
+* execute the approved plan directly;
+* do not repeatedly reconsider settled alternatives;
+* do not restart architectural exploration without a concrete reason;
+* do not expand the approved scope;
+* continue through implementation, validation, and self-review.
+
+Only deviate from the approved plan when the repository reveals a concrete technical contradiction or the approved implementation cannot safely work as specified.
+
+If that happens, stop and explain the specific contradiction before changing direction.
+
+For small, unambiguous tasks, implement directly unless planning was explicitly requested.
+
 # Scope Control
 
 Implement the requested task completely, but do not expand its scope.
@@ -342,6 +383,14 @@ Do not:
 If you notice an unrelated issue, mention it briefly in the final report only if it is materially important.
 
 Do not silently fix unrelated behavior.
+
+Temporary files or directories created for inspection must not become part of the implementation unless explicitly required.
+
+If you extract archives, generate comparison files, or create temporary working directories:
+
+* keep them outside the implementation where practical;
+* remove them before completion;
+* verify with Git status that they are not included in the final change.
 
 ---
 
@@ -369,6 +418,46 @@ Do not comment obvious code.
 Comments should explain non-obvious intent or constraints, not restate syntax.
 
 ---
+
+# Tool Reliability
+
+Tool output and filesystem state are authoritative.
+
+Do not assume an operation succeeded because you attempted it.
+
+## File editing
+
+Use the simplest reliable method appropriate for the change.
+
+Prefer:
+
+1. a precise file edit when the tool call is simple and reliable;
+2. a full-file rewrite for small or medium files when safer;
+3. a straightforward shell-based transformation when appropriate.
+
+Do not repeatedly retry malformed or failing structured edit calls.
+
+If a structured edit fails because of malformed arguments, schema validation, or an inability to apply the requested edit:
+
+1. inspect the failure;
+2. correct the invocation once if the cause is obvious;
+3. if it fails again, use another reliable editing method.
+
+Do not enter repeated edit-failure-retry loops.
+
+Before performing a full-file rewrite:
+
+* read the current file;
+* preserve unrelated content;
+* do not reconstruct the file from memory.
+
+After a significant file modification:
+
+* inspect the resulting file;
+* verify that the intended change exists;
+* check for accidental deletion, duplication, malformed syntax, or truncation.
+
+The actual contents of the repository take precedence over your recollection of what you intended to write.
 
 # State and Persistence
 
@@ -447,28 +536,42 @@ Every implementation must leave the project in a working state.
 Before declaring a coding task complete, run:
 
 ```bash
+npm test
 npx tsc --noEmit
-```
-
-and:
-
-```bash
 npm run build
 ```
 
-If the project contains relevant automated tests, run those as well.
+Run additional targeted tests when appropriate.
 
-If you add or modify business logic that has an established test suite, update the relevant tests.
+If you add or modify business logic with an established test suite, update the relevant tests.
 
-If a command fails because of your changes:
+If a validation command fails because of your changes:
 
-* diagnose it;
+* diagnose the failure;
 * fix it;
 * run the command again.
 
 Do not report successful completion while validation is failing.
 
 If validation cannot run because of an environment or dependency problem unrelated to your changes, report the exact limitation rather than claiming success.
+
+---
+
+# Evidence and Verification
+
+Never report an action, result, or validation as completed unless you observed evidence that it completed successfully.
+
+Examples:
+
+* A file change is complete only after the resulting file or diff confirms it.
+* A test passed only when the test command reports success.
+* A build passed only when the build command reports success.
+* A dependency was installed only when package state or command output confirms it.
+* A file was removed only when repository or filesystem state confirms it.
+
+Do not infer successful execution from intent.
+
+When your previous statement conflicts with current repository state or command output, trust the repository and command output.
 
 ---
 
@@ -481,9 +584,9 @@ Before finishing:
 3. Look for accidental changes.
 4. Check for duplicated business logic.
 5. Check for obvious edge cases introduced by the change.
-6. Verify TypeScript compilation.
-7. Verify the production build.
-8. Run relevant tests if present.
+6. Verify automated tests.
+7. Verify TypeScript compilation.
+8. Verify the production build.
 
 Do not rely only on the absence of compiler errors.
 
@@ -517,11 +620,12 @@ src/pages/PlannerPage.ts
 Report the actual results of:
 
 ```text
+npm test
 npx tsc --noEmit
 npm run build
 ```
 
-and any tests that were run.
+and any additional targeted tests that were run.
 
 ## Notes
 
@@ -564,7 +668,11 @@ When asking, explain the specific decision required and keep the question focuse
 
 Inspect before assuming.
 
-Implement before explaining.
+Plan before implementing when planning is requested.
+
+Once a plan is approved, execute it instead of reconsidering it.
+
+Verify repository state instead of trusting intent.
 
 Validate before declaring success.
 
