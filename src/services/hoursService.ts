@@ -171,6 +171,26 @@ export function getMonthShifts(
     );
 }
 
+export function getMonthlyTargetMinutes(
+    weeklyTargetMinutes: number,
+    year: number,
+    month: number,
+): number {
+    const daysInMonth =
+        new Date(
+            Date.UTC(
+                year,
+                month,
+                0,
+            ),
+        ).getUTCDate();
+
+    return Math.round(
+        weeklyTargetMinutes *
+            (daysInMonth / 7),
+    );
+}
+
 export function getEmployeeMonthSummaries(
     state: PlannerState,
 ): EmployeeMonthSummary[] {

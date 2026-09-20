@@ -1,5 +1,6 @@
 import "./styles.css";
 import "./sidebar.css";
+import "./employee-planning.css";
 import { renderApp } from "./app";
 
 const root = document.querySelector<HTMLDivElement>("#app");

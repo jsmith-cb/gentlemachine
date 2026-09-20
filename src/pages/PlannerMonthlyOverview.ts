@@ -1,4 +1,7 @@
-import { formatMinutes } from "../services/hoursService";
+import {
+    formatMinutes,
+    getMonthlyTargetMinutes,
+} from "../services/hoursService";
 import type {
     Employee,
     EmployeeMonthSummary,
@@ -26,7 +29,7 @@ export function renderPlannerMonthlyOverview(
                     const summary = summaries.find(
                         ({ employeeId }) => employeeId === employee.id,
                     );
-                    return renderEmployeeSummary(employee, summary);
+                    return renderEmployeeSummary(employee, summary, state.selectedYear, state.selectedMonth);
                 }).join("")}
             </div>
         </section>
@@ -36,6 +39,8 @@ export function renderPlannerMonthlyOverview(
 function renderEmployeeSummary(
     employee: Employee,
     summary: EmployeeMonthSummary | undefined,
+    year: number,
+    month: number,
 ): string {
     if (!summary) return "";
 
@@ -47,8 +52,8 @@ function renderEmployeeSummary(
             </div>
 
             <div class="summary-stat">
-                <strong>${formatMinutes(employee.weeklyTargetMinutes)}</strong>
-                <span>weekly target</span>
+                <strong>${formatMinutes(getMonthlyTargetMinutes(employee.weeklyTargetMinutes, year, month))}</strong>
+                <span>monthly target</span>
             </div>
 
             <div class="summary-stat">
