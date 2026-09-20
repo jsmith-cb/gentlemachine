@@ -1,4 +1,5 @@
 import "./styles.css";
+import "./sidebar.css";
 import { renderApp } from "./app";
 
 const root = document.querySelector<HTMLDivElement>("#app");
