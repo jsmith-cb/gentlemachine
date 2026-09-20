@@ -6,6 +6,11 @@ import {
     renderEmployeePlanningPage,
 } from "./pages/EmployeePlanningPage";
 
+import {
+    bindSidebar,
+    createSidebar,
+} from "./components/Sidebar";
+
 export function renderApp(
     root: HTMLElement,
 ): void {
@@ -14,35 +19,10 @@ export function renderApp(
     const shell = document.createElement("div");
     shell.className = "app-shell";
 
-    const sidebar = document.createElement("aside");
-    sidebar.className = "sidebar";
-
-    sidebar.innerHTML = `
-        <div class="sidebar-logo">
-            <span class="sidebar-logo-text">
-                <h2>PricePocket</h2>
-                <span>CREW</span>
-            </span>
-        </div>
-
-        <nav class="sidebar-nav" aria-label="Pages">
-            <button
-                class="sidebar-button active"
-                id="sidebar-planner-button"
-                type="button"
-            >
-                Planner
-            </button>
-
-            <button
-                class="sidebar-button"
-                id="sidebar-employee-planning-button"
-                type="button"
-            >
-                Employee Planning
-            </button>
-        </nav>
-    `;
+    const {
+        sidebar,
+        overlay: sidebarOverlay,
+    } = createSidebar();
 
     const header = document.createElement("header");
     header.className = "app-header";
@@ -54,6 +34,8 @@ export function renderApp(
                 class="hamburger-button"
                 type="button"
                 aria-label="Open menu"
+                aria-controls="app-sidebar"
+                aria-expanded="false"
             >
                 ☰
             </button>
@@ -68,46 +50,37 @@ export function renderApp(
                 </h1>
             </div>
         </div>
-
-        <nav class="page-navigation" aria-label="Pages">
-            <button
-                id="planner-button"
-                type="button"
-            >
-                Planner
-            </button>
-
-            <button
-                id="employee-planning-button"
-                type="button"
-            >
-                Employee Planning
-            </button>
-        </nav>
     `;
 
     const pageContent = document.createElement("main");
     pageContent.id = "page-content";
 
     shell.appendChild(sidebar);
+    shell.appendChild(sidebarOverlay);
     shell.appendChild(header);
     shell.appendChild(pageContent);
 
     root.appendChild(shell);
 
-    attachNavigationListeners(
-        header,
-        sidebar,
-        pageContent,
-    );
-
     const hamburgerButton = header.querySelector<HTMLButtonElement>(
         "#hamburger-button",
-    )!;
+    );
 
-    hamburgerButton.addEventListener("click", () => {
-        sidebar.classList.toggle("open");
+    if (!hamburgerButton) {
+        throw new Error("Hamburger button not found");
+    }
+
+    const sidebarController = bindSidebar({
+        sidebar,
+        overlay: sidebarOverlay,
+        trigger: hamburgerButton,
     });
+
+    attachNavigationListeners(
+        sidebar,
+        pageContent,
+        () => sidebarController.close(),
+    );
 
     renderPlannerPage(
         pageContent,
@@ -115,66 +88,44 @@ export function renderApp(
 }
 
 function attachNavigationListeners(
-    header: HTMLElement,
     sidebar: HTMLElement,
     pageContent: HTMLElement,
+    closeSidebar: () => void,
 ): void {
-    const plannerButton = header.querySelector<HTMLButtonElement>(
-        "#planner-button",
-    )!;
-
-    const employeePlanningButton = header.querySelector<HTMLButtonElement>(
-        "#employee-planning-button",
-    )!;
-
     const sidebarPlannerButton = sidebar.querySelector<HTMLButtonElement>(
         "#sidebar-planner-button",
-    )!;
+    );
 
     const sidebarEmployeePlanningButton = sidebar.querySelector<HTMLButtonElement>(
         "#sidebar-employee-planning-button",
-    )!;
+    );
 
-    for (const button of [
-        plannerButton,
-        employeePlanningButton,
-        sidebarPlannerButton,
-        sidebarEmployeePlanningButton,
-    ]) {
-        if (!button) {
-            throw new Error("Navigation button not found");
-        }
-
-        button.addEventListener(
-            "click",
-            () => {
-                const pageName = button.id
-                    .replace("sidebar-", "")
-                    .replace("-button", "");
-
-                const isActive = (b: HTMLButtonElement, name: string) =>
-                    b.id === `sidebar-${name}-button`;
-
-                sidebarPlannerButton.classList.toggle(
-                    "active",
-                    isActive(sidebarPlannerButton, "planner")
-                        ? pageName === "planner"
-                        : false,
-                );
-
-                sidebarEmployeePlanningButton.classList.toggle(
-                    "active",
-                    pageName === "employee-planning",
-                );
-
-                sidebar.classList.remove("open");
-
-                if (pageName === "planner") {
-                    renderPlannerPage(pageContent);
-                } else {
-                    renderEmployeePlanningPage(pageContent);
-                }
-            },
-        );
+    if (
+        !sidebarPlannerButton ||
+        !sidebarEmployeePlanningButton
+    ) {
+        throw new Error("Sidebar navigation button not found");
     }
+
+    sidebarPlannerButton.addEventListener(
+        "click",
+        () => {
+            sidebarPlannerButton.classList.add("active");
+            sidebarEmployeePlanningButton.classList.remove("active");
+
+            closeSidebar();
+            renderPlannerPage(pageContent);
+        },
+    );
+
+    sidebarEmployeePlanningButton.addEventListener(
+        "click",
+        () => {
+            sidebarPlannerButton.classList.remove("active");
+            sidebarEmployeePlanningButton.classList.add("active");
+
+            closeSidebar();
+            renderEmployeePlanningPage(pageContent);
+        },
+    );
 }

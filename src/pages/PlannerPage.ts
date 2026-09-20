@@ -1,6 +1,4 @@
 import {
-    formatDifferenceMinutes,
-    formatMinutes,
     getEmployeeMonthSummaries,
     getEmployeeWeekSummaries,
 } from "../services/hoursService";
@@ -17,13 +15,28 @@ import {
 } from "../state/plannerState";
 
 import type {
-    Employee,
     EmployeeMonthSummary,
     EmployeeWeekSummary,
     PlannerState,
     Shift,
     ValidationIssue,
 } from "../types/planning";
+
+import {
+    renderPlannerCalendar,
+} from "./PlannerCalendar";
+
+import type {
+    PlannerEditorMode,
+} from "./PlannerCalendar";
+
+import {
+    renderPlannerMonthlyOverview,
+} from "./PlannerMonthlyOverview";
+
+import {
+    renderPlannerWeeklyOverview,
+} from "./PlannerWeeklyOverview";
 
 const MONTH_NAMES = [
     "January",
@@ -40,24 +53,13 @@ const MONTH_NAMES = [
     "December",
 ] as const;
 
-const OPEN_DAY_LABELS = [
-    "Mon",
-    "Tue",
-    "Wed",
-    "Thu",
-    "Fri",
-    "Sat",
+const PLANNER_TABS = [
+    { id: "calendar", label: "Calendar" },
+    { id: "weekly", label: "Weekly Overview" },
+    { id: "monthly", label: "Monthly Overview" },
 ] as const;
 
-type EditorMode =
-    | {
-        type: "add";
-        date: string;
-    }
-    | {
-        type: "edit";
-        shiftId: string;
-    };
+type PlannerTab = typeof PLANNER_TABS[number]["id"];
 
 export function renderPlannerPage(
     container: HTMLElement,
@@ -68,8 +70,10 @@ export function renderPlannerPage(
     let state = createInitialPlannerState(storedShifts, storedEmployees);
 
     let editorMode:
-        | EditorMode
+        | PlannerEditorMode
         | null = null;
+
+    let activeTab: PlannerTab = "calendar";
 
     function render(): void {
         const monthSummaries =
@@ -130,93 +134,47 @@ export function renderPlannerPage(
                     </div>
                 </div>
 
-                <div class="planner-meta">
-                    <p class="store-hours">
-                        Store hours
-                        <strong>
-                            ${state.storeHours.open}–${state.storeHours.close}
-                        </strong>
-                    </p>
-
-                    <p class="closed-note">
-                        Sunday closed
-                    </p>
+                <div
+                    class="planner-tabs"
+                    role="tablist"
+                    aria-label="Planner views"
+                >
+                    ${PLANNER_TABS.map((tab) => `
+                        <button
+                            id="planner-tab-${tab.id}"
+                            class="planner-tab${activeTab === tab.id ? " planner-tab--active" : ""}"
+                            data-planner-tab="${tab.id}"
+                            type="button"
+                            role="tab"
+                            aria-selected="${activeTab === tab.id}"
+                            aria-controls="planner-tabpanel"
+                            tabindex="${activeTab === tab.id ? "0" : "-1"}"
+                        >
+                            ${tab.label}
+                        </button>
+                    `).join("")}
                 </div>
 
-                <div class="calendar-scroll">
-                    <div class="calendar">
-                        <div class="calendar-weekdays">
-                            ${OPEN_DAY_LABELS.map(
-                                (day) => `
-                                    <div class="weekday-label">
-                                        ${day}
-                                    </div>
-                                `,
-                            ).join("")}
-                        </div>
-
-                        <div class="calendar-grid">
-                            ${renderCalendarDays(
-                                state,
-                                editorMode,
-                            )}
-                        </div>
-                    </div>
+                <div
+                    id="planner-tabpanel"
+                    class="planner-tabpanel"
+                    role="tabpanel"
+                    aria-labelledby="planner-tab-${activeTab}"
+                >
+                    ${renderActiveTab(
+                        activeTab,
+                        state,
+                        editorMode,
+                        scheduleIssues,
+                        weekSummaries,
+                        monthSummaries,
+                    )}
                 </div>
-
-                ${
-                    editorMode
-                        ? renderShiftEditor(
-                            state,
-                            editorMode,
-                        )
-                        : ""
-                }
-
-                ${renderScheduleStatus(
-                    scheduleIssues,
-                )}
-
-                ${renderWeeklyHours(
-                    state,
-                    weekSummaries,
-                )}
-
-                <section class="employee-summary">
-                    <div class="summary-heading">
-                        <p class="section-label">
-                            Employees
-                        </p>
-
-                        <h2>
-                            Monthly overview
-                        </h2>
-                    </div>
-
-                    <div class="summary-list">
-                        ${state.employees
-                            .map(
-                                (employee) => {
-                                    const summary =
-                                        monthSummaries.find(
-                                            ({ employeeId }) =>
-                                                employeeId ===
-                                                employee.id,
-                                        );
-
-                                    return renderEmployeeSummary(
-                                        employee,
-                                        summary,
-                                    );
-                                },
-                            )
-                            .join("")}
-                    </div>
-                </section>
             </section>
         `;
 
         attachNavigationListeners();
+        attachTabListeners();
         attachCalendarListeners();
         attachShiftEditorListeners();
         attachValidationFilterListeners();
@@ -288,6 +246,50 @@ export function renderPlannerPage(
                 render();
             },
         );
+    }
+
+    function attachTabListeners(): void {
+        const tabs = Array.from(
+            container.querySelectorAll<HTMLButtonElement>(
+                "[data-planner-tab]",
+            ),
+        );
+
+        const activateTab = (
+            tab: PlannerTab,
+            focus: boolean,
+        ): void => {
+            activeTab = tab;
+            editorMode = null;
+            render();
+
+            if (focus) {
+                container.querySelector<HTMLButtonElement>(
+                    `[data-planner-tab="${tab}"]`,
+                )?.focus();
+            }
+        };
+
+        tabs.forEach((tab, index) => {
+            tab.addEventListener("click", () => {
+                const nextTab = tab.dataset.plannerTab as PlannerTab | undefined;
+                if (nextTab && nextTab !== activeTab) activateTab(nextTab, false);
+            });
+
+            tab.addEventListener("keydown", (event) => {
+                let nextIndex: number | null = null;
+
+                if (event.key === "ArrowRight") nextIndex = (index + 1) % tabs.length;
+                if (event.key === "ArrowLeft") nextIndex = (index - 1 + tabs.length) % tabs.length;
+                if (event.key === "Home") nextIndex = 0;
+                if (event.key === "End") nextIndex = tabs.length - 1;
+                if (nextIndex === null) return;
+
+                event.preventDefault();
+                const nextTab = tabs[nextIndex]?.dataset.plannerTab as PlannerTab | undefined;
+                if (nextTab) activateTab(nextTab, true);
+            });
+        });
     }
 
     function attachCalendarListeners(): void {
@@ -644,697 +646,29 @@ export function renderPlannerPage(
     render();
 }
 
-function renderScheduleStatus(
-    issues: ValidationIssue[],
-): string {
-    const errors =
-        issues.filter(
-            ({ severity }) =>
-                severity === "error",
-        );
-
-    const warnings =
-        issues.filter(
-            ({ severity }) =>
-                severity === "warning",
-        );
-
-    const coverage =
-        issues.filter(
-            ({ category }) =>
-                category === "coverage",
-        );
-
-    const hours =
-        issues.filter(
-            ({ category }) =>
-                category === "hours",
-        );
-
-    const availability =
-        issues.filter(
-            ({ category }) =>
-                category === "availability",
-        );
-
-    return `
-        <section class="schedule-status">
-            <div class="summary-heading">
-                <p class="section-label">
-                    Validation
-                </p>
-
-                <div class="status-heading-row">
-                    <h2>
-                        Schedule status
-                    </h2>
-
-                    <div class="status-counts">
-                        <span class="status-count status-count--error">
-                            ${errors.length} errors
-                        </span>
-
-                        <span class="status-count status-count--warning">
-                            ${warnings.length} warnings
-                        </span>
-                    </div>
-                </div>
-            </div>
-
-            ${
-                issues.length === 0
-                    ? `
-                        <div class="status-clear">
-                            No schedule issues found.
-                        </div>
-                    `
-                    : `
-                        <details class="status-details">
-                            <summary>
-                                Show validation details
-                            </summary>
-
-                            <div class="validation-filter-bar">
-                                <button
-                                    class="validation-filter validation-filter--active"
-                                    data-validation-filter="all"
-                                    type="button"
-                                    aria-pressed="true"
-                                >
-                                    All
-                                    <span>${issues.length}</span>
-                                </button>
-
-                                <button
-                                    class="validation-filter"
-                                    data-validation-filter="error"
-                                    type="button"
-                                    aria-pressed="false"
-                                >
-                                    Errors
-                                    <span>${errors.length}</span>
-                                </button>
-
-                                <button
-                                    class="validation-filter"
-                                    data-validation-filter="warning"
-                                    type="button"
-                                    aria-pressed="false"
-                                >
-                                    Warnings
-                                    <span>${warnings.length}</span>
-                                </button>
-
-                                <button
-                                    class="validation-filter"
-                                    data-validation-filter="coverage"
-                                    type="button"
-                                    aria-pressed="false"
-                                >
-                                    Coverage
-                                    <span>${coverage.length}</span>
-                                </button>
-
-                                <button
-                                    class="validation-filter"
-                                    data-validation-filter="hours"
-                                    type="button"
-                                    aria-pressed="false"
-                                >
-                                    Hours
-                                    <span>${hours.length}</span>
-                                </button>
-
-                                <button
-                                    class="validation-filter"
-                                    data-validation-filter="availability"
-                                    type="button"
-                                    aria-pressed="false"
-                                >
-                                    Availability
-                                    <span>${availability.length}</span>
-                                </button>
-                            </div>
-
-                            <div class="validation-results-heading">
-                                <span id="validation-result-count">
-                                    ${issues.length} issues
-                                </span>
-                            </div>
-
-                            <div class="status-issues">
-                                ${issues
-                                    .map(
-                                        renderScheduleIssue,
-                                    )
-                                    .join("")}
-                            </div>
-
-                            <p class="coverage-note">
-                                Coverage currently checks scheduled shift spans.
-                                Break coverage is not yet included.
-                            </p>
-                        </details>
-                    `
-            }
-        </section>
-    `;
-}
-
-function renderScheduleIssue(
-    issue: ValidationIssue,
-): string {
-    return `
-        <div
-            class="schedule-issue schedule-issue--${issue.severity}"
-            data-validation-issue
-            data-severity="${issue.severity}"
-            data-category="${issue.category}"
-        >
-            <strong>
-                ${
-                    issue.severity ===
-                    "error"
-                        ? "Error"
-                        : "Warning"
-                }
-            </strong>
-
-            <span>
-                ${
-                    issue.date
-                        ? `${formatShortDate(issue.date)} · `
-                        : ""
-                }${issue.message}
-            </span>
-        </div>
-    `;
-}
-
-function renderWeeklyHours(
+function renderActiveTab(
+    activeTab: PlannerTab,
     state: PlannerState,
-    summaries: EmployeeWeekSummary[],
+    editorMode: PlannerEditorMode | null,
+    scheduleIssues: ValidationIssue[],
+    weekSummaries: EmployeeWeekSummary[],
+    monthSummaries: EmployeeMonthSummary[],
 ): string {
-    const weekStarts =
-        [
-            ...new Set(
-                summaries.map(
-                    ({ weekStart }) =>
-                        weekStart,
-                ),
-            ),
-        ];
-
-    return `
-        <section class="weekly-hours">
-            <div class="summary-heading">
-                <p class="section-label">
-                    Contract hours
-                </p>
-
-                <h2>
-                    Weekly overview
-                </h2>
-            </div>
-
-            <div class="week-list">
-                ${weekStarts
-                    .map(
-                        (weekStart) =>
-                            renderWeek(
-                                state,
-                                summaries,
-                                weekStart,
-                            ),
-                    )
-                    .join("")}
-            </div>
-        </section>
-    `;
-}
-
-function renderWeek(
-    state: PlannerState,
-    summaries: EmployeeWeekSummary[],
-    weekStart: string,
-): string {
-    const weekSummaries =
-        summaries.filter(
-            (summary) =>
-                summary.weekStart ===
-                weekStart,
-        );
-
-    const firstSummary =
-        weekSummaries[0];
-
-    if (!firstSummary) {
-        return "";
+    if (activeTab === "weekly") {
+        return renderPlannerWeeklyOverview(state, weekSummaries);
     }
 
-    return `
-        <article class="week-card">
-            <div class="week-card-header">
-                <strong>
-                    ${formatShortDate(firstSummary.weekStart)}
-                    –
-                    ${formatShortDate(firstSummary.weekEnd)}
-                </strong>
-
-                ${
-                    firstSummary.partialMonthWeek
-                        ? `
-                            <span class="partial-week-label">
-                                Partial month week
-                            </span>
-                        `
-                        : ""
-                }
-            </div>
-
-            <div class="week-employees">
-                ${state.employees
-                    .map(
-                        (employee) => {
-                            const summary =
-                                weekSummaries.find(
-                                    ({ employeeId }) =>
-                                        employeeId ===
-                                        employee.id,
-                                );
-
-                            if (!summary) {
-                                return "";
-                            }
-
-                            return `
-                                <div class="week-employee">
-                                    <span>
-                                        ${employee.name}
-                                    </span>
-
-                                    <strong>
-                                        ${formatMinutes(summary.scheduledMinutes)}
-                                        / ${formatMinutes(summary.targetMinutes)}
-                                    </strong>
-
-                                    <small>
-                                        ${
-											employee.availability.days.length === 1
-											    ? `${summary.daysWorked} day${summary.daysWorked === 1 ? "" : "s"}`
-                                                : firstSummary.partialMonthWeek
-                                                  ? "partial"
-                                                  : formatDifferenceMinutes(
-                                                        summary.differenceMinutes,
-                                                    )
-                                        }
-                                    </small>
-                                </div>
-                            `;
-                        },
-                    )
-                    .join("")}
-            </div>
-        </article>
-    `;
-}
-
-function renderCalendarDays(
-    state: PlannerState,
-    editorMode:
-        | EditorMode
-        | null,
-): string {
-    const daysInMonth =
-        new Date(
-            state.selectedYear,
-            state.selectedMonth,
-            0,
-        ).getDate();
-
-    const openDates:
-        number[] = [];
-
-    for (
-        let day = 1;
-        day <= daysInMonth;
-        day += 1
-    ) {
-        const date =
-            new Date(
-                state.selectedYear,
-                state.selectedMonth - 1,
-                day,
-            );
-
-        if (
-            date.getDay() !== 0
-        ) {
-            openDates.push(
-                day,
-            );
-        }
+    if (activeTab === "monthly") {
+        return renderPlannerMonthlyOverview(state, monthSummaries);
     }
 
-    if (
-        openDates.length === 0
-    ) {
-        return "";
-    }
-
-    const firstOpenDay =
-        openDates[0];
-
-    const firstDate =
-        new Date(
-            state.selectedYear,
-            state.selectedMonth - 1,
-            firstOpenDay,
-        );
-
-    const firstDayIndex =
-        firstDate.getDay() -
-        1;
-
-    const placeholders =
-        Array.from(
-            {
-                length:
-                    Math.max(
-                        firstDayIndex,
-                        0,
-                    ),
-            },
-            () => `
-                <div
-                    class="calendar-day calendar-day--placeholder"
-                    aria-hidden="true"
-                ></div>
-            `,
-        ).join("");
-
-    return (
-        placeholders +
-        openDates
-            .map(
-                (day) =>
-                    renderCalendarDay(
-                        state,
-                        day,
-                        editorMode,
-                    ),
-            )
-            .join("")
-    );
-}
-
-function renderCalendarDay(
-    state: PlannerState,
-    day: number,
-    editorMode:
-        | EditorMode
-        | null,
-): string {
-    const dateKey =
-        createDateKey(
-            state.selectedYear,
-            state.selectedMonth,
-            day,
-        );
-
-    const shifts =
-        state.shifts
-            .filter(
-                (shift) =>
-                    shift.date ===
-                    dateKey,
-            )
-            .sort(
-                (left, right) =>
-                    left.start.localeCompare(
-                        right.start,
-                    ),
-            );
-
-    const selectedDate =
-        getEditorDate(
-            state,
-            editorMode,
-        );
-
-    const selectedClass =
-        selectedDate ===
-        dateKey
-            ? " calendar-day--selected"
-            : "";
-
-    return `
-        <article class="calendar-day${selectedClass}">
-            <button
-                class="calendar-day-add"
-                data-add-date="${dateKey}"
-                type="button"
-            >
-                <span class="calendar-day-number">
-                    ${day}
-                </span>
-
-                <span class="add-shift-label">
-                    + Shift
-                </span>
-            </button>
-
-            <div class="calendar-day-content">
-                ${
-                    shifts.length === 0
-                        ? `
-                            <span class="no-shifts">
-                                No shifts
-                            </span>
-                        `
-                        : shifts
-                            .map(
-                                (shift) =>
-                                    renderShift(
-                                        state,
-                                        shift,
-                                        editorMode,
-                                    ),
-                            )
-                            .join("")
-                }
-            </div>
-        </article>
-    `;
-}
-
-function renderShift(
-    state: PlannerState,
-    shift: Shift,
-    editorMode:
-        | EditorMode
-        | null,
-): string {
-    const employee =
-        state.employees.find(
-            ({ id }) =>
-                id ===
-                shift.employeeId,
-        );
-
-    const selectedClass =
-        editorMode?.type ===
-            "edit" &&
-        editorMode.shiftId ===
-            shift.id
-            ? " calendar-shift--selected"
-            : "";
-
-    return `
-        <button
-            class="calendar-shift${selectedClass}"
-            data-edit-shift="${shift.id}"
-            type="button"
-        >
-            <strong>
-                ${employee?.name ?? shift.employeeId}
-            </strong>
-
-            <span>
-                ${shift.start}–${shift.end}
-            </span>
-        </button>
-    `;
-}
-
-function renderShiftEditor(
-    state: PlannerState,
-    editorMode: EditorMode,
-): string {
-    const existingShift =
-        editorMode.type ===
-            "edit"
-            ? state.shifts.find(
-                ({ id }) =>
-                    id ===
-                    editorMode.shiftId,
-            )
-            : undefined;
-
-    if (
-        editorMode.type ===
-            "edit" &&
-        !existingShift
-    ) {
-        return "";
-    }
-
-    const date =
-        existingShift?.date ??
-        (
-            editorMode.type ===
-                "add"
-                ? editorMode.date
-                : ""
-        );
-
-    const employeeId =
-        existingShift?.employeeId ??
-        state.employees[0]?.id ??
-        "";
-
-    const start =
-        existingShift?.start ??
-        state.storeHours.open;
-
-    const end =
-        existingShift?.end ??
-        state.storeHours.close;
-
-    const isEditing =
-        editorMode.type ===
-        "edit";
-
-    return `
-        <section class="shift-editor">
-            <div class="shift-editor-heading">
-                <div>
-                    <p class="section-label">
-                        ${isEditing ? "Edit shift" : "Add shift"}
-                    </p>
-
-                    <h2>
-                        ${formatDateLabel(date)}
-                    </h2>
-                </div>
-            </div>
-
-            <form
-                id="shift-form"
-                class="shift-form"
-            >
-                <label class="form-field">
-                    <span>
-                        Employee
-                    </span>
-
-                    <select
-                        id="shift-employee"
-                        name="employeeId"
-                        required
-                    >
-                        ${state.employees
-                            .map(
-                                (employee) => `
-                                    <option
-                                        value="${employee.id}"
-                                        ${
-                                            employee.id ===
-                                            employeeId
-                                                ? "selected"
-                                                : ""
-                                        }
-                                    >
-                                        ${employee.name}
-                                    </option>
-                                `,
-                            )
-                            .join("")}
-                    </select>
-                </label>
-
-                <label class="form-field">
-                    <span>
-                        Start
-                    </span>
-
-                    <input
-                        name="start"
-                        type="time"
-                        value="${start}"
-                        required
-                    />
-                </label>
-
-                <label class="form-field">
-                    <span>
-                        End
-                    </span>
-
-                    <input
-                        name="end"
-                        type="time"
-                        value="${end}"
-                        required
-                    />
-                </label>
-
-                <div class="shift-form-actions">
-                    ${
-                        isEditing
-                            ? `
-                                <button
-                                    class="danger-button"
-                                    data-action="delete-shift"
-                                    type="button"
-                                >
-                                    Delete
-                                </button>
-                            `
-                            : ""
-                    }
-
-                    <button
-                        class="secondary-button"
-                        data-action="cancel-shift"
-                        type="button"
-                    >
-                        Cancel
-                    </button>
-
-                    <button
-                        class="primary-button"
-                        id="save-shift-button"
-                        type="submit"
-                    >
-                        ${isEditing ? "Save changes" : "Add shift"}
-                    </button>
-                </div>
-            </form>
-
-            <div
-                id="shift-validation"
-                class="shift-validation"
-                aria-live="polite"
-            ></div>
-        </section>
-    `;
+    return renderPlannerCalendar(state, editorMode, scheduleIssues);
 }
 
 function createShiftFromForm(
     form: HTMLFormElement,
     editorMode:
-        | EditorMode
+        | PlannerEditorMode
         | null,
     state: PlannerState,
 ): Shift | null {
@@ -1466,92 +800,6 @@ function updateSaveButton(
     }
 }
 
-function renderEmployeeSummary(
-    employee: Employee,
-    summary:
-        | EmployeeMonthSummary
-        | undefined,
-): string {
-    if (!summary) {
-        return "";
-    }
-
-    return `
-        <article class="summary-row">
-            <div class="employee-name">
-                <strong>
-                    ${employee.name}
-                </strong>
-
-                <span>
-                    ${
-						formatEmployeeAvailability(
-						    employee,
-						)
-                    }
-                </span>
-            </div>
-
-            <div class="summary-stat">
-                <strong>
-                    ${formatMinutes(employee.weeklyTargetMinutes)}
-                </strong>
-
-                <span>
-                    weekly target
-                </span>
-            </div>
-
-            <div class="summary-stat">
-                <strong>
-                    ${formatMinutes(summary.scheduledMinutes)}
-                </strong>
-
-                <span>
-                    month scheduled
-                </span>
-            </div>
-
-            <div class="summary-stat">
-                <strong>
-                    ${summary.saturdaysWorked}
-                </strong>
-
-                <span>
-                    Saturdays
-                </span>
-            </div>
-        </article>
-    `;
-}
-
-function getEditorDate(
-    state: PlannerState,
-    editorMode:
-        | EditorMode
-        | null,
-): string | null {
-    if (!editorMode) {
-        return null;
-    }
-
-    if (
-        editorMode.type ===
-        "add"
-    ) {
-        return editorMode.date;
-    }
-
-    return (
-        state.shifts.find(
-            ({ id }) =>
-                id ===
-                editorMode.shiftId,
-        )?.date ??
-        null
-    );
-}
-
 function changeMonth(
     state: PlannerState,
     amount: number,
@@ -1575,84 +823,6 @@ function changeMonth(
     };
 }
 
-function createDateKey(
-    year: number,
-    month: number,
-    day: number,
-): string {
-    return [
-        year,
-        String(month).padStart(
-            2,
-            "0",
-        ),
-        String(day).padStart(
-            2,
-            "0",
-        ),
-    ].join("-");
-}
-
-function formatDateLabel(
-    date: string,
-): string {
-    const [
-        year,
-        month,
-        day,
-    ] =
-        date
-            .split("-")
-            .map(
-                Number,
-            );
-
-    return new Intl.DateTimeFormat(
-        "en",
-        {
-            weekday: "long",
-            month: "long",
-            day: "numeric",
-            year: "numeric",
-        },
-    ).format(
-        new Date(
-            year,
-            month - 1,
-            day,
-        ),
-    );
-}
-
-function formatShortDate(
-    date: string,
-): string {
-    const [
-        year,
-        month,
-        day,
-    ] =
-        date
-            .split("-")
-            .map(
-                Number,
-            );
-
-    return new Intl.DateTimeFormat(
-        "en",
-        {
-            month: "short",
-            day: "numeric",
-        },
-    ).format(
-        new Date(
-            year,
-            month - 1,
-            day,
-        ),
-    );
-}
-
 function createShiftId(): string {
     if (
         typeof crypto !==
@@ -1670,39 +840,4 @@ function createShiftId(): string {
             .toString(16)
             .slice(2),
     ].join("-");
-}
-
-function formatEmployeeAvailability(
-    employee: Employee,
-): string {
-    const {
-        days,
-        earliestStart,
-        latestEnd,
-    } = employee.availability;
-
-    if (
-        days.length === 1 &&
-        days[0] === 6
-    ) {
-        return "Saturday only";
-    }
-
-    if (
-        days.length === 5 &&
-        !days.includes(6) &&
-        earliestStart &&
-        latestEnd
-    ) {
-        return `Mon–Fri · ${earliestStart}–${latestEnd}`;
-    }
-
-    if (
-        earliestStart &&
-        latestEnd
-    ) {
-        return `${earliestStart}–${latestEnd}`;
-    }
-
-    return `Max ${employee.maxDaysPerWeek} days/week`;
 }

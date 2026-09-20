@@ -141,6 +141,21 @@ button {
     padding: 56px 0 80px;
 }
 
+@media (min-width: 1291px) {
+    .app-shell {
+        display: grid;
+        grid-template-columns: 272px minmax(0, 1fr);
+        column-gap: 48px;
+        width: min(1600px, calc(100% - 48px));
+    }
+
+    .app-header,
+    #page-content {
+        grid-column: 2;
+        min-width: 0;
+    }
+}
+
 .app-header {
     margin-bottom: 56px;
 }
@@ -205,6 +220,42 @@ button {
     margin: 0;
     font-size: 1.75rem;
     letter-spacing: -0.035em;
+}
+
+.planner-tabs {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 24px;
+    padding: 5px;
+    overflow-x: auto;
+    background: var(--color-surface-muted);
+    border: 1px solid var(--color-border);
+    border-radius: 12px;
+}
+
+.planner-tab {
+    flex: 1 0 auto;
+    min-height: 42px;
+    padding: 9px 16px;
+    color: var(--color-text-muted);
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 8px;
+    font: inherit;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+.planner-tab--active {
+    color: var(--color-text-strong);
+    background: var(--color-surface);
+    border-color: var(--color-border-strong);
+    box-shadow: var(--shadow-card);
+}
+
+.planner-tab:focus-visible {
+    outline: none;
+    box-shadow: var(--focus-ring);
 }
 
 .month-navigation {
@@ -800,6 +851,11 @@ button {
 .week-employee small {
     color: var(--color-text-faint);
     font-size: 0.7rem;
+}
+
+.weekly-hours.planner-overview,
+.employee-summary.planner-overview {
+    margin-top: 0;
 }
 
 @media (max-width: 800px) {
