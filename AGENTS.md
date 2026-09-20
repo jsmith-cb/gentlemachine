@@ -41,6 +41,14 @@ If a product or architecture decision is genuinely ambiguous and cannot be resol
 
 ---
 
+## MVP and Iteration
+
+Prefer a working MVP that can be tested and reviewed over trying to achieve initial task perfection through exhaustive investigation.
+
+Inspect enough of the repository to understand the relevant architecture and make a sound implementation. Once you have sufficient context for a feasible implementation, stop exploring and implement it.
+
+We can iterate on working software. Do not spend time reading additional files solely to eliminate every possible uncertainty before making the first implementation.
+
 # Product Principles
 
 PricePocket Crew should make employee planning easier without becoming enterprise workforce-management software.
@@ -328,6 +336,14 @@ Do not assume a function, service, type, or behavior does not exist before searc
 If the repository answers a question, use the repository as the source of truth.
 
 ---
+
+## Investigation Scope
+
+Inspect only the files necessary to establish the implementation path.
+
+Once the relevant data model, persistence path, target UI, and direct consumers are understood, stop expanding repository exploration and implement the change.
+
+Do not inspect additional consumers or adjacent components merely to build a complete architectural picture unless the task requires changing them or existing evidence indicates they may be affected.
 
 # Planning and Implementation
 
