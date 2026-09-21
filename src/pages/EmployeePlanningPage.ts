@@ -7,7 +7,7 @@ import {
     getAdjustedMonthlyTargetMinutes,
     formatMinutes,
 } from "../services/hoursService";
-import { employeeFullName, employeeSelectOptions } from "../services/employeeIdentity";
+import { employeeSelectOptions } from "../services/employeeIdentity";
 import { hasValidAvailabilityHours } from "../services/availabilityService";
 import { isValidVacationPeriod, overlapsVacation } from "../services/vacationService";
 
@@ -88,7 +88,7 @@ export function renderEmployeePlanningPage(
                             Team
                         </h2>
                     </div>
-                   
+
                 </div>
 
                 <div class="employee-planning-toolbar">
