@@ -7,6 +7,8 @@ import {
 
 import {
     getStoredEmployees,
+    getStoredVacations,
+    setStoredVacations,
 } from "./storageService";
 
 const EMPLOYEE_STORAGE_KEY = "@pp_crew_employees";
@@ -79,6 +81,46 @@ describe("storageService - Employee Persistence", () => {
         );
 
         expect(getStoredEmployees()).toEqual(employees);
+    });
+
+    it("persists optional employee contact details without changing employee identity", () => {
+        const employee = {
+            id: "e1",
+            firstName: "Emp",
+            lastName: "One",
+            email: "emp@example.com",
+            telephoneNumber: "+49 30 123456",
+            weeklyTargetMinutes: 60,
+            maxDaysPerWeek: 5,
+            availability: { days: [1, 2, 3] },
+        };
+        localStorageMock.setItem(EMPLOYEE_STORAGE_KEY, JSON.stringify([employee]));
+        expect(getStoredEmployees()).toEqual([employee]);
+
+        localStorageMock.setItem(EMPLOYEE_STORAGE_KEY, JSON.stringify([{ ...employee, email: 42 }]));
+        expect(getStoredEmployees()).toBeUndefined();
+    });
+
+    it("accepts valid day-specific hours and rejects malformed overrides", () => {
+        const employee = {
+            id: "e1",
+            firstName: "Emp",
+            lastName: "1",
+            weeklyTargetMinutes: 60,
+            maxDaysPerWeek: 5,
+            availability: {
+                days: [1, 2],
+                earliestStart: "10:00",
+                latestEnd: "18:00",
+                dayHours: { 1: { earliestStart: "08:00", latestEnd: "14:00" } },
+            },
+        };
+        localStorageMock.setItem(EMPLOYEE_STORAGE_KEY, JSON.stringify([employee]));
+        expect(getStoredEmployees()).toEqual([employee]);
+
+        employee.availability.dayHours[1].latestEnd = "25:00";
+        localStorageMock.setItem(EMPLOYEE_STORAGE_KEY, JSON.stringify([employee]));
+        expect(getStoredEmployees()).toBeUndefined();
     });
 
     it("rejects employee with empty id", () => {
@@ -300,5 +342,30 @@ describe("storageService - Employee Persistence", () => {
         );
 
         expect(getStoredEmployees()).toEqual(employees);
+    });
+});
+
+describe("storageService - Vacation Persistence", () => {
+    beforeEach(() => localStorageMock.clear());
+
+    it("persists a vacation period", () => {
+        const periods = [{
+            id: "vacation-1",
+            employeeId: "e1",
+            startDate: "2026-09-29",
+            endDate: "2026-10-02",
+        }];
+        setStoredVacations(periods);
+        expect(getStoredVacations()).toEqual(periods);
+    });
+
+    it("rejects malformed saved periods", () => {
+        localStorageMock.setItem("@pp_crew_vacations", JSON.stringify([{
+            id: "vacation-1",
+            employeeId: "e1",
+            startDate: "2026-09-31",
+            endDate: "2026-10-02",
+        }]));
+        expect(getStoredVacations()).toEqual([]);
     });
 });

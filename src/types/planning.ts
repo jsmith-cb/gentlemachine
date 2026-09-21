@@ -7,12 +7,18 @@ export interface EmployeeAvailability {
     days: number[];
     earliestStart?: string;
     latestEnd?: string;
+    dayHours?: Record<number, {
+        earliestStart?: string;
+        latestEnd?: string;
+    }>;
 }
 
 export interface Employee {
     id: string;
     firstName: string;
     lastName: string;
+    email?: string;
+    telephoneNumber?: string;
     weeklyTargetMinutes: number;
     maxDaysPerWeek: number;
     availability: EmployeeAvailability;
@@ -26,6 +32,13 @@ export interface Shift {
     end: string;
 }
 
+export interface VacationPeriod {
+    id: string;
+    employeeId: string;
+    startDate: string;
+    endDate: string;
+}
+
 export interface BreakRule {
     minimumShiftMinutes: number;
     breakMinutes: number;
@@ -37,6 +50,7 @@ export interface PlannerState {
     storeHours: StoreHours;
     employees: Employee[];
     shifts: Shift[];
+    vacations: VacationPeriod[];
 }
 
 export interface EmployeeMonthSummary {

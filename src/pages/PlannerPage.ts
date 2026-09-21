@@ -8,7 +8,7 @@ import {
     validateShift,
 } from "../services/validationService";
 
-import { getStoredShifts, setStoredShifts, getStoredEmployees } from "../services/storageService";
+import { getStoredShifts, setStoredShifts, getStoredEmployees, getStoredVacations } from "../services/storageService";
 
 import {
     createInitialPlannerState,
@@ -67,13 +67,19 @@ export function renderPlannerPage(
     const storedShifts = getStoredShifts();
     const storedEmployees = getStoredEmployees();
 
-    let state = createInitialPlannerState(storedShifts, storedEmployees);
+    let state = createInitialPlannerState(storedShifts, storedEmployees, getStoredVacations());
 
     let editorMode:
         | PlannerEditorMode
         | null = null;
 
     let activeTab: PlannerTab = "calendar";
+    let assistantOpen = false;
+    let assistantPosition: { x: number; y: number } | null = null;
+    let shiftEditorPosition: { x: number; y: number } | null = null;
+    let frontWindow: "assistant" | "shift" = "shift";
+    let assistantFilter = "all";
+    let assistantScrollTop = 0;
 
     function render(): void {
         const monthSummaries =
@@ -168,6 +174,7 @@ export function renderPlannerPage(
                         scheduleIssues,
                         weekSummaries,
                         monthSummaries,
+                        assistantOpen,
                     )}
                 </div>
             </section>
@@ -178,6 +185,109 @@ export function renderPlannerPage(
         attachCalendarListeners();
         attachShiftEditorListeners();
         attachValidationFilterListeners();
+        attachPlanningAssistantListeners();
+        const savedAssistantScrollTop = assistantScrollTop;
+        if (assistantFilter !== "all") {
+            container.querySelector<HTMLButtonElement>(`[data-validation-filter="${assistantFilter}"]`)?.click();
+        }
+        const assistantBody = container.querySelector<HTMLElement>(".planning-assistant-body");
+        if (assistantBody) assistantBody.scrollTop = savedAssistantScrollTop;
+        assistantScrollTop = savedAssistantScrollTop;
+    }
+
+    function attachPlanningAssistantListeners(): void {
+        const trigger = container.querySelector<HTMLButtonElement>('[data-action="toggle-planning-assistant"]');
+        const panel = container.querySelector<HTMLElement>("#planning-assistant-window");
+        const closeButton = container.querySelector<HTMLButtonElement>('[data-action="close-planning-assistant"]');
+        const handle = container.querySelector<HTMLElement>("[data-assistant-drag-handle]");
+        if (!trigger || !panel || !handle) return;
+
+        const moveTo = attachFloatingWindow(panel, handle, () => assistantPosition,
+            (position) => { assistantPosition = position; }, "assistant");
+
+        panel.querySelector<HTMLElement>(".planning-assistant-body")?.addEventListener("scroll", (event) => {
+            assistantScrollTop = (event.currentTarget as HTMLElement).scrollTop;
+        });
+
+        trigger.addEventListener("click", () => {
+            assistantOpen = !assistantOpen;
+            panel.hidden = !assistantOpen;
+            trigger.setAttribute("aria-expanded", String(assistantOpen));
+            if (assistantOpen) {
+                bringToFront("assistant");
+                if (assistantPosition) moveTo(assistantPosition.x, assistantPosition.y);
+                panel.querySelector<HTMLElement>("#planning-assistant-title")?.focus();
+            }
+        });
+
+        closeButton?.addEventListener("click", () => {
+            assistantOpen = false;
+            panel.hidden = true;
+            trigger.setAttribute("aria-expanded", "false");
+            trigger.focus();
+        });
+
+        panel.addEventListener("keydown", (event) => {
+            if (event.key === "Escape") {
+                event.preventDefault();
+                closeButton?.click();
+            }
+        });
+
+    }
+
+    function bringToFront(windowName: "assistant" | "shift"): void {
+        frontWindow = windowName;
+        const assistant = container.querySelector<HTMLElement>("#planning-assistant-window");
+        const shift = container.querySelector<HTMLElement>("#shift-editor-window");
+        if (assistant) assistant.style.zIndex = frontWindow === "assistant" ? "811" : "800";
+        if (shift) shift.style.zIndex = frontWindow === "shift" ? "811" : "800";
+    }
+
+    function attachFloatingWindow(
+        panel: HTMLElement,
+        handle: HTMLElement,
+        getPosition: () => { x: number; y: number } | null,
+        setPosition: (position: { x: number; y: number }) => void,
+        windowName: "assistant" | "shift",
+    ): (x: number, y: number) => void {
+        const moveTo = (x: number, y: number): void => {
+            const minY = window.innerWidth <= 1290 ? 72 : 16;
+            const maxX = Math.max(16, window.innerWidth - panel.offsetWidth - 16);
+            const maxY = Math.max(minY, window.innerHeight - Math.min(panel.offsetHeight, 64));
+            const position = {
+                x: Math.min(Math.max(16, x), maxX),
+                y: Math.min(Math.max(minY, y), maxY),
+            };
+            setPosition(position);
+            panel.style.left = `${position.x}px`;
+            panel.style.top = `${position.y}px`;
+            panel.style.right = "auto";
+        };
+
+        const position = getPosition();
+        if (position) moveTo(position.x, position.y);
+        bringToFront(frontWindow);
+        panel.addEventListener("pointerdown", () => bringToFront(windowName));
+
+        let drag: { pointerId: number; pointerX: number; pointerY: number; x: number; y: number } | null = null;
+        handle.addEventListener("pointerdown", (event) => {
+            if (event.button !== 0 || (event.target as HTMLElement).closest("button")) return;
+            const bounds = panel.getBoundingClientRect();
+            drag = { pointerId: event.pointerId, pointerX: event.clientX, pointerY: event.clientY, x: bounds.left, y: bounds.top };
+            handle.setPointerCapture(event.pointerId);
+            event.preventDefault();
+        });
+        handle.addEventListener("pointermove", (event) => {
+            if (!drag || event.pointerId !== drag.pointerId) return;
+            moveTo(drag.x + event.clientX - drag.pointerX, drag.y + event.clientY - drag.pointerY);
+        });
+        const stopDragging = (event: PointerEvent): void => {
+            if (drag?.pointerId === event.pointerId) drag = null;
+        };
+        handle.addEventListener("pointerup", stopDragging);
+        handle.addEventListener("pointercancel", stopDragging);
+        return moveTo;
     }
 
     function attachNavigationListeners(): void {
@@ -318,6 +428,7 @@ export function renderPlannerPage(
                     };
 
                     render();
+                    bringToFront("shift");
                     focusEmployeeField();
                 },
             );
@@ -348,6 +459,7 @@ export function renderPlannerPage(
                     };
 
                     render();
+                    bringToFront("shift");
                     focusEmployeeField();
                 },
             );
@@ -360,23 +472,34 @@ export function renderPlannerPage(
                 "#shift-form",
             );
 
-        const cancelButton =
-            container.querySelector<HTMLButtonElement>(
-                '[data-action="cancel-shift"]',
-            );
+        const cancelButtons = container.querySelectorAll<HTMLButtonElement>(
+            '[data-action="cancel-shift"]',
+        );
 
         const deleteButton =
             container.querySelector<HTMLButtonElement>(
                 '[data-action="delete-shift"]',
             );
 
-        cancelButton?.addEventListener(
-            "click",
-            () => {
+        for (const button of cancelButtons) {
+            button.addEventListener("click", () => {
                 editorMode = null;
                 render();
-            },
-        );
+            });
+        }
+
+        const panel = container.querySelector<HTMLElement>("#shift-editor-window");
+        const handle = container.querySelector<HTMLElement>("[data-shift-drag-handle]");
+        if (panel && handle) {
+            attachFloatingWindow(panel, handle, () => shiftEditorPosition,
+                (position) => { shiftEditorPosition = position; }, "shift");
+            panel.addEventListener("keydown", (event) => {
+                if (event.key === "Escape") {
+                    event.preventDefault();
+                    cancelButtons[0]?.click();
+                }
+            });
+        }
 		
 		deleteButton?.addEventListener(
 		    "click",
@@ -426,6 +549,7 @@ export function renderPlannerPage(
                     renderEditorIssues(
                         container,
                         [],
+                        false,
                     );
 
                     updateSaveButton(
@@ -445,6 +569,7 @@ export function renderPlannerPage(
                 renderEditorIssues(
                     container,
                     issues,
+                    true,
                 );
 
                 updateSaveButton(
@@ -583,6 +708,11 @@ export function renderPlannerPage(
                         return;
                     }
 
+                    assistantFilter = filter;
+                    assistantScrollTop = 0;
+                    const assistantBody = container.querySelector<HTMLElement>(".planning-assistant-body");
+                    if (assistantBody) assistantBody.scrollTop = 0;
+
                     for (
                         const candidate
                         of filterButtons
@@ -653,6 +783,7 @@ function renderActiveTab(
     scheduleIssues: ValidationIssue[],
     weekSummaries: EmployeeWeekSummary[],
     monthSummaries: EmployeeMonthSummary[],
+    assistantOpen: boolean,
 ): string {
     if (activeTab === "weekly") {
         return renderPlannerWeeklyOverview(state, weekSummaries);
@@ -662,7 +793,7 @@ function renderActiveTab(
         return renderPlannerMonthlyOverview(state, monthSummaries);
     }
 
-    return renderPlannerCalendar(state, editorMode, scheduleIssues);
+    return renderPlannerCalendar(state, editorMode, scheduleIssues, assistantOpen);
 }
 
 function createShiftFromForm(
@@ -747,6 +878,7 @@ function createShiftFromForm(
 function renderEditorIssues(
     container: HTMLElement,
     issues: ValidationIssue[],
+    hasDraft: boolean,
 ): void {
     const validationContainer =
         container.querySelector<HTMLElement>(
@@ -757,20 +889,19 @@ function renderEditorIssues(
         return;
     }
 
-    if (
-        issues.length === 0
-    ) {
-        validationContainer.innerHTML =
-            "";
-
-        validationContainer.hidden =
-            true;
-
+    if (!hasDraft) {
+        validationContainer.textContent = "";
+        validationContainer.hidden = true;
         return;
     }
 
-    validationContainer.hidden =
-        false;
+    validationContainer.hidden = false;
+
+    if (issues.length === 0) {
+        validationContainer.innerHTML =
+            '<p class="validation-message validation-message--success">Available for this day and these hours.</p>';
+        return;
+    }
 
     validationContainer.innerHTML =
         issues

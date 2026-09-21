@@ -1,11 +1,35 @@
-import type { Shift, Employee } from "../types/planning";
+import type { Shift, Employee, VacationPeriod } from "../types/planning";
+import { isValidVacationPeriod } from "./vacationService";
+import { hasValidAvailabilityHours } from "./availabilityService";
 
-export type StorageKey = "shifts" | "employees";
+export type StorageKey = "shifts" | "employees" | "vacations";
 
 const STORAGE_KEYS: Record<StorageKey, string> = {
     shifts: "@pp_crew_shifts",
     employees: "@pp_crew_employees",
+    vacations: "@pp_crew_vacations",
 };
+
+export function getStoredVacations(): VacationPeriod[] {
+    try {
+        const raw = localStorage.getItem(STORAGE_KEYS.vacations);
+        if (!raw) return [];
+        const parsed: unknown = JSON.parse(raw);
+        return Array.isArray(parsed) && parsed.every(isValidVacationPeriod)
+            ? parsed
+            : [];
+    } catch {
+        return [];
+    }
+}
+
+export function setStoredVacations(vacations: VacationPeriod[]): void {
+    try {
+        localStorage.setItem(STORAGE_KEYS.vacations, JSON.stringify(vacations));
+    } catch {
+        // Match the existing local-storage persistence behavior.
+    }
+}
 
 export function getStoredShifts(): Shift[] {
     try {
@@ -96,6 +120,8 @@ export function getStoredEmployees(): Employee[] | undefined {
                 item.firstName.trim() !== "" &&
                 typeof item.lastName === "string" &&
                 item.lastName.trim() !== "" &&
+                (item.email === undefined || typeof item.email === "string") &&
+                (item.telephoneNumber === undefined || typeof item.telephoneNumber === "string") &&
                 Number.isFinite(item.weeklyTargetMinutes) &&
                 item.weeklyTargetMinutes >= 0 &&
                 Number.isInteger(item.maxDaysPerWeek) &&
@@ -110,18 +136,7 @@ export function getStoredEmployees(): Employee[] | undefined {
                 return undefined;
             }
 
-            // Validate HH:mm format and values for optional fields
-            if (item.availability.earliestStart !== undefined) {
-                if (!/^(0[0-9]|1[0-9]|2[0-3]):[0-5][0-9]$/.test(item.availability.earliestStart)) {
-                    return undefined;
-                }
-            }
-
-            if (item.availability.latestEnd !== undefined) {
-                if (!/^(0[0-9]|1[0-9]|2[0-3]):[0-5][0-9]$/.test(item.availability.latestEnd)) {
-                    return undefined;
-                }
-            }
+            if (!hasValidAvailabilityHours(item.availability)) return undefined;
         }
 
         // All entries valid — accept the entire list

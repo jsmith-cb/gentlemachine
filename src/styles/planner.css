@@ -384,6 +384,165 @@ button {
     margin-bottom: 20px;
 }
 
+.planner-schedule-facts {
+    display: flex;
+    align-items: flex-end;
+    gap: 24px;
+}
+
+.planner-schedule-facts .closed-note {
+    padding-bottom: 2px;
+}
+
+.planning-assistant-trigger {
+    display: grid;
+    grid-template-columns: 10px minmax(0, 1fr);
+    align-items: center;
+    column-gap: 12px;
+    width: clamp(245px, 24vw, 320px);
+    min-height: 66px;
+    padding: 11px 16px;
+    color: var(--color-text);
+    background: var(--color-primary-soft);
+    border: 1px solid var(--color-primary-border);
+    border-radius: 12px;
+    box-shadow: var(--shadow-card);
+    text-align: left;
+}
+
+.planning-assistant-trigger::before {
+    grid-row: 1 / 3;
+    width: 10px;
+    height: 10px;
+    background: var(--color-primary);
+    border-radius: 50%;
+    content: "";
+}
+
+.planning-assistant-trigger strong {
+    align-self: end;
+    color: var(--color-text-strong);
+    font-size: .94rem;
+}
+
+.planning-assistant-trigger span {
+    align-self: start;
+    color: var(--color-text-muted);
+    font-size: .75rem;
+}
+
+.planning-assistant-trigger:hover,
+.planning-assistant-trigger[aria-expanded="true"] {
+    background: var(--color-primary-soft-strong);
+}
+
+.planning-assistant-trigger:focus-visible,
+.planning-assistant-header button:focus-visible {
+    outline: 2px solid var(--color-focus);
+    outline-offset: 2px;
+}
+
+.planning-assistant-window {
+    --assistant-start-top: 220px;
+    position: fixed;
+    z-index: 800;
+    top: var(--assistant-start-top);
+    right: 24px;
+    display: flex;
+    flex-direction: column;
+    width: min(420px, calc(100vw - 32px));
+    max-height: calc(100dvh - var(--assistant-start-top) - 16px);
+    overflow: hidden;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border-strong);
+    border-radius: 14px;
+    box-shadow: var(--shadow-elevated);
+}
+
+@media (max-width: 1290px) {
+    .planning-assistant-window {
+        --assistant-start-top: 300px;
+    }
+}
+
+.planning-assistant-window[hidden] {
+    display: none;
+}
+
+.planning-assistant-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 16px 18px;
+    background: var(--color-surface-subtle);
+    border-bottom: 1px solid var(--color-border-subtle);
+    cursor: grab;
+    touch-action: none;
+    user-select: none;
+}
+
+.planning-assistant-header:active {
+    cursor: grabbing;
+}
+
+.planning-assistant-header .section-label {
+    margin-bottom: 4px;
+}
+
+.planning-assistant-header h2 {
+    margin: 0;
+    color: var(--color-text-strong);
+    font-size: 1rem;
+}
+
+.planning-assistant-header button {
+    flex: 0 0 32px;
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    color: var(--color-text-secondary);
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: 50%;
+    cursor: pointer;
+    font-size: 1.25rem;
+}
+
+.planning-assistant-body {
+    min-height: 0;
+    padding: 16px 18px 18px;
+    overflow-y: auto;
+}
+
+.planning-assistant-body > .status-counts {
+    margin-bottom: 14px;
+}
+
+@media (max-width: 700px) {
+    .planner-meta {
+        align-items: stretch;
+        flex-direction: column;
+        gap: 12px;
+    }
+
+    .planning-assistant-trigger {
+        width: 100%;
+    }
+}
+
+@media (max-width: 560px) {
+    .planner-schedule-facts {
+        align-items: center;
+        gap: 14px;
+    }
+
+    .planning-assistant-window {
+        right: 16px;
+    }
+
+}
+
 .store-hours {
     display: flex;
     flex-direction: column;
@@ -499,6 +658,20 @@ button {
     font-size: 0.75rem;
 }
 
+.calendar-vacation {
+    display: block;
+    overflow: hidden;
+    padding: 7px 8px;
+    color: var(--color-primary);
+    background: var(--color-primary-soft-strong);
+    border: 1px solid var(--color-primary-border);
+    border-radius: 7px;
+    font-size: .75rem;
+    font-weight: 700;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
 .calendar-shift {
     display: flex;
     flex-direction: column;
@@ -528,23 +701,74 @@ button {
 }
 
 .shift-editor {
-    margin-top: 24px;
-    padding: 24px;
+    --shift-start-top: 220px;
+    position: fixed;
+    z-index: 811;
+    top: var(--shift-start-top);
+    left: max(16px, min(20vw, calc(100vw - 480px)));
+    display: flex;
+    flex-direction: column;
+    width: min(460px, calc(100vw - 32px));
+    max-height: calc(100dvh - var(--shift-start-top) - 16px);
+    overflow: hidden;
     background: var(--color-surface);
-    border: 1px solid var(--color-border-subtle);
+    border: 1px solid var(--color-border-strong);
     border-radius: 14px;
-    box-shadow: var(--shadow-card);
+    box-shadow: var(--shadow-elevated);
 }
 
 .shift-editor-heading {
-    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 16px 18px;
+    background: var(--color-surface-subtle);
+    border-bottom: 1px solid var(--color-border-subtle);
+    cursor: grab;
+    touch-action: none;
+    user-select: none;
+}
+
+.shift-editor-heading:active {
+    cursor: grabbing;
+}
+
+.shift-editor-heading .section-label {
+    margin-bottom: 4px;
+}
+
+.shift-editor-heading h2 {
+    margin: 0;
+    font-size: 1rem;
+}
+
+.shift-editor-heading button {
+    flex: 0 0 32px;
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    color: var(--color-text-secondary);
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: 50%;
+    font-size: 1.25rem;
+    cursor: pointer;
 }
 
 .shift-form {
     display: grid;
-    grid-template-columns: minmax(180px, 1fr) minmax(130px, 180px) minmax(130px, 180px) auto;
+    grid-template-columns: 1fr 1fr;
     align-items: end;
-    gap: 16px;
+    gap: 16px 12px;
+    padding: 18px;
+    overflow-y: auto;
+}
+
+.shift-form .form-field:first-child,
+.shift-form .shift-validation,
+.shift-form-actions {
+    grid-column: 1 / -1;
 }
 
 .form-field {
@@ -586,6 +810,29 @@ button {
 .shift-form-actions {
     display: flex;
     gap: 8px;
+    justify-content: flex-end;
+}
+
+.shift-editor-heading button:focus-visible {
+    outline: 2px solid var(--color-focus);
+    outline-offset: 2px;
+}
+
+.employee-save-actions {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0.35rem;
+}
+
+#save-status {
+    min-height: 1rem;
+}
+
+@media (max-width: 1290px) {
+    .shift-editor {
+        left: 16px;
+    }
 }
 
 .primary-button,
@@ -624,7 +871,6 @@ button {
     display: flex;
     flex-direction: column;
     gap: 8px;
-    margin-top: 18px;
 }
 
 .shift-validation:empty,
@@ -644,6 +890,12 @@ button {
     color: var(--color-danger-strong);
     background: var(--color-danger-soft);
     border: 1px solid var(--color-danger-border);
+}
+
+.validation-message--success {
+    color: var(--color-success);
+    background: var(--color-primary-soft);
+    border: 1px solid var(--color-border);
 }
 
 .validation-message--warning {
@@ -754,7 +1006,8 @@ button {
     }
 
     .shift-editor {
-        padding: 20px;
+        --shift-start-top: 96px;
+        left: 16px;
     }
 
     .shift-form {
@@ -789,19 +1042,10 @@ button {
     }
 }
 
-.schedule-status,
 .weekly-hours {
     margin-top: 56px;
 }
 
-.status-heading-row {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 24px;
-}
-
-.status-heading-row h2,
 .weekly-hours h2 {
     margin: 0;
     font-size: 1.75rem;
@@ -947,12 +1191,6 @@ button {
 }
 
 @media (max-width: 800px) {
-    .status-heading-row {
-        align-items: flex-start;
-        flex-direction: column;
-        gap: 12px;
-    }
-
     .week-employees {
         grid-template-columns: repeat(2, minmax(0, 1fr));
     }
@@ -963,7 +1201,6 @@ button {
 }
 
 @media (max-width: 560px) {
-    .schedule-status,
     .weekly-hours {
         margin-top: 40px;
     }
@@ -984,26 +1221,6 @@ button {
 
 .status-details {
     margin-top: 12px;
-}
-
-.status-details summary {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    padding: 8px 0;
-    color: var(--color-text-secondary);
-    font-size: 0.8rem;
-    font-weight: 700;
-    cursor: pointer;
-    user-select: none;
-}
-
-.status-details summary:hover {
-    color: var(--color-text-strong);
-}
-
-.status-details[open] summary {
-    margin-bottom: 10px;
 }
 
 .status-details .status-issues {

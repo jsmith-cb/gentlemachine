@@ -13,6 +13,8 @@ import {
     getCoverageGapsForMonth,
 } from "./coverageService";
 import { employeeFullName } from "./employeeIdentity";
+import { availableHoursForDay } from "./availabilityService";
+import { overlapsVacation } from "./vacationService";
 
 import type {
     PlannerState,
@@ -127,6 +129,16 @@ function validateEmployeeAvailability(
         return;
     }
 
+    if (overlapsVacation(state.vacations, employee.id, shift.date, shift.date)) {
+        issues.push({
+            severity: "error",
+            category: "availability",
+            message: `${employeeFullName(employee)} is on vacation on this day.`,
+            employeeId: employee.id,
+            date: shift.date,
+        });
+    }
+
     const dayOfWeek =
         getDayOfWeek(
             shift.date,
@@ -149,9 +161,7 @@ function validateEmployeeAvailability(
         });
     }
 
-    const earliestStart =
-        employee.availability
-            .earliestStart;
+    const { earliestStart, latestEnd } = availableHoursForDay(employee.availability, dayOfWeek);
 
     if (
         earliestStart &&
@@ -173,10 +183,6 @@ function validateEmployeeAvailability(
                 shift.date,
         });
     }
-
-    const latestEnd =
-        employee.availability
-            .latestEnd;
 
     if (
         latestEnd &&

@@ -1,6 +1,6 @@
 import {
     formatMinutes,
-    getMonthlyTargetMinutes,
+    getAdjustedMonthlyTargetMinutes,
 } from "../services/hoursService";
 import { employeeFullName } from "../services/employeeIdentity";
 import type {
@@ -30,7 +30,7 @@ export function renderPlannerMonthlyOverview(
                     const summary = summaries.find(
                         ({ employeeId }) => employeeId === employee.id,
                     );
-                    return renderEmployeeSummary(employee, summary, state.selectedYear, state.selectedMonth);
+                    return renderEmployeeSummary(employee, summary, state);
                 }).join("")}
             </div>
         </section>
@@ -40,8 +40,7 @@ export function renderPlannerMonthlyOverview(
 function renderEmployeeSummary(
     employee: Employee,
     summary: EmployeeMonthSummary | undefined,
-    year: number,
-    month: number,
+    state: PlannerState,
 ): string {
     if (!summary) return "";
 
@@ -53,8 +52,8 @@ function renderEmployeeSummary(
             </div>
 
             <div class="summary-stat">
-                <strong>${formatMinutes(getMonthlyTargetMinutes(employee.weeklyTargetMinutes, year, month))}</strong>
-                <span>monthly target</span>
+                <strong>${formatMinutes(getAdjustedMonthlyTargetMinutes(employee, state.vacations, state.selectedYear, state.selectedMonth))}</strong>
+                <span>monthly target after vacation</span>
             </div>
 
             <div class="summary-stat">
@@ -71,7 +70,9 @@ function renderEmployeeSummary(
 }
 
 function formatEmployeeAvailability(employee: Employee): string {
-    const { days, earliestStart, latestEnd } = employee.availability;
+    const { days, earliestStart, latestEnd, dayHours } = employee.availability;
+
+    if (dayHours && Object.keys(dayHours).length > 0) return "Day-specific hours";
 
     if (days.length === 1 && days[0] === 6) return "Saturday only";
     if (

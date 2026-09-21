@@ -4,6 +4,7 @@ import type {
     ValidationIssue,
 } from "../types/planning";
 import { employeeFullName } from "../services/employeeIdentity";
+import { vacationEmployeesOnDate } from "../services/vacationService";
 
 const OPEN_DAY_LABELS = [
     "Mon",
@@ -13,6 +14,11 @@ const OPEN_DAY_LABELS = [
     "Fri",
     "Sat",
 ] as const;
+
+function escapeHtml(value: string): string {
+    return value.replace(/&/g, "&amp;").replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
 
 export type PlannerEditorMode =
     | {
@@ -28,19 +34,23 @@ export function renderPlannerCalendar(
     state: PlannerState,
     editorMode: PlannerEditorMode | null,
     scheduleIssues: ValidationIssue[],
+    assistantOpen = false,
 ): string {
     return `
         <div class="planner-meta">
-            <p class="store-hours">
-                Store hours
-                <strong>
-                    ${state.storeHours.open}–${state.storeHours.close}
-                </strong>
-            </p>
-
-            <p class="closed-note">
-                Sunday closed
-            </p>
+            <div class="planner-schedule-facts">
+                <p class="store-hours">
+                    Store hours
+                    <strong>${state.storeHours.open}–${state.storeHours.close}</strong>
+                </p>
+                <p class="closed-note">Sunday closed</p>
+            </div>
+            <button class="planning-assistant-trigger" type="button"
+                data-action="toggle-planning-assistant" aria-controls="planning-assistant-window"
+                aria-expanded="${assistantOpen}">
+                <strong>Planning assistant</strong>
+                <span>${scheduleIssues.filter(({ severity }) => severity === "error").length} errors · ${scheduleIssues.filter(({ severity }) => severity === "warning").length} warnings</span>
+            </button>
         </div>
 
         <div class="calendar-scroll">
@@ -62,12 +72,13 @@ export function renderPlannerCalendar(
         </div>
 
         ${editorMode ? renderShiftEditor(state, editorMode) : ""}
-        ${renderScheduleStatus(scheduleIssues)}
+        ${renderPlanningAssistant(scheduleIssues, assistantOpen)}
     `;
 }
 
-function renderScheduleStatus(
+function renderPlanningAssistant(
     issues: ValidationIssue[],
+    isOpen: boolean,
 ): string {
     const errors = issues.filter(({ severity }) => severity === "error");
     const warnings = issues.filter(({ severity }) => severity === "warning");
@@ -76,28 +87,22 @@ function renderScheduleStatus(
     const availability = issues.filter(({ category }) => category === "availability");
 
     return `
-        <section class="schedule-status">
-            <div class="summary-heading">
-                <p class="section-label">
-                    Validation
-                </p>
-
-                <div class="status-heading-row">
-                    <h2>
-                        Schedule status
-                    </h2>
-
-                    <div class="status-counts">
-                        <span class="status-count status-count--error">
-                            ${errors.length} errors
-                        </span>
-
-                        <span class="status-count status-count--warning">
-                            ${warnings.length} warnings
-                        </span>
-                    </div>
+        <aside class="planning-assistant-window" id="planning-assistant-window"
+            role="dialog" aria-modal="false" aria-labelledby="planning-assistant-title"
+            ${isOpen ? "" : "hidden"}>
+            <div class="planning-assistant-header" data-assistant-drag-handle>
+                <div>
+                    <p class="section-label">Planning assistant</p>
+                    <h2 id="planning-assistant-title" tabindex="-1">Schedule guidance</h2>
                 </div>
+                <button type="button" data-action="close-planning-assistant"
+                    aria-label="Close Planning assistant">×</button>
             </div>
+            <div class="planning-assistant-body">
+                <div class="status-counts">
+                    <span class="status-count status-count--error">${errors.length} errors</span>
+                    <span class="status-count status-count--warning">${warnings.length} warnings</span>
+                </div>
 
             ${issues.length === 0
                 ? `
@@ -106,11 +111,7 @@ function renderScheduleStatus(
                     </div>
                 `
                 : `
-                    <details class="status-details">
-                        <summary>
-                            Show validation details
-                        </summary>
-
+                    <div class="status-details">
                         <div class="validation-filter-bar">
                             ${renderValidationFilter("all", "All", issues.length, true)}
                             ${renderValidationFilter("error", "Errors", errors.length)}
@@ -134,9 +135,10 @@ function renderScheduleStatus(
                             Coverage currently checks scheduled shift spans.
                             Break coverage is not yet included.
                         </p>
-                    </details>
+                    </div>
                 `}
-        </section>
+            </div>
+        </aside>
     `;
 }
 
@@ -236,6 +238,10 @@ function renderCalendarDay(
     const shifts = state.shifts
         .filter((shift) => shift.date === dateKey)
         .sort((left, right) => left.start.localeCompare(right.start));
+    const vacationEmployees = vacationEmployeesOnDate(state.vacations, dateKey)
+        .map((employeeId) => state.employees.find((employee) => employee.id === employeeId))
+        .filter((employee) => employee !== undefined)
+        .sort((a, b) => employeeFullName(a).localeCompare(employeeFullName(b)));
     const selectedClass = getEditorDate(state, editorMode) === dateKey
         ? " calendar-day--selected"
         : "";
@@ -257,7 +263,12 @@ function renderCalendarDay(
             </button>
 
             <div class="calendar-day-content">
-                ${shifts.length === 0
+                ${vacationEmployees.map((employee) => `
+                    <span class="calendar-vacation" title="${escapeHtml(employeeFullName(employee))} on vacation">
+                        ${escapeHtml(employeeFullName(employee))} · Vacation
+                    </span>
+                `).join("")}
+                ${shifts.length === 0 && vacationEmployees.length === 0
                     ? `<span class="no-shifts">No shifts</span>`
                     : shifts.map((shift) => renderShift(state, shift, editorMode)).join("")}
             </div>
@@ -310,17 +321,20 @@ function renderShiftEditor(
     const isEditing = editorMode.type === "edit";
 
     return `
-        <section class="shift-editor">
-            <div class="shift-editor-heading">
+        <section class="shift-editor" id="shift-editor-window" role="dialog"
+            aria-modal="false" aria-labelledby="shift-editor-title">
+            <div class="shift-editor-heading" data-shift-drag-handle>
                 <div>
                     <p class="section-label">
                         ${isEditing ? "Edit shift" : "Add shift"}
                     </p>
 
-                    <h2>
+                    <h2 id="shift-editor-title" tabindex="-1">
                         ${formatDateLabel(date)}
                     </h2>
                 </div>
+                <button type="button" data-action="cancel-shift"
+                    aria-label="Close ${isEditing ? "Edit shift" : "Add shift"}">×</button>
             </div>
 
             <form id="shift-form" class="shift-form">
@@ -347,6 +361,13 @@ function renderShiftEditor(
                     <span>End</span>
                     <input name="end" type="time" value="${end}" required />
                 </label>
+
+                <div
+                    id="shift-validation"
+                    class="shift-validation"
+                    role="status"
+                    aria-live="polite"
+                ></div>
 
                 <div class="shift-form-actions">
                     ${isEditing ? `
@@ -377,11 +398,6 @@ function renderShiftEditor(
                 </div>
             </form>
 
-            <div
-                id="shift-validation"
-                class="shift-validation"
-                aria-live="polite"
-            ></div>
         </section>
     `;
 }

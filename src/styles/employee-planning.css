@@ -7,7 +7,7 @@
     align-items: center;
     justify-content: space-between;
     gap: 48px;
-    max-width: 1040px;
+    max-width: 1700px;
     margin-bottom: 28px;
 }
 
@@ -20,14 +20,34 @@
 
 .employee-planning-columns {
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: minmax(0, .9fr) minmax(0, 1.15fr) minmax(0, .95fr);
     align-items: start;
-    gap: 28px;
-    max-width: 1040px;
+    gap: 24px;
+    max-width: 1700px;
+}
+
+.employee-settings-form {
+    display: grid;
+    grid-column: span 2;
+    grid-template-columns: minmax(0, .9fr) minmax(0, 1.15fr);
+    align-items: start;
+    gap: 24px;
+    min-width: 0;
 }
 
 .employee-planning-analytics {
     min-width: 0;
+    padding: 24px;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border-subtle);
+    border-radius: 14px;
+    box-shadow: var(--shadow-card);
+}
+
+.employee-planning-analytics > h3 {
+    margin: 0 0 20px;
+    color: var(--color-text-strong);
+    font-size: 1rem;
 }
 
 .employee-planning-analytics > .section-label {
@@ -75,6 +95,91 @@
     font-weight: 650;
 }
 
+.employee-vacation {
+    margin-top: 20px;
+    padding: 20px;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border-subtle);
+    border-radius: 14px;
+    box-shadow: var(--shadow-card);
+}
+
+.employee-vacation h3 {
+    margin: 0 0 7px;
+    color: var(--color-text-strong);
+    font-size: 1rem;
+}
+
+.employee-vacation > p {
+    margin: 0 0 18px;
+    color: var(--color-text-secondary);
+    font-size: .8rem;
+    line-height: 1.5;
+}
+
+.vacation-form {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+}
+
+.vacation-form label {
+    display: grid;
+    gap: 7px;
+    min-width: 0;
+    color: var(--color-text-secondary);
+    font-size: .75rem;
+    font-weight: 700;
+}
+
+.vacation-form input {
+    width: 100%;
+    min-width: 0;
+    min-height: 44px;
+    padding: 0 10px;
+    color: var(--color-text);
+    background: var(--color-surface);
+    border: 1px solid var(--color-border-control);
+    border-radius: 9px;
+}
+
+.vacation-form button {
+    grid-column: 1 / -1;
+    justify-self: start;
+}
+
+.employee-vacation .vacation-status {
+    margin: 10px 0 0;
+    color: var(--color-danger);
+}
+
+.vacation-periods {
+    margin: 18px 0 0;
+    padding: 0;
+    list-style: none;
+}
+
+.vacation-periods li {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 10px 0;
+    border-top: 1px solid var(--color-border-subtle);
+    font-size: .8rem;
+}
+
+.vacation-periods button {
+    color: var(--color-danger);
+    background: transparent;
+    border: 0;
+    font-weight: 700;
+}
+
+.employee-vacation .vacation-empty {
+    margin: 18px 0 0;
+}
+
 .employee-selector {
     display: grid;
     gap: 8px;
@@ -119,17 +224,25 @@
     gap: 12px;
 }
 
-@media (max-width: 850px) {
+@media (max-width: 1450px) {
     .employee-planning-columns {
         grid-template-columns: 1fr;
     }
 
-    .employee-planning-analytics {
-        grid-row: 1;
+    .employee-settings-form {
+        grid-column: 1;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 
     .employee-planning-summary {
         grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 850px) {
+    .employee-settings-form,
+    .employee-planning-summary {
+        grid-template-columns: 1fr;
     }
 }
 
@@ -199,9 +312,9 @@
     min-width: 48px;
     min-height: 36px;
     padding: 0 8px;
-    color: var(--color-text-secondary);
-    background: var(--color-surface-subtle);
-    border: 1px solid var(--color-border);
+    color: #9f3030;
+    background: #fff0f0;
+    border: 1px solid #edbbbb;
     border-radius: 8px;
     font-size: 0.75rem;
     font-weight: 650;
@@ -219,20 +332,130 @@
 }
 
 .day-checkbox:has(input:checked) {
-    color: var(--color-text-inverse);
-    background: var(--color-primary);
-    border-color: var(--color-primary);
+    color: #166534;
+    background: #e9f7ee;
+    border-color: #a8dab9;
+}
+
+.day-checkbox:has(input:focus-visible) {
+    outline: 2px solid var(--color-focus);
+    outline-offset: 2px;
+}
+
+.availability-key {
+    color: var(--color-text-muted);
+    font-size: .72rem;
+}
+
+.availability-hours {
+    margin-top: 22px;
+    padding-top: 20px;
+    border-top: 1px solid var(--color-border-subtle);
+}
+
+.availability-hours h4 {
+    margin: 0 0 6px;
+    color: var(--color-text-strong);
+    font-size: .9rem;
+}
+
+.availability-hours > p:first-of-type {
+    margin: 0 0 16px;
+    color: var(--color-text-secondary);
+    font-size: .78rem;
+    line-height: 1.45;
+}
+
+.apply-hours-button {
+    width: 100%;
+    min-height: 40px;
+    margin-bottom: 4px;
+    font-size: .78rem;
+}
+
+.apply-hours-status {
+    min-height: 1em;
+    margin: 0 0 12px;
+    color: var(--color-text-muted);
+    font-size: .73rem;
+}
+
+.day-hours-list {
+    display: grid;
+    gap: 8px;
+}
+
+.day-hours-row {
+    display: grid;
+    grid-template-columns: 36px repeat(2, minmax(0, 1fr));
+    align-items: end;
+    gap: 10px;
+    padding: 10px;
+    background: var(--color-surface-subtle);
+    border: 1px solid var(--color-border-subtle);
+    border-radius: 9px;
+}
+
+.day-hours-row[hidden] {
+    display: none;
+}
+
+.day-hours-row strong {
+    align-self: center;
+    color: var(--color-text-strong);
+    font-size: .8rem;
+}
+
+.day-hours-row label {
+    display: grid;
+    gap: 5px;
+    min-width: 0;
+    color: var(--color-text-secondary);
+    font-size: .7rem;
+    font-weight: 700;
+}
+
+.day-hours-row input {
+    width: 100%;
+    min-width: 0;
+    min-height: 40px;
+    padding: 0 6px;
+    color: var(--color-text);
+    background: var(--color-surface);
+    border: 1px solid var(--color-border-control);
+    border-radius: 8px;
+}
+
+@media (max-width: 420px) {
+    .day-hours-row {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .day-hours-row strong {
+        grid-column: 1 / -1;
+    }
 }
 
 @media (hover: hover) and (pointer: fine) {
     .day-checkbox:hover {
-        border-color: var(--color-border-strong);
+        border-color: #c97878;
     }
 
     .day-checkbox:has(input:checked):hover {
-        background: var(--color-primary-hover);
-        border-color: var(--color-primary-hover);
+        border-color: #6cb98a;
     }
+}
+
+:root[data-theme="dark"] .day-checkbox {
+    color: #ffabab;
+    background: rgba(180, 60, 60, .15);
+    border-color: #8d5257;
+}
+
+:root[data-theme="dark"] .day-checkbox:has(input:checked) {
+    color: #8be0a5;
+    background: rgba(39, 144, 80, .19);
+    border-color: #4f8a65;
 }
 
 .form-actions {

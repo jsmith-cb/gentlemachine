@@ -1,10 +1,13 @@
 import { BREAK_RULES } from "../state/plannerState";
+import { overlapsVacation } from "./vacationService";
 
 import type {
     EmployeeMonthSummary,
     EmployeeWeekSummary,
+    Employee,
     PlannerState,
     Shift,
+    VacationPeriod,
 } from "../types/planning";
 
 const MINUTES_PER_HOUR = 60;
@@ -191,6 +194,53 @@ export function getMonthlyTargetMinutes(
     );
 }
 
+function getVacationTargetReductionMinutes(
+    employee: Employee,
+    vacations: VacationPeriod[],
+    startDate: string,
+    endDate: string,
+): number {
+    const availableDays = new Set(employee.availability.days);
+    const targetDays = Math.min(employee.maxDaysPerWeek, availableDays.size);
+    if (targetDays === 0 || employee.weeklyTargetMinutes <= 0) return 0;
+
+    const vacationDaysByWeek = new Map<string, number>();
+    for (let date = startDate; date <= endDate; date = addDaysToDateKey(date, 1)) {
+        if (!availableDays.has(getDayOfWeek(date)) ||
+            !overlapsVacation(vacations, employee.id, date, date)) continue;
+        const weekStart = getWeekStartDate(date);
+        vacationDaysByWeek.set(weekStart, (vacationDaysByWeek.get(weekStart) ?? 0) + 1);
+    }
+
+    let reduction = 0;
+    for (const days of vacationDaysByWeek.values()) {
+        reduction += Math.round(employee.weeklyTargetMinutes * Math.min(days, targetDays) / targetDays);
+    }
+    return reduction;
+}
+
+export function getAdjustedWeeklyTargetMinutes(
+    employee: Employee,
+    vacations: VacationPeriod[],
+    weekStart: string,
+    weekEnd: string,
+): number {
+    return Math.max(0, employee.weeklyTargetMinutes -
+        getVacationTargetReductionMinutes(employee, vacations, weekStart, weekEnd));
+}
+
+export function getAdjustedMonthlyTargetMinutes(
+    employee: Employee,
+    vacations: VacationPeriod[],
+    year: number,
+    month: number,
+): number {
+    const monthStart = createDateKey(year, month, 1);
+    const monthEnd = createDateKey(year, month, new Date(Date.UTC(year, month, 0)).getUTCDate());
+    return Math.max(0, getMonthlyTargetMinutes(employee.weeklyTargetMinutes, year, month) -
+        getVacationTargetReductionMinutes(employee, vacations, monthStart, monthEnd));
+}
+
 export function getEmployeeMonthSummaries(
     state: PlannerState,
 ): EmployeeMonthSummary[] {
@@ -276,6 +326,9 @@ export function getEmployeeWeekSummaries(
                     employee.id,
                     weekShifts,
                 );
+            const targetMinutes = getAdjustedWeeklyTargetMinutes(
+                employee, state.vacations, weekStart, weekEnd,
+            );
 
             summaries.push({
                 employeeId:
@@ -288,11 +341,11 @@ export function getEmployeeWeekSummaries(
                 scheduledMinutes,
 
                 targetMinutes:
-                    employee.weeklyTargetMinutes,
+                    targetMinutes,
 
                 differenceMinutes:
                     scheduledMinutes -
-                    employee.weeklyTargetMinutes,
+                    targetMinutes,
 
                 daysWorked:
                     getEmployeeDaysWorked(

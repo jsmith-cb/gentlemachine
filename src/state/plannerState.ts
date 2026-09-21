@@ -4,6 +4,7 @@ import type {
     PlannerState,
     Shift,
     StoreHours,
+    VacationPeriod,
 } from "../types/planning";
 
 export const STORE_HOURS: StoreHours = {
@@ -105,6 +106,7 @@ export const EMPLOYEES: Employee[] = [
 export function createInitialPlannerState(
     providedShifts?: Shift[],
     providedEmployees?: Employee[],
+    providedVacations?: VacationPeriod[],
 ): PlannerState {
     const now = new Date();
 
@@ -114,5 +116,6 @@ export function createInitialPlannerState(
         storeHours: STORE_HOURS,
         employees: providedEmployees ?? EMPLOYEES,
         shifts: providedShifts ?? [],
+        vacations: providedVacations ?? [],
     };
 }
