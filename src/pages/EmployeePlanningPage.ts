@@ -42,7 +42,7 @@ export function renderEmployeePlanningPage(
         if (!selectedEmployee) {
             container.innerHTML = `
                 <h1 class="page-heading">
-                    Employee Planning
+                    Employee Details
                 </h1>
 
                 <p class="page-placeholder">
@@ -85,7 +85,7 @@ export function renderEmployeePlanningPage(
                         </p>
 
                         <h2>
-                            Employee Planning
+                            Team
                         </h2>
                     </div>
                    

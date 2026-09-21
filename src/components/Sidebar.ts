@@ -52,7 +52,7 @@ export function createSidebar(): SidebarElements {
                 id="sidebar-employee-planning-button"
                 type="button"
             >
-                Employee Planning
+                Team
             </button>
         </nav>
     `;
