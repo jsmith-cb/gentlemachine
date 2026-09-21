@@ -4,11 +4,12 @@ import {
 
 import {
     getEmployeeMonthSummaries,
+    getMonthlyTargetMinutes,
     formatMinutes,
-    isDateInMonth,
 } from "../services/hoursService";
+import { employeeFullName, employeeSelectOptions } from "../services/employeeIdentity";
 
-import { getStoredShifts, getStoredEmployees, setStoredEmployees } from "../services/storageService";
+import { getStoredShifts, getStoredEmployees, setStoredEmployees, setStoredShifts } from "../services/storageService";
 
 import type { PlannerState } from "../types/planning";
 
@@ -16,7 +17,7 @@ let state: PlannerState;
 let selectedEmployeeId: string | null = null;
 
 function escapeHtml(text: string): string {
-    return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
 
 export function renderEmployeePlanningPage(
@@ -27,10 +28,7 @@ export function renderEmployeePlanningPage(
 
     state = createInitialPlannerState(storedShifts, storedEmployees);
 
-    // Default to the first employee if available
-    if (state.employees.length > 0) {
-        selectedEmployeeId = state.employees[0].id;
-    }
+    selectedEmployeeId = employeeSelectOptions(state.employees)[0]?.employee.id ?? null;
 
     function render(): void {
         const monthSummaries = getEmployeeMonthSummaries(state);
@@ -55,16 +53,17 @@ export function renderEmployeePlanningPage(
             ({ employeeId }) => employeeId === selectedEmployee.id,
         );
 
-        const shiftCount = state.shifts.filter(
-            (shift) =>
-                shift.employeeId ===
-                    selectedEmployeeId &&
-                isDateInMonth(
-                    shift.date,
-                    state.selectedYear,
-                    state.selectedMonth,
-                ),
-        ).length;
+        const monthlyTargetMinutes = getMonthlyTargetMinutes(
+            selectedEmployee.weeklyTargetMinutes,
+            state.selectedYear,
+            state.selectedMonth,
+        );
+        const hoursFromTarget = (summary?.scheduledMinutes ?? 0) - monthlyTargetMinutes;
+        const targetDirection = hoursFromTarget < 0
+            ? "below target"
+            : hoursFromTarget > 0
+                ? "above target"
+                : "on target";
 
         const dayLabels = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
         const availability = selectedEmployee.availability;
@@ -72,72 +71,56 @@ export function renderEmployeePlanningPage(
 
         container.innerHTML = `
             <section class="planner">
-                <div class="planner-intro">
+                <div class="planner-intro employee-planning-intro">
                     <div>
                         <p class="section-label">
-                            Employee Planning
+                            Workforce
                         </p>
 
-                        <h2 class="employee-name">
-                            ${escapeHtml(selectedEmployee.name)}
+                        <h2>
+                            Employee Planning
                         </h2>
                     </div>
                 </div>
 
-                <div class="summary-list" style="margin-top: 2rem;">
-                    <div class="summary-item">
-                        <span class="summary-label">
-                            Shifts this month:
-                        </span>
-                        <span class="summary-value">
-                            ${shiftCount}
-                        </span>
+                <div class="employee-planning-toolbar">
+                    <h3 class="employee-planning-name">${escapeHtml(employeeFullName(selectedEmployee))}</h3>
+
+                    <div class="employee-selector">
+                        <label for="employee-select">Select Employee</label>
+                        <select id="employee-select">
+                            ${employeeSelectOptions(state.employees)
+                                .map(
+                                    ({ employee, label }) => `
+                                        <option
+                                            value="${escapeHtml(employee.id)}"
+                                            ${employee.id === selectedEmployeeId ? "selected" : ""}
+                                        >${escapeHtml(label)}</option>
+                                    `,
+                                )
+                                .join("")}
+                        </select>
                     </div>
-
-                    <div class="summary-item">
-                        <span class="summary-label">
-                            Total scheduled paid hours:
-                        </span>
-                        <span class="summary-value">
-                            ${formatMinutes(summary?.scheduledMinutes ?? 0)}
-                        </span>
-                    </div>
                 </div>
 
-                <div class="employee-selector" style="margin-top: 3rem;">
-                    <label for="employee-select">
-                        Select Employee:
-                    </label>
-
-                    <select
-                        id="employee-select"
-                        style="padding: 0.5rem; font-size: 1rem;"
-                    >
-                        ${state.employees
-                            .map(
-                                (emp) => `
-                                    <option
-                                        value="${emp.id}"
-                                        ${emp.id === selectedEmployeeId ? "selected" : ""}
-                                    >
-                                        ${escapeHtml(emp.name)}
-                                    </option>
-                                `,
-                            )
-                            .join("")}
-                    </select>
-                </div>
-
-                <div class="planner-meta" style="margin-top: 3rem;">
-                    <p class="closed-note">${state.selectedYear}-${String(state.selectedMonth).padStart(2, "0")} Overview</p>
-                </div>
-
-                <form class="employee-form" id="employee-form" style="margin-top: 2rem;">
+                <div class="employee-planning-columns">
+                <form class="employee-form" id="employee-form">
                     <h3>Employee Settings</h3>
 
+                    <div class="employee-identity-fields">
+                        <div class="form-group">
+                            <label for="emp-first-name">First name</label>
+                            <input type="text" id="emp-first-name" name="firstName" value="${escapeHtml(selectedEmployee.firstName)}" required />
+                        </div>
+                        <div class="form-group">
+                            <label for="emp-last-name">Last name</label>
+                            <input type="text" id="emp-last-name" name="lastName" value="${escapeHtml(selectedEmployee.lastName)}" required />
+                        </div>
+                    </div>
+
                     <div class="form-group">
-                        <label for="emp-name">Name</label>
-                        <input type="text" id="emp-name" name="name" value="${escapeHtml(selectedEmployee.name)}" required />
+                        <label for="emp-id">Employee ID</label>
+                        <input type="text" id="emp-id" name="employeeId" value="${escapeHtml(selectedEmployee.id)}" required />
                     </div>
 
                     <div class="form-group">
@@ -182,9 +165,26 @@ export function renderEmployeePlanningPage(
 
                     <div class="form-actions">
                         <button type="submit" class="primary-button">Save</button>
-                        <span id="save-status"></span>
+                        <span id="save-status" role="status"></span>
                     </div>
                 </form>
+                <section class="employee-planning-analytics" aria-label="Monthly employee overview">
+                    <p class="section-label">${state.selectedYear}-${String(state.selectedMonth).padStart(2, "0")} Overview</p>
+                    <div class="employee-planning-summary">
+                        <div class="employee-planning-summary-item">
+                            <span class="summary-label">Hours from monthly target</span>
+                            <span>
+                                <span class="summary-value">${formatMinutes(Math.abs(hoursFromTarget))}</span>
+                                <span class="employee-planning-summary-context">${targetDirection}</span>
+                            </span>
+                        </div>
+                        <div class="employee-planning-summary-item">
+                            <span class="summary-label">Total scheduled paid hours</span>
+                            <span class="summary-value">${formatMinutes(summary?.scheduledMinutes ?? 0)}</span>
+                        </div>
+                    </div>
+                </section>
+                </div>
             </section>
         `;
 
@@ -198,13 +198,27 @@ export function renderEmployeePlanningPage(
         form?.addEventListener("submit", (event) => {
             event.preventDefault();
 
-            const nameInput = container.querySelector<HTMLInputElement>('#emp-name');
+            const firstNameInput = container.querySelector<HTMLInputElement>('#emp-first-name');
+            const lastNameInput = container.querySelector<HTMLInputElement>('#emp-last-name');
+            const idInput = container.querySelector<HTMLInputElement>('#emp-id');
             const targetInput = container.querySelector<HTMLInputElement>('#emp-target-hours');
             const maxDaysSelect = container.querySelector<HTMLSelectElement>('#emp-max-days');
             const earliestInput = container.querySelector<HTMLInputElement>('#emp-earliest');
             const latestInput = container.querySelector<HTMLInputElement>('#emp-latest');
 
-            const name = nameInput?.value ?? "";
+            const firstName = firstNameInput?.value.trim() ?? "";
+            const lastName = lastNameInput?.value.trim() ?? "";
+            const id = idInput?.value.trim() ?? "";
+            const saveStatus = container.querySelector("#save-status");
+
+            if (!firstName || !lastName || !id) {
+                if (saveStatus) saveStatus.textContent = "First name, last name, and employee ID are required.";
+                return;
+            }
+            if (id !== selectedEmployee.id && state.employees.some((employee) => employee.id === id)) {
+                if (saveStatus) saveStatus.textContent = "This employee ID is already in use.";
+                return;
+            }
             const targetHoursNum = parseFloat(targetInput?.value ?? "0");
             const maxDays = parseInt(maxDaysSelect?.value ?? "5", 10);
 
@@ -216,7 +230,9 @@ export function renderEmployeePlanningPage(
 
             const updatedEmployee = {
                 ...selectedEmployee,
-                name,
+                id,
+                firstName,
+                lastName,
                 weeklyTargetMinutes: Math.round(targetHoursNum * 60),
                 maxDaysPerWeek: maxDays,
                 availability: {
@@ -230,15 +246,26 @@ export function renderEmployeePlanningPage(
                 emp.id === selectedEmployeeId ? updatedEmployee : emp,
             );
 
+            if (id !== selectedEmployee.id) {
+                state.shifts = state.shifts.map((shift) =>
+                    shift.employeeId === selectedEmployee.id
+                        ? { ...shift, employeeId: id }
+                        : shift,
+                );
+                setStoredShifts(state.shifts);
+            }
+
+            selectedEmployeeId = id;
+
             setStoredEmployees(state.employees);
 
             render();
 
-            const saveStatus = container.querySelector("#save-status");
-            if (saveStatus) {
-                saveStatus.textContent = "Saved!";
+            const updatedStatus = container.querySelector("#save-status");
+            if (updatedStatus) {
+                updatedStatus.textContent = "Saved!";
                 setTimeout(() => {
-                    saveStatus.textContent = "";
+                    updatedStatus.textContent = "";
                 }, 2000);
             }
         });

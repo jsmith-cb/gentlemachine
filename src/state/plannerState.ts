@@ -50,7 +50,8 @@ const MONDAY_TO_FRIDAY = [
 export const EMPLOYEES: Employee[] = [
     {
         id: "a",
-        name: "Employee A",
+        firstName: "Employee",
+        lastName: "A",
         weeklyTargetMinutes: 35 * 60,
         maxDaysPerWeek: 5,
         availability: {
@@ -59,7 +60,8 @@ export const EMPLOYEES: Employee[] = [
     },
     {
         id: "b",
-        name: "Employee B",
+        firstName: "Employee",
+        lastName: "B",
         weeklyTargetMinutes: 20 * 60,
         maxDaysPerWeek: 5,
         availability: {
@@ -68,7 +70,8 @@ export const EMPLOYEES: Employee[] = [
     },
     {
         id: "c",
-        name: "Employee C",
+        firstName: "Employee",
+        lastName: "C",
         weeklyTargetMinutes: 15 * 60,
         maxDaysPerWeek: 5,
         availability: {
@@ -79,7 +82,8 @@ export const EMPLOYEES: Employee[] = [
     },
     {
         id: "d",
-        name: "Employee D",
+        firstName: "Employee",
+        lastName: "D",
         weeklyTargetMinutes: 15 * 60,
         maxDaysPerWeek: 5,
         availability: {
@@ -88,7 +92,8 @@ export const EMPLOYEES: Employee[] = [
     },
     {
         id: "e",
-        name: "Employee E",
+        firstName: "Employee",
+        lastName: "E",
         weeklyTargetMinutes: 5 * 60,
         maxDaysPerWeek: 1,
         availability: {

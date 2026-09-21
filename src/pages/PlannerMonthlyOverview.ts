@@ -2,6 +2,7 @@ import {
     formatMinutes,
     getMonthlyTargetMinutes,
 } from "../services/hoursService";
+import { employeeFullName } from "../services/employeeIdentity";
 import type {
     Employee,
     EmployeeMonthSummary,
@@ -47,7 +48,7 @@ function renderEmployeeSummary(
     return `
         <article class="summary-row">
             <div class="employee-name">
-                <strong>${employee.name}</strong>
+                <strong>${employeeFullName(employee)}</strong>
                 <span>${formatEmployeeAvailability(employee)}</span>
             </div>
 

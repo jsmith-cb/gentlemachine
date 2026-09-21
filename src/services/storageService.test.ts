@@ -63,7 +63,8 @@ describe("storageService - Employee Persistence", () => {
         const employees = [
             {
                 id: "e1",
-                name: "Emp 1",
+                firstName: "Emp",
+                lastName: "1",
                 weeklyTargetMinutes: 60,
                 maxDaysPerWeek: 5,
                 availability: {
@@ -84,7 +85,8 @@ describe("storageService - Employee Persistence", () => {
         const employees = [
             {
                 id: "",
-                name: "Emp 1",
+                firstName: "Emp",
+                lastName: "1",
                 weeklyTargetMinutes: 60,
                 maxDaysPerWeek: 5,
                 availability: {
@@ -105,7 +107,8 @@ describe("storageService - Employee Persistence", () => {
         const employees = [
             {
                 id: "e1",
-                name: "",
+                firstName: "",
+                lastName: "1",
                 weeklyTargetMinutes: 60,
                 maxDaysPerWeek: 5,
                 availability: {
@@ -126,7 +129,8 @@ describe("storageService - Employee Persistence", () => {
         const employees = [
             {
                 id: "e1",
-                name: "Emp 1",
+                firstName: "Emp",
+                lastName: "1",
                 weeklyTargetMinutes: -1,
                 maxDaysPerWeek: 5,
                 availability: {
@@ -147,7 +151,8 @@ describe("storageService - Employee Persistence", () => {
         const employeesHigh = [
             {
                 id: "e1",
-                name: "Emp 1",
+                firstName: "Emp",
+                lastName: "1",
                 weeklyTargetMinutes: 60,
                 maxDaysPerWeek: 8,
                 availability: {
@@ -166,7 +171,8 @@ describe("storageService - Employee Persistence", () => {
         const employeesLow = [
             {
                 id: "e2",
-                name: "Emp 2",
+                firstName: "Emp",
+                lastName: "2",
                 weeklyTargetMinutes: 60,
                 maxDaysPerWeek: 0,
                 availability: {
@@ -187,7 +193,8 @@ describe("storageService - Employee Persistence", () => {
         const employees = [
             {
                 id: "e1",
-                name: "Emp 1",
+                firstName: "Emp",
+                lastName: "1",
                 weeklyTargetMinutes: 60,
                 maxDaysPerWeek: 5,
                 availability: {
@@ -208,7 +215,8 @@ describe("storageService - Employee Persistence", () => {
         const employees = [
             {
                 id: "e1",
-                name: "Emp 1",
+                firstName: "Emp",
+                lastName: "1",
                 weeklyTargetMinutes: 60,
                 maxDaysPerWeek: 5,
                 availability: {
@@ -229,7 +237,8 @@ describe("storageService - Employee Persistence", () => {
         const employees = [
             {
                 id: "e1",
-                name: "Emp 1",
+                firstName: "Emp",
+                lastName: "1",
                 weeklyTargetMinutes: 60,
                 maxDaysPerWeek: 5,
                 availability: {
@@ -250,7 +259,8 @@ describe("storageService - Employee Persistence", () => {
         const employees = [
             {
                 id: "e1",
-                name: "Emp 1",
+                firstName: "Emp",
+                lastName: "1",
                 weeklyTargetMinutes: 60,
                 maxDaysPerWeek: 5,
                 availability: {
@@ -272,7 +282,8 @@ describe("storageService - Employee Persistence", () => {
         const employees = [
             {
                 id: "e1",
-                name: "Emp 1",
+                firstName: "Emp",
+                lastName: "1",
                 weeklyTargetMinutes: 60,
                 maxDaysPerWeek: 5,
                 availability: {

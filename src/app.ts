@@ -11,6 +11,8 @@ import {
     createSidebar,
 } from "./components/Sidebar";
 
+import logoIcon from "./assets/pricepocket_logo_icon.png";
+
 export function renderApp(
     root: HTMLElement,
 ): void {
@@ -39,6 +41,12 @@ export function renderApp(
             >
                 ☰
             </button>
+
+            <img
+                class="app-header-logo"
+                src="${logoIcon}"
+                alt=""
+            >
 
             <div>
                 <p class="app-eyebrow">

@@ -115,7 +115,10 @@ src/
 │   └── plannerState.ts
 ├── types/
 │   └── planning.ts
-└── styles.css
+└── styles/
+    ├── planner.css
+    ├── sidebar.css
+    └── employee-planning.css
 ```
 
 Automated tests are colocated with the code they exercise where appropriate.
@@ -173,7 +176,7 @@ Pages may:
 
 Pages should not become the authoritative source of scheduling business rules.
 
-## `styles.css`
+## `styles/`
 
 Owns application styling.
 

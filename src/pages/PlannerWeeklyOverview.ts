@@ -2,6 +2,7 @@ import {
     formatDifferenceMinutes,
     formatMinutes,
 } from "../services/hoursService";
+import { employeeFullName } from "../services/employeeIdentity";
 import type {
     EmployeeWeekSummary,
     PlannerState,
@@ -72,7 +73,7 @@ function renderWeek(
 
                     return `
                         <div class="week-employee">
-                            <span>${employee.name}</span>
+                            <span>${employeeFullName(employee)}</span>
                             <strong>
                                 ${formatMinutes(summary.scheduledMinutes)}
                                 / ${formatMinutes(summary.targetMinutes)}

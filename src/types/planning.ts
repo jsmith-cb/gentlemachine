@@ -11,7 +11,8 @@ export interface EmployeeAvailability {
 
 export interface Employee {
     id: string;
-    name: string;
+    firstName: string;
+    lastName: string;
     weeklyTargetMinutes: number;
     maxDaysPerWeek: number;
     availability: EmployeeAvailability;

@@ -12,6 +12,7 @@ import {
 import {
     getCoverageGapsForMonth,
 } from "./coverageService";
+import { employeeFullName } from "./employeeIdentity";
 
 import type {
     PlannerState,
@@ -140,7 +141,7 @@ function validateEmployeeAvailability(
             severity: "error",
             category: "availability",
             message:
-                `${employee.name} is not available on this day.`,
+                `${employeeFullName(employee)} is not available on this day.`,
             employeeId:
                 employee.id,
             date:
@@ -165,7 +166,7 @@ function validateEmployeeAvailability(
             severity: "error",
             category: "availability",
             message:
-                `${employee.name} cannot start before ${earliestStart}.`,
+                `${employeeFullName(employee)} cannot start before ${earliestStart}.`,
             employeeId:
                 employee.id,
             date:
@@ -190,7 +191,7 @@ function validateEmployeeAvailability(
             severity: "error",
             category: "availability",
             message:
-                `${employee.name} cannot work after ${latestEnd}.`,
+                `${employeeFullName(employee)} cannot work after ${latestEnd}.`,
             employeeId:
                 employee.id,
             date:
@@ -241,7 +242,7 @@ function validateMaximumDaysPerWeek(
                     severity: "error",
                     category: "hours",
                     message:
-                        `${employee.name} works ${daysWorked} days ` +
+                        `${employeeFullName(employee)} works ${daysWorked} days ` +
                         `during the week starting ${weekStart}. ` +
                         `Maximum is ${employee.maxDaysPerWeek}.`,
                     employeeId:
@@ -320,7 +321,7 @@ function validateWeeklyTargets(
             severity: "warning",
             category: "hours",
             message:
-                `${employee.name} is ${formattedDifference} ${direction} ` +
+                `${employeeFullName(employee)} is ${formattedDifference} ${direction} ` +
                 `their weekly target for ${summary.weekStart}–${summary.weekEnd}.`,
             employeeId:
                 employee.id,

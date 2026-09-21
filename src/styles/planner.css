@@ -109,12 +109,16 @@
     --shadow-primary: 0 12px 28px rgba(0, 0, 0, .24);
 }
 
-* {
+*,
+*::before,
+*::after {
     box-sizing: border-box;
 }
 
 html {
     min-width: 320px;
+    height: 100%;
+    overflow: hidden;
     background: var(--color-background);
 }
 
@@ -122,6 +126,18 @@ body {
     margin: 0;
     min-width: 320px;
     min-height: 100vh;
+    height: 100%;
+    overflow: hidden;
+    background: radial-gradient(
+        circle at top,
+        var(--color-background-accent) 0%,
+        var(--color-background-soft) 45%,
+        var(--color-background) 100%
+    );
+}
+
+#app {
+    height: 100%;
 }
 
 button,
@@ -136,28 +152,23 @@ button {
 }
 
 .app-shell {
-    width: min(1280px, calc(100% - 48px));
-    margin: 0 auto;
-    padding: 56px 0 80px;
+    display: grid;
+    grid-template-columns: 272px minmax(0, 1fr);
+    grid-template-rows: max-content minmax(0, 1fr);
+    height: 100vh;
+    height: 100dvh;
+    overflow: hidden;
+    background: var(--color-background);
 }
 
-@media (min-width: 1291px) {
-    .app-shell {
-        display: grid;
-        grid-template-columns: 272px minmax(0, 1fr);
-        column-gap: 48px;
-        width: min(1600px, calc(100% - 48px));
-    }
-
-    .app-header,
-    #page-content {
-        grid-column: 2;
-        min-width: 0;
-    }
+.app-header,
+#page-content {
+    grid-column: 2;
+    min-width: 0;
 }
 
 .app-header {
-    margin-bottom: 56px;
+    display: none;
 }
 
 .app-header-top {
@@ -180,11 +191,76 @@ button {
     cursor: pointer;
 }
 
+.app-header-logo {
+    display: none;
+}
+
+#page-content {
+    grid-row: 2;
+    min-height: 0;
+    padding: 24px 32px 32px;
+    overflow-x: hidden;
+    overflow-y: auto;
+}
+
+.planner {
+    width: 100%;
+    max-width: 1700px;
+    min-width: 0;
+    margin: 0 auto;
+}
+
 @media (max-width: 1290px) {
+    .app-shell {
+        grid-template-columns: minmax(0, 1fr);
+        grid-template-rows: minmax(0, 1fr);
+        padding-top: 64px;
+    }
+
+    .app-header {
+        position: fixed;
+        inset: 0 0 auto;
+        z-index: 900;
+        display: flex;
+        align-items: center;
+        min-height: 64px;
+        padding: 8px 16px;
+        border-bottom: 1px solid var(--color-sidebar-border);
+        background: var(--color-sidebar);
+        color: var(--color-text-inverse);
+        box-shadow: var(--shadow-elevated);
+    }
+
+    .app-header-top {
+        align-items: center;
+        gap: 10px;
+    }
+
+    .app-header-logo {
+        display: block;
+        width: 34px;
+        height: 34px;
+        object-fit: contain;
+    }
+
     .hamburger-button {
         display: inline-flex;
         align-items: center;
         justify-content: center;
+        padding: 0;
+        border: 0;
+        background: transparent;
+        color: inherit;
+    }
+
+    .hamburger-button:hover {
+        background: var(--color-sidebar-hover);
+    }
+
+    #page-content {
+        grid-column: 1;
+        grid-row: 1;
+        padding: 16px clamp(16px, 3vw, 32px) 32px;
     }
 }
 
@@ -198,6 +274,11 @@ button {
     text-transform: uppercase;
 }
 
+.section-label {
+    color: var(--color-primary);
+    font-weight: 800;
+}
+
 .app-header h1 {
     margin: 0;
     font-size: clamp(2.25rem, 5vw, 4rem);
@@ -206,12 +287,28 @@ button {
     line-height: 1;
 }
 
+@media (max-width: 1290px) {
+    .app-header h1 {
+        font-size: 1.15rem;
+        line-height: 1.1;
+    }
+
+    .app-eyebrow {
+        margin-bottom: 2px;
+        color: var(--color-sidebar-muted);
+        font-size: .62rem;
+    }
+}
+
 .planner-intro {
     display: flex;
-    align-items: center;
+    align-items: flex-end;
     justify-content: space-between;
-    gap: 32px;
-    margin-bottom: 20px;
+    gap: 24px;
+    min-height: 72px;
+    margin-bottom: 24px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid var(--color-border);
 }
 
 .planner-intro h2,
@@ -225,7 +322,7 @@ button {
 .planner-tabs {
     display: flex;
     gap: 6px;
-    margin-bottom: 24px;
+    margin-bottom: 28px;
     padding: 5px;
     overflow-x: auto;
     background: var(--color-surface-muted);
@@ -309,6 +406,7 @@ button {
 
 .calendar-scroll {
     overflow-x: auto;
+    max-width: 100%;
     padding-bottom: 4px;
 }
 
@@ -637,21 +735,8 @@ button {
 }
 
 @media (max-width: 800px) {
-    .app-shell {
-        width: min(100% - 32px, 1280px);
-        padding-top: 32px;
-    }
-
-    .app-header {
-        margin-bottom: 40px;
-    }
-
     .summary-row {
         grid-template-columns: minmax(160px, 1fr) repeat(2, minmax(100px, auto));
-    }
-
-    .summary-stat:last-child {
-        display: none;
     }
 }
 
@@ -691,13 +776,16 @@ button {
     }
 
     .summary-row {
-        grid-template-columns: 1fr auto;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
         gap: 14px;
     }
 
-    .summary-stat:nth-child(3),
-    .summary-stat:nth-child(4) {
-        display: none;
+    .summary-row .employee-name {
+        grid-column: 1 / -1;
+    }
+
+    .summary-stat {
+        text-align: left;
     }
 }
 

@@ -3,6 +3,7 @@ import type {
     Shift,
     ValidationIssue,
 } from "../types/planning";
+import { employeeFullName } from "../services/employeeIdentity";
 
 const OPEN_DAY_LABELS = [
     "Mon",
@@ -282,7 +283,7 @@ function renderShift(
             type="button"
         >
             <strong>
-                ${employee?.name ?? shift.employeeId}
+                ${employee ? employeeFullName(employee) : shift.employeeId}
             </strong>
 
             <span>
@@ -331,7 +332,7 @@ function renderShiftEditor(
                                 value="${employee.id}"
                                 ${employee.id === employeeId ? "selected" : ""}
                             >
-                                ${employee.name}
+                                ${employeeFullName(employee)}
                             </option>
                         `).join("")}
                     </select>

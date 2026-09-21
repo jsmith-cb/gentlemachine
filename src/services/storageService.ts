@@ -92,8 +92,10 @@ export function getStoredEmployees(): Employee[] | undefined {
                 null !== item &&
                 typeof item.id === "string" &&
                 item.id.trim() !== "" &&
-                typeof item.name === "string" &&
-                item.name.trim() !== "" &&
+                typeof item.firstName === "string" &&
+                item.firstName.trim() !== "" &&
+                typeof item.lastName === "string" &&
+                item.lastName.trim() !== "" &&
                 Number.isFinite(item.weeklyTargetMinutes) &&
                 item.weeklyTargetMinutes >= 0 &&
                 Number.isInteger(item.maxDaysPerWeek) &&

@@ -1,3 +1,5 @@
+import logoIcon from "../assets/pricepocket_logo_icon.png";
+
 export interface SidebarElements {
     readonly sidebar: HTMLElement;
     readonly overlay: HTMLButtonElement;
@@ -25,6 +27,11 @@ export function createSidebar(): SidebarElements {
         </button>
 
         <div class="sidebar-logo">
+            <img
+                class="sidebar-logo-image"
+                src="${logoIcon}"
+                alt=""
+            >
             <span class="sidebar-logo-text">
                 <h2>PricePocket</h2>
                 <span>CREW</span>
