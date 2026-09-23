@@ -42,4 +42,39 @@ describe("Planner calendar vacation markers", () => {
         expect(html).toContain('id="planning-assistant-window"');
         expect(html).not.toContain('id="shift-editor-window"');
     });
+
+    it("offers draft generation for an empty displayed month", () => {
+        const state = createInitialPlannerState();
+        state.selectedYear = 2026;
+        state.selectedMonth = 9;
+
+        const html = renderPlannerCalendar(state, null, [], true);
+
+        expect(html).toContain("Create a draft schedule");
+        expect(html).toContain('data-action="generate-draft-schedule"');
+        expect(html).not.toContain("Schedule guidance");
+    });
+
+    it("shows Schedule Guidance instead of generation when the month has a shift", () => {
+        const state = createInitialPlannerState([
+            { id: "existing", employeeId: "a", date: "2026-09-07", start: "10:30", end: "12:30" },
+        ]);
+        state.selectedYear = 2026;
+        state.selectedMonth = 9;
+
+        const html = renderPlannerCalendar(state, null, [], true);
+
+        expect(html).toContain("Schedule guidance");
+        expect(html).not.toContain('data-action="generate-draft-schedule"');
+    });
+
+    it("shows scoped no-result feedback in the generation surface", () => {
+        const state = createInitialPlannerState();
+        const message = "No shifts could be created. Review team availability, time off, and target hours.";
+
+        const html = renderPlannerCalendar(state, null, [], true, message);
+
+        expect(html).toContain('class="planning-assistant-feedback"');
+        expect(html).toContain(message);
+    });
 });

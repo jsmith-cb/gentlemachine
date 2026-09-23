@@ -515,6 +515,28 @@ button {
     overflow-y: auto;
 }
 
+.planning-assistant-generation {
+    display: grid;
+    gap: 1rem;
+}
+
+.planning-assistant-generation p {
+    margin: 0;
+    color: var(--color-text-muted);
+    line-height: 1.55;
+}
+
+.planning-assistant-generation .primary-button {
+    width: 100%;
+}
+
+.planning-assistant-feedback {
+    padding: .75rem;
+    border: 1px solid var(--color-border);
+    border-radius: .75rem;
+    background: var(--color-surface-subtle);
+}
+
 .planning-assistant-body > .status-counts {
     margin-bottom: 14px;
 }

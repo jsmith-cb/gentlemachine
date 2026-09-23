@@ -21,6 +21,7 @@ import type {
 } from "../types/planning";
 import { attachDayPlanningModal } from "./DayPlanningModal";
 import { applyDayPlanningChanges } from "../services/dayPlanningService";
+import { generateShifts } from "../services/generationService";
 
 import {
     renderPlannerCalendar,
@@ -61,6 +62,43 @@ const PLANNER_TABS = [
 
 type PlannerTab = typeof PLANNER_TABS[number]["id"];
 
+export type DraftGenerationOutcome = "blocked" | "no-result" | "generated";
+
+export function selectedPlanningPeriodKey(state: PlannerState): string {
+    return `${state.selectedYear}-${String(state.selectedMonth).padStart(2, "0")}`;
+}
+
+export function planningPeriodHasShifts(state: PlannerState): boolean {
+    const prefix = `${selectedPlanningPeriodKey(state)}-`;
+    return state.shifts.some(({ date }) => date.startsWith(prefix));
+}
+
+export function generateDraftForEmptyPlanningPeriod(state: PlannerState): {
+    state: PlannerState;
+    outcome: DraftGenerationOutcome;
+} {
+    if (planningPeriodHasShifts(state)) {
+        return { state, outcome: "blocked" };
+    }
+
+    const { shifts } = generateShifts(
+        state.employees,
+        state.vacations,
+        state.storeHours,
+        state.selectedYear,
+        state.selectedMonth,
+    );
+
+    if (shifts.length === 0) {
+        return { state, outcome: "no-result" };
+    }
+
+    return {
+        state: { ...state, shifts: [...state.shifts, ...shifts] },
+        outcome: "generated",
+    };
+}
+
 export function renderPlannerPage(
     container: HTMLElement,
 ): void {
@@ -78,6 +116,7 @@ export function renderPlannerPage(
     let assistantPosition: { x: number; y: number } | null = null;
     let assistantFilter = "all";
     let assistantScrollTop = 0;
+    let generationFeedback: { period: string; message: string } | null = null;
 
     function render(): void {
         const monthSummaries =
@@ -173,6 +212,9 @@ export function renderPlannerPage(
                         weekSummaries,
                         monthSummaries,
                         assistantOpen,
+                        generationFeedback?.period === selectedPlanningPeriodKey(state)
+                            ? generationFeedback.message
+                            : null,
                     )}
                 </div>
             </section>
@@ -228,6 +270,38 @@ export function renderPlannerPage(
             if (event.key === "Escape") {
                 event.preventDefault();
                 closeButton?.click();
+            }
+        });
+
+        panel.querySelector<HTMLButtonElement>(
+            '[data-action="generate-draft-schedule"]',
+        )?.addEventListener("click", () => {
+            // The rendered empty-period state is not authoritative. Guard the
+            // current state again before asking the integration to generate.
+            if (planningPeriodHasShifts(state)) {
+                render();
+                return;
+            }
+
+            const period = selectedPlanningPeriodKey(state);
+            const result = generateDraftForEmptyPlanningPeriod(state);
+
+            if (result.outcome === "no-result") {
+                generationFeedback = {
+                    period,
+                    message: "No shifts could be created. Review team availability, time off, and target hours.",
+                };
+                assistantOpen = true;
+                render();
+                return;
+            }
+
+            if (result.outcome === "generated") {
+                state = result.state;
+                setStoredShifts(state.shifts);
+                generationFeedback = null;
+                assistantOpen = true;
+                render();
             }
         });
 
@@ -563,6 +637,7 @@ function renderActiveTab(
     weekSummaries: EmployeeWeekSummary[],
     monthSummaries: EmployeeMonthSummary[],
     assistantOpen: boolean,
+    generationFeedback: string | null,
 ): string {
     if (activeTab === "weekly") {
         return renderPlannerWeeklyOverview(state, weekSummaries);
@@ -572,7 +647,13 @@ function renderActiveTab(
         return renderPlannerMonthlyOverview(state, monthSummaries);
     }
 
-    return renderPlannerCalendar(state, editorMode, scheduleIssues, assistantOpen);
+    return renderPlannerCalendar(
+        state,
+        editorMode,
+        scheduleIssues,
+        assistantOpen,
+        generationFeedback,
+    );
 }
 
 function changeMonth(

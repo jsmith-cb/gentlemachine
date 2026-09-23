@@ -36,7 +36,14 @@ export function renderPlannerCalendar(
     editorMode: PlannerEditorMode | null,
     scheduleIssues: ValidationIssue[],
     assistantOpen = false,
+    generationFeedback: string | null = null,
 ): string {
+    const planningPeriodIsEmpty = !state.shifts.some(
+        ({ date }) => date.startsWith(
+            `${state.selectedYear}-${String(state.selectedMonth).padStart(2, "0")}-`,
+        ),
+    );
+
     return `
         <div class="planner-meta">
             <div class="planner-schedule-facts">
@@ -50,7 +57,9 @@ export function renderPlannerCalendar(
                 data-action="toggle-planning-assistant" aria-controls="planning-assistant-window"
                 aria-expanded="${assistantOpen}">
                 <strong>Planning assistant</strong>
-                <span>${scheduleIssues.filter(({ severity }) => severity === "error").length} errors · ${scheduleIssues.filter(({ severity }) => severity === "warning").length} warnings</span>
+                <span>${planningPeriodIsEmpty
+                    ? "Generate a draft schedule"
+                    : `${scheduleIssues.filter(({ severity }) => severity === "error").length} errors · ${scheduleIssues.filter(({ severity }) => severity === "warning").length} warnings`}</span>
             </button>
         </div>
 
@@ -73,13 +82,20 @@ export function renderPlannerCalendar(
         </div>
 
         ${editorMode ? renderDayPlanningModal(state, getEditorDate(state, editorMode) ?? "") : ""}
-        ${renderPlanningAssistant(scheduleIssues, assistantOpen)}
+        ${renderPlanningAssistant(
+            scheduleIssues,
+            assistantOpen,
+            planningPeriodIsEmpty,
+            generationFeedback,
+        )}
     `;
 }
 
 function renderPlanningAssistant(
     issues: ValidationIssue[],
     isOpen: boolean,
+    planningPeriodIsEmpty: boolean,
+    generationFeedback: string | null,
 ): string {
     const errors = issues.filter(({ severity }) => severity === "error");
     const warnings = issues.filter(({ severity }) => severity === "warning");
@@ -94,12 +110,30 @@ function renderPlanningAssistant(
             <div class="planning-assistant-header" data-assistant-drag-handle>
                 <div>
                     <p class="section-label">Planning assistant</p>
-                    <h2 id="planning-assistant-title" tabindex="-1">Schedule guidance</h2>
+                    <h2 id="planning-assistant-title" tabindex="-1">${planningPeriodIsEmpty
+                        ? "Create a draft schedule"
+                        : "Schedule guidance"}</h2>
                 </div>
                 <button type="button" data-action="close-planning-assistant"
                     aria-label="Close Planning assistant">×</button>
             </div>
             <div class="planning-assistant-body">
+                ${planningPeriodIsEmpty
+                    ? `
+                        <div class="planning-assistant-generation">
+                            <p>
+                                Crew can create a draft for this month from the team's
+                                availability, time off, and target hours.
+                            </p>
+                            ${generationFeedback
+                                ? `<p class="planning-assistant-feedback" role="status">${escapeHtml(generationFeedback)}</p>`
+                                : ""}
+                            <button class="primary-button" type="button" data-action="generate-draft-schedule">
+                                Generate draft schedule
+                            </button>
+                        </div>
+                    `
+                    : `
                 <div class="status-counts">
                     <span class="status-count status-count--error">${errors.length} errors</span>
                     <span class="status-count status-count--warning">${warnings.length} warnings</span>
@@ -137,6 +171,7 @@ function renderPlanningAssistant(
                             Break coverage is not yet included.
                         </p>
                     </div>
+                `}
                 `}
             </div>
         </aside>
