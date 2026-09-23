@@ -1,6 +1,16 @@
 import { describe, expect, it } from "vitest";
-import { generateShifts } from "./generationService";
-import { getDayOfWeek, getWeekStartDate } from "./hoursService";
+import {
+    classifyGenerationFlexibility,
+    generateShifts,
+    orderEmployeesForGeneration,
+} from "./generationService";
+import {
+    getAdjustedMonthlyTargetMinutes,
+    getDayOfWeek,
+    getPaidShiftMinutes,
+    getWeekStartDate,
+    timeToMinutes,
+} from "./hoursService";
 import type { Employee, StoreHours, VacationPeriod } from "../types/planning";
 
 const STORE_HOURS: StoreHours = { open: "10:00", close: "20:00" };
@@ -70,7 +80,7 @@ describe("generateShifts", () => {
         const result = generateShifts(employees, [], STORE_HOURS, 2026, 3);
         for (const shift of result.shifts) {
             expect(shift.start).toBe("11:00");
-            expect(shift.end).toBe("17:00");
+            expect(timeToMinutes(shift.end)).toBeLessThanOrEqual(timeToMinutes("17:00"));
         }
     });
 
@@ -85,7 +95,7 @@ describe("generateShifts", () => {
         const result = generateShifts(employees, [], STORE_HOURS, 2026, 3);
         for (const shift of result.shifts) {
             expect(shift.start).toBe("10:00");
-            expect(shift.end).toBe("15:00");
+            expect(timeToMinutes(shift.end)).toBeLessThanOrEqual(timeToMinutes("15:00"));
         }
     });
 
@@ -100,7 +110,7 @@ describe("generateShifts", () => {
         const result = generateShifts(employees, [], STORE_HOURS, 2026, 3);
         for (const shift of result.shifts) {
             expect(shift.start).toBe("16:00");
-            expect(shift.end).toBe("20:00");
+            expect(timeToMinutes(shift.end)).toBeLessThanOrEqual(timeToMinutes("20:00"));
         }
     });
 
@@ -132,10 +142,10 @@ describe("generateShifts", () => {
             const dow = getDayOfWeek(shift.date);
             if (dow === 1) {
                 expect(shift.start).toBe("12:00");
-                expect(shift.end).toBe("16:00");
+                expect(timeToMinutes(shift.end)).toBeLessThanOrEqual(timeToMinutes("16:00"));
             } else {
                 expect(shift.start).toBe("11:00");
-                expect(shift.end).toBe("17:00");
+                expect(timeToMinutes(shift.end)).toBeLessThanOrEqual(timeToMinutes("17:00"));
             }
         }
     });
@@ -145,7 +155,7 @@ describe("generateShifts", () => {
         const result = generateShifts(employees, [], STORE_HOURS, 2026, 3);
         for (const shift of result.shifts) {
             expect(shift.start).toBe(STORE_HOURS.open);
-            expect(shift.end).toBe(STORE_HOURS.close);
+            expect(timeToMinutes(shift.end)).toBeLessThanOrEqual(timeToMinutes(STORE_HOURS.close));
         }
     });
 
@@ -207,5 +217,157 @@ describe("generateShifts", () => {
         const employees = [employee];
         generateShifts(employees, [], STORE_HOURS, 2026, 3);
         expect(JSON.stringify(employee)).toBe(original);
+    });
+
+    describe("flexibility ordering", () => {
+        const hourly = makeEmployee({
+            id: "hourly",
+            availability: { days: [1, 2, 3, 4, 5, 6], latestEnd: "14:00" },
+        });
+        const daily = makeEmployee({
+            id: "daily",
+            availability: { days: [1, 2, 3] },
+        });
+        const general = makeEmployee({
+            id: "general",
+            availability: { days: [1, 2, 3, 4, 5, 6] },
+        });
+
+        it("classifies hour, day, and generally available employees directly", () => {
+            expect(classifyGenerationFlexibility(hourly, STORE_HOURS)).toBe("hour-constrained");
+            expect(classifyGenerationFlexibility(daily, STORE_HOURS)).toBe("day-constrained");
+            expect(classifyGenerationFlexibility(general, STORE_HOURS)).toBe("general");
+        });
+
+        it("ranks hour-constrained, then day-constrained, then general", () => {
+            expect(orderEmployeesForGeneration([general, daily, hourly], STORE_HOURS).map(({ id }) => id))
+                .toEqual(["hourly", "daily", "general"]);
+        });
+
+        it("uses immutable employee identity as the deterministic tie-breaker", () => {
+            const later = makeEmployee({ id: "z-employee", availability: general.availability });
+            const earlier = makeEmployee({ id: "a-employee", availability: general.availability });
+            expect(orderEmployeesForGeneration([later, earlier], STORE_HOURS).map(({ id }) => id))
+                .toEqual(["a-employee", "z-employee"]);
+        });
+    });
+
+    describe("target allocation", () => {
+        it("approaches the employee target", () => {
+            const employee = makeEmployee({
+                weeklyTargetMinutes: 5 * 60,
+                maxDaysPerWeek: 5,
+                availability: {
+                    days: [1, 2, 3, 4, 5],
+                    earliestStart: "10:00",
+                    latestEnd: "12:00",
+                },
+            });
+
+            const result = generateShifts([employee], [], STORE_HOURS, 2026, 3);
+            const paidMinutes = result.shifts.reduce(
+                (sum, shift) => sum + getPaidShiftMinutes(shift),
+                0,
+            );
+
+            const monthlyTarget = getAdjustedMonthlyTargetMinutes(employee, [], 2026, 3);
+            expect(paidMinutes).toBeGreaterThan(0);
+            expect(paidMinutes).toBeLessThanOrEqual(monthlyTarget);
+            expect(monthlyTarget - paidMinutes).toBeLessThan(120);
+        });
+
+        it("does not overschedule when target can be met", () => {
+            const employee = makeEmployee({
+                weeklyTargetMinutes: 5 * 60,
+                maxDaysPerWeek: 5,
+                availability: {
+                    days: [1, 2, 3, 4, 5],
+                    earliestStart: "10:00",
+                    latestEnd: "15:00",
+                },
+            });
+
+            const result = generateShifts([employee], [], STORE_HOURS, 2026, 3);
+            const paidMinutes = result.shifts.reduce(
+                (sum, shift) => sum + getPaidShiftMinutes(shift), 0);
+            const target = getAdjustedMonthlyTargetMinutes(employee, [], 2026, 3);
+            expect(paidMinutes).toBeLessThanOrEqual(target);
+            expect(result.shifts.some(({ end }) => end !== "15:00")).toBe(true);
+        });
+
+        it("stops under target rather than generating a final shift below two paid hours", () => {
+            const employee = makeEmployee({
+                weeklyTargetMinutes: 140,
+                maxDaysPerWeek: 5,
+                availability: { days: [1, 2, 3, 4, 5], earliestStart: "10:00", latestEnd: "12:00" },
+            });
+            const result = generateShifts([employee], [], STORE_HOURS, 2026, 3);
+            const paidMinutes = result.shifts.reduce(
+                (sum, shift) => sum + getPaidShiftMinutes(shift), 0);
+            const target = getAdjustedMonthlyTargetMinutes(employee, [], 2026, 3);
+            expect(target - paidMinutes).toBeGreaterThan(0);
+            expect(target - paidMinutes).toBeLessThan(120);
+            expect(result.shifts.every((shift) => getPaidShiftMinutes(shift) >= 120)).toBe(true);
+        });
+
+        it("uses the authoritative vacation-adjusted monthly target", () => {
+            const employee = makeEmployee({
+                weeklyTargetMinutes: 35 * 60,
+                maxDaysPerWeek: 5,
+                availability: { days: [1, 2, 3, 4, 5] },
+            });
+            const vacations: VacationPeriod[] = [{
+                id: "vacation", employeeId: employee.id,
+                startDate: "2026-03-09", endDate: "2026-03-10",
+            }];
+            const result = generateShifts([employee], vacations, STORE_HOURS, 2026, 3);
+            const paidMinutes = result.shifts.reduce(
+                (sum, shift) => sum + getPaidShiftMinutes(shift), 0);
+            const adjustedTarget = getAdjustedMonthlyTargetMinutes(employee, vacations, 2026, 3);
+            expect(paidMinutes).toBeLessThanOrEqual(adjustedTarget);
+            expect(adjustedTarget - paidMinutes).toBeLessThan(120);
+        });
+
+        it("does not violate availability when target cannot be met", () => {
+            const employee = makeEmployee({
+                weeklyTargetMinutes: 20 * 60,
+                maxDaysPerWeek: 5,
+                availability: {
+                    days: [6],
+                    earliestStart: "10:00",
+                    latestEnd: "12:00",
+                },
+            });
+
+            const result = generateShifts([employee], [], STORE_HOURS, 2026, 3);
+            for (const shift of result.shifts) {
+                expect(shift.start).toBe("10:00");
+                expect(shift.end).toBe("12:00");
+                expect(getDayOfWeek(shift.date)).toBe(6);
+            }
+            expect(result.shifts.reduce((sum, shift) => sum + getPaidShiftMinutes(shift), 0))
+                .toBeLessThan(getAdjustedMonthlyTargetMinutes(employee, [], 2026, 3));
+        });
+
+        it("does not violate maxDaysPerWeek when target cannot be met", () => {
+            const employee = makeEmployee({
+                weeklyTargetMinutes: 40 * 60,
+                maxDaysPerWeek: 2,
+                availability: { days: [1, 2, 3, 4, 5, 6] },
+            });
+
+            const result = generateShifts([employee], [], STORE_HOURS, 2026, 3);
+            const byWeek = new Map<string, Set<string>>();
+            for (const shift of result.shifts) {
+                const week = getWeekStartDate(shift.date);
+                if (!byWeek.has(week)) byWeek.set(week, new Set());
+                byWeek.get(week)!.add(shift.date);
+            }
+            for (const dates of byWeek.values()) {
+                expect(dates.size).toBeLessThanOrEqual(2);
+            }
+            expect(result.shifts.reduce((sum, shift) => sum + getPaidShiftMinutes(shift), 0))
+                .toBeLessThan(getAdjustedMonthlyTargetMinutes(employee, [], 2026, 3));
+        });
     });
 });
