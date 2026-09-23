@@ -3,6 +3,7 @@ import {
     getAdjustedMonthlyTargetMinutes,
 } from "../services/hoursService";
 import { employeeFullName } from "../services/employeeIdentity";
+import { employeesForPlanningPeriod } from "../services/teamService";
 import type {
     Employee,
     EmployeeMonthSummary,
@@ -26,7 +27,9 @@ export function renderPlannerMonthlyOverview(
             </div>
 
             <div class="summary-list">
-                ${state.employees.map((employee) => {
+                ${employeesForPlanningPeriod(state.employees, state.shifts,
+                    `${state.selectedYear}-${String(state.selectedMonth).padStart(2, "0")}-01`,
+                    `${state.selectedYear}-${String(state.selectedMonth).padStart(2, "0")}-31`).map((employee) => {
                     const summary = summaries.find(
                         ({ employeeId }) => employeeId === employee.id,
                     );

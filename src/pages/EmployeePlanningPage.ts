@@ -8,15 +8,17 @@ import {
     formatMinutes,
 } from "../services/hoursService";
 import { employeeSelectOptions } from "../services/employeeIdentity";
+import { activeEmployees, createTeamMemberDraft, deactivateTeamMember } from "../services/teamService";
 import { hasValidAvailabilityHours } from "../services/availabilityService";
 import { isValidVacationPeriod, overlapsVacation } from "../services/vacationService";
 
-import { getStoredShifts, getStoredEmployees, getStoredVacations, setStoredEmployees, setStoredShifts, setStoredVacations } from "../services/storageService";
+import { getStoredShifts, getStoredEmployees, getStoredVacations, setStoredEmployees, setStoredVacations } from "../services/storageService";
 
-import type { PlannerState } from "../types/planning";
+import type { Employee, PlannerState } from "../types/planning";
 
 let state: PlannerState;
 let selectedEmployeeId: string | null = null;
+let newEmployeeDraft: Employee | null = null;
 
 function escapeHtml(text: string): string {
     return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
@@ -31,26 +33,39 @@ export function renderEmployeePlanningPage(
 
     state = createInitialPlannerState(storedShifts, storedEmployees, storedVacations);
 
-    selectedEmployeeId = employeeSelectOptions(state.employees)[0]?.employee.id ?? null;
+    newEmployeeDraft = null;
+    selectedEmployeeId = employeeSelectOptions(activeEmployees(state.employees))[0]?.employee.id ?? null;
+
+    function startAdd(): void {
+        newEmployeeDraft = createTeamMemberDraft();
+        selectedEmployeeId = newEmployeeDraft.id;
+        render();
+        container.querySelector<HTMLInputElement>("#emp-first-name")?.focus();
+    }
 
     function render(): void {
         const monthSummaries = getEmployeeMonthSummaries(state);
-        const selectedEmployee = state.employees.find(
+        const selectedEmployee = newEmployeeDraft ?? state.employees.find(
             (e) => e.id === selectedEmployeeId,
         );
 
         if (!selectedEmployee) {
             container.innerHTML = `
-                <h1 class="page-heading">
-                    Employee Details
-                </h1>
-
-                <p class="page-placeholder">
-                    Please select an employee to view their planning details.
-                </p>
+                <section class="planner">
+                    <div class="planner-intro employee-planning-intro">
+                        <div><p class="section-label">Workforce</p><h2>Team</h2></div>
+                    </div>
+                    <div class="employee-planning-toolbar">
+                        <p>No active team members yet.</p>
+                        <button type="button" class="primary-button" id="add-employee">+ Add</button>
+                    </div>
+                </section>
             `;
+            container.querySelector("#add-employee")?.addEventListener("click", startAdd);
             return;
         }
+
+        const isNew = newEmployeeDraft !== null;
 
         const summary = monthSummaries.find(
             ({ employeeId }) => employeeId === selectedEmployee.id,
@@ -71,6 +86,9 @@ export function renderEmployeePlanningPage(
 
         const dayLabels = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
         const availability = selectedEmployee.availability;
+        const hasDayHours = Object.values(availability.dayHours ?? {}).some(
+            (hours) => Boolean(hours?.earliestStart || hours?.latestEnd),
+        );
         const targetHours = (selectedEmployee.weeklyTargetMinutes / 60).toFixed(1);
         const employeeVacations = state.vacations
             .filter((period) => period.employeeId === selectedEmployee.id)
@@ -94,8 +112,8 @@ export function renderEmployeePlanningPage(
                 <div class="employee-planning-toolbar">
                     <div class="employee-selector">
                         <label for="employee-select">Select an Employee</label>
-                        <select id="employee-select">
-                            ${employeeSelectOptions(state.employees)
+                        <select id="employee-select" ${isNew ? "disabled" : ""}>
+                            ${isNew ? `<option value="${escapeHtml(selectedEmployee.id)}">New team member</option>` : employeeSelectOptions(activeEmployees(state.employees))
                                 .map(
                                     ({ employee, label }) => `
                                         <option
@@ -108,15 +126,19 @@ export function renderEmployeePlanningPage(
                         </select>
                     </div>
 
+                    ${isNew
+                        ? '<button type="button" class="secondary-button" id="cancel-add-employee">Cancel</button>'
+                        : '<button type="button" class="primary-button" id="add-employee">+ Add</button>'}
+
 					<div class="employee-save-actions">
 					    <button
 					        type="submit"
 					        form="employee-form"
 					        class="primary-button"
 					    >
-					        Save changes
-					    </button>
-					    <span id="save-status" role="status"></span>
+				        ${isNew ? "Add team member" : "Save changes"}
+				    </button>
+				    <span id="save-status" role="status"></span>
 					</div>
                 </div>
 
@@ -137,7 +159,8 @@ export function renderEmployeePlanningPage(
 
                     <div class="form-group">
                         <label for="emp-id">Employee ID</label>
-                        <input type="text" id="emp-id" name="employeeId" value="${escapeHtml(selectedEmployee.id)}" required />
+                        <input type="text" id="emp-id" name="employeeNumber" value="${escapeHtml(selectedEmployee.employeeNumber)}" ${isNew ? "" : "readonly"} required />
+                        <small class="employee-id-note">${isNew ? "Choose an ID for this team member. It cannot be changed after saving." : "Employee ID is fixed after the team member is added."}</small>
                     </div>
 
                     <div class="employee-identity-fields">
@@ -149,24 +172,25 @@ export function renderEmployeePlanningPage(
                             <label for="emp-telephone">Telephone number</label>
                             <input type="tel" id="emp-telephone" name="telephoneNumber" value="${escapeHtml(selectedEmployee.telephoneNumber ?? "")}" autocomplete="tel" />
                         </div>
-	                    <div class="form-group">
-	                        <label for="emp-target-hours">Weekly Target Hours</label>
-	                        <input type="number" id="emp-target-hours" name="targetHours" value="${targetHours}" step="0.5" min="0" max="60" required />
-	                    </div>
-
-	                    <div class="form-group">
-	                        <label for="emp-max-days">Max Days Per Week</label>
-	                        <select id="emp-max-days" name="maxDays" required>
-	                            ${[1, 2, 3, 4, 5, 6, 7].map((d) =>
-	                                `<option value="${d}" ${d === selectedEmployee.maxDaysPerWeek ? "selected" : ""}>${d}</option>`
-	                            ).join("")}
-	                        </select>
-	                    </div>
                     </div>
+                    ${isNew ? "" : `<div class="employee-details-actions"><button type="button" class="secondary-button employee-inactivate-button" id="inactivate-employee">Make inactive</button></div>`}
                     </section>
 
                     <section class="employee-form employee-availability" aria-labelledby="employee-availability-heading">
                     <h3 id="employee-availability-heading">Availability</h3>
+                    <div class="form-group">
+                        <label for="emp-target-hours">Weekly Target Hours</label>
+                        <input type="number" id="emp-target-hours" name="targetHours" value="${targetHours}" step="0.5" min="0" max="60" required />
+                    </div>
+
+                    <div class="form-group">
+                        <label for="emp-max-days">Max Days Per Week</label>
+                        <select id="emp-max-days" name="maxDays" required>
+                            ${[1, 2, 3, 4, 5, 6, 7].map((d) =>
+                                `<option value="${d}" ${d === selectedEmployee.maxDaysPerWeek ? "selected" : ""}>${d}</option>`
+                            ).join("")}
+                        </select>
+                    </div>
                     <div class="form-group">
                         <label>Available Days</label>
                         <div class="day-checkboxes">
@@ -201,6 +225,8 @@ export function renderEmployeePlanningPage(
                             Apply default hours to all available days
                         </button>
                         <p class="apply-hours-status" id="apply-hours-status" role="status"></p>
+                        <details class="day-hours-details" ${hasDayHours ? "open" : ""}>
+                            <summary>Day-specific hours</summary>
                         <div class="day-hours-list">
                             ${dayLabels.map((label, i) => {
                                 const day = i + 1;
@@ -221,11 +247,13 @@ export function renderEmployeePlanningPage(
                                 `;
                             }).join("")}
                         </div>
+                        </details>
                     </div>
                     </section>
                 </form>
                 <section class="employee-planning-analytics" aria-labelledby="employee-metrics-heading">
                     <h3 id="employee-metrics-heading">Metrics and Time off</h3>
+                    ${isNew ? '<p>Save this team member before planning time off or viewing metrics.</p>' : `
                     <p class="section-label">${state.selectedYear}-${String(state.selectedMonth).padStart(2, "0")} Overview</p>
                     <div class="employee-planning-summary">
                         <div class="employee-planning-summary-item">
@@ -266,14 +294,45 @@ export function renderEmployeePlanningPage(
                             </ul>
                         ` : '<p class="vacation-empty">No vacation days planned.</p>'}
                     </section>
+                    `}
                 </section>
                 </div>
             </section>
+            ${isNew ? "" : `
+            <dialog class="employee-inactivate-dialog" id="employee-inactivate-dialog" aria-labelledby="employee-inactivate-title" aria-describedby="employee-inactivate-description">
+                <h2 id="employee-inactivate-title">Make team member inactive?</h2>
+                <p id="employee-inactivate-description">Make ${escapeHtml(selectedEmployee.firstName)} ${escapeHtml(selectedEmployee.lastName)} inactive? They will no longer be available for new shifts. Existing shifts and vacations will be preserved.</p>
+                <form method="dialog" class="employee-inactivate-dialog-actions">
+                    <button type="submit" value="cancel" class="secondary-button" autofocus>Cancel</button>
+                    <button type="submit" value="confirm" class="danger-button">Make inactive</button>
+                </form>
+            </dialog>
+            `}
         `;
 
         const selector = container.querySelector<HTMLSelectElement>("#employee-select");
         selector?.addEventListener("change", () => {
             selectedEmployeeId = selector.value || null;
+            render();
+        });
+
+        container.querySelector("#add-employee")?.addEventListener("click", startAdd);
+        container.querySelector("#cancel-add-employee")?.addEventListener("click", () => {
+            newEmployeeDraft = null;
+            selectedEmployeeId = employeeSelectOptions(activeEmployees(state.employees))[0]?.employee.id ?? null;
+            render();
+        });
+        const inactivateDialog = container.querySelector<HTMLDialogElement>("#employee-inactivate-dialog");
+        container.querySelector("#inactivate-employee")?.addEventListener("click", () => {
+            if (!inactivateDialog) return;
+            inactivateDialog.returnValue = "";
+            inactivateDialog.showModal();
+        });
+        inactivateDialog?.addEventListener("close", () => {
+            if (inactivateDialog.returnValue !== "confirm") return;
+            state.employees = deactivateTeamMember(state.employees, selectedEmployee.id);
+            setStoredEmployees(state.employees);
+            selectedEmployeeId = employeeSelectOptions(activeEmployees(state.employees))[0]?.employee.id ?? null;
             render();
         });
 
@@ -329,6 +388,8 @@ export function renderEmployeePlanningPage(
                 if (dayEarliest) dayEarliest.value = earliest;
                 if (dayLatest) dayLatest.value = latest;
             });
+            const dayHoursDetails = form.querySelector<HTMLDetailsElement>(".day-hours-details");
+            if (dayHoursDetails) dayHoursDetails.open = true;
             if (status) status.textContent = "Default hours copied to available days. Save to keep them.";
         });
         form?.querySelectorAll<HTMLInputElement>('input[name="days"]').forEach((checkbox) => {
@@ -356,16 +417,18 @@ export function renderEmployeePlanningPage(
 
             const firstName = firstNameInput?.value.trim() ?? "";
             const lastName = lastNameInput?.value.trim() ?? "";
-            const id = idInput?.value.trim() ?? "";
+            const employeeNumber = isNew ? idInput?.value.trim() ?? "" : selectedEmployee.employeeNumber;
             const email = emailInput?.value.trim() ?? "";
             const telephoneNumber = telephoneInput?.value.trim() ?? "";
             const saveStatus = container.querySelector("#save-status");
 
-            if (!firstName || !lastName || !id) {
+            if (!firstName || !lastName || !employeeNumber) {
                 if (saveStatus) saveStatus.textContent = "First name, last name, and employee ID are required.";
                 return;
             }
-            if (id !== selectedEmployee.id && state.employees.some((employee) => employee.id === id)) {
+            if (isNew && state.employees.some((employee) =>
+                employee.id !== selectedEmployee.id &&
+                employee.employeeNumber.toLocaleLowerCase() === employeeNumber.toLocaleLowerCase())) {
                 if (saveStatus) saveStatus.textContent = "This employee ID is already in use.";
                 return;
             }
@@ -398,7 +461,7 @@ export function renderEmployeePlanningPage(
 
             const updatedEmployee = {
                 ...selectedEmployee,
-                id,
+                employeeNumber,
                 firstName,
                 lastName,
                 email,
@@ -408,26 +471,12 @@ export function renderEmployeePlanningPage(
                 availability: updatedAvailability,
             };
 
-            state.employees = state.employees.map((emp) =>
-                emp.id === selectedEmployeeId ? updatedEmployee : emp,
-            );
+            state.employees = isNew
+                ? [...state.employees, updatedEmployee]
+                : state.employees.map((emp) => emp.id === selectedEmployee.id ? updatedEmployee : emp);
 
-            if (id !== selectedEmployee.id) {
-                state.shifts = state.shifts.map((shift) =>
-                    shift.employeeId === selectedEmployee.id
-                        ? { ...shift, employeeId: id }
-                        : shift,
-                );
-                setStoredShifts(state.shifts);
-                state.vacations = state.vacations.map((period) =>
-                    period.employeeId === selectedEmployee.id
-                        ? { ...period, employeeId: id }
-                        : period,
-                );
-                setStoredVacations(state.vacations);
-            }
-
-            selectedEmployeeId = id;
+            newEmployeeDraft = null;
+            selectedEmployeeId = selectedEmployee.id;
 
             setStoredEmployees(state.employees);
 

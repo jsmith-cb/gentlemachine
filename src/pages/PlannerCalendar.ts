@@ -5,6 +5,7 @@ import type {
 } from "../types/planning";
 import { employeeFullName } from "../services/employeeIdentity";
 import { vacationEmployeesOnDate } from "../services/vacationService";
+import { renderDayPlanningModal } from "./DayPlanningModal";
 
 const OPEN_DAY_LABELS = [
     "Mon",
@@ -71,7 +72,7 @@ export function renderPlannerCalendar(
             </div>
         </div>
 
-        ${editorMode ? renderShiftEditor(state, editorMode) : ""}
+        ${editorMode ? renderDayPlanningModal(state, getEditorDate(state, editorMode) ?? "") : ""}
         ${renderPlanningAssistant(scheduleIssues, assistantOpen)}
     `;
 }
@@ -304,104 +305,6 @@ function renderShift(
     `;
 }
 
-function renderShiftEditor(
-    state: PlannerState,
-    editorMode: PlannerEditorMode,
-): string {
-    const existingShift = editorMode.type === "edit"
-        ? state.shifts.find(({ id }) => id === editorMode.shiftId)
-        : undefined;
-    if (editorMode.type === "edit" && !existingShift) return "";
-
-    const date = existingShift?.date
-        ?? (editorMode.type === "add" ? editorMode.date : "");
-    const employeeId = existingShift?.employeeId ?? state.employees[0]?.id ?? "";
-    const start = existingShift?.start ?? state.storeHours.open;
-    const end = existingShift?.end ?? state.storeHours.close;
-    const isEditing = editorMode.type === "edit";
-
-    return `
-        <section class="shift-editor" id="shift-editor-window" role="dialog"
-            aria-modal="false" aria-labelledby="shift-editor-title">
-            <div class="shift-editor-heading" data-shift-drag-handle>
-                <div>
-                    <p class="section-label">
-                        ${isEditing ? "Edit shift" : "Add shift"}
-                    </p>
-
-                    <h2 id="shift-editor-title" tabindex="-1">
-                        ${formatDateLabel(date)}
-                    </h2>
-                </div>
-                <button type="button" data-action="cancel-shift"
-                    aria-label="Close ${isEditing ? "Edit shift" : "Add shift"}">×</button>
-            </div>
-
-            <form id="shift-form" class="shift-form">
-                <label class="form-field">
-                    <span>Employee</span>
-                    <select id="shift-employee" name="employeeId" required>
-                        ${state.employees.map((employee) => `
-                            <option
-                                value="${employee.id}"
-                                ${employee.id === employeeId ? "selected" : ""}
-                            >
-                                ${employeeFullName(employee)}
-                            </option>
-                        `).join("")}
-                    </select>
-                </label>
-
-                <label class="form-field">
-                    <span>Start</span>
-                    <input name="start" type="time" value="${start}" required />
-                </label>
-
-                <label class="form-field">
-                    <span>End</span>
-                    <input name="end" type="time" value="${end}" required />
-                </label>
-
-                <div
-                    id="shift-validation"
-                    class="shift-validation"
-                    role="status"
-                    aria-live="polite"
-                ></div>
-
-                <div class="shift-form-actions">
-                    ${isEditing ? `
-                        <button
-                            class="danger-button"
-                            data-action="delete-shift"
-                            type="button"
-                        >
-                            Delete
-                        </button>
-                    ` : ""}
-
-                    <button
-                        class="secondary-button"
-                        data-action="cancel-shift"
-                        type="button"
-                    >
-                        Cancel
-                    </button>
-
-                    <button
-                        class="primary-button"
-                        id="save-shift-button"
-                        type="submit"
-                    >
-                        ${isEditing ? "Save changes" : "Add shift"}
-                    </button>
-                </div>
-            </form>
-
-        </section>
-    `;
-}
-
 function getEditorDate(
     state: PlannerState,
     editorMode: PlannerEditorMode | null,
@@ -421,16 +324,6 @@ function createDateKey(
         String(month).padStart(2, "0"),
         String(day).padStart(2, "0"),
     ].join("-");
-}
-
-function formatDateLabel(date: string): string {
-    const [year, month, day] = date.split("-").map(Number);
-    return new Intl.DateTimeFormat("en", {
-        weekday: "long",
-        month: "long",
-        day: "numeric",
-        year: "numeric",
-    }).format(new Date(year, month - 1, day));
 }
 
 function formatShortDate(date: string): string {

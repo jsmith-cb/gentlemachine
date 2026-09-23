@@ -8,6 +8,7 @@ import {
 import {
     getStoredEmployees,
     getStoredVacations,
+    setStoredEmployees,
     setStoredVacations,
 } from "./storageService";
 
@@ -80,7 +81,9 @@ describe("storageService - Employee Persistence", () => {
             JSON.stringify(employees),
         );
 
-        expect(getStoredEmployees()).toEqual(employees);
+        expect(getStoredEmployees()).toEqual(employees.map((employee) => ({
+            ...employee, employeeNumber: employee.id, status: "active",
+        })));
     });
 
     it("persists optional employee contact details without changing employee identity", () => {
@@ -95,10 +98,38 @@ describe("storageService - Employee Persistence", () => {
             availability: { days: [1, 2, 3] },
         };
         localStorageMock.setItem(EMPLOYEE_STORAGE_KEY, JSON.stringify([employee]));
-        expect(getStoredEmployees()).toEqual([employee]);
+        expect(getStoredEmployees()).toEqual([{
+            ...employee, employeeNumber: employee.id, status: "active",
+        }]);
 
         localStorageMock.setItem(EMPLOYEE_STORAGE_KEY, JSON.stringify([{ ...employee, email: 42 }]));
         expect(getStoredEmployees()).toBeUndefined();
+    });
+
+    it("persists new lifecycle fields and upgrades existing records without changing their IDs", () => {
+        const oldEmployee = {
+            id: "original-reference", firstName: "Mina", lastName: "Cole",
+            weeklyTargetMinutes: 1200, maxDaysPerWeek: 5, availability: { days: [1, 2, 3] },
+        };
+        localStorageMock.setItem(EMPLOYEE_STORAGE_KEY, JSON.stringify([oldEmployee]));
+        expect(getStoredEmployees()).toEqual([{
+            ...oldEmployee, employeeNumber: "original-reference", status: "active",
+        }]);
+        expect(JSON.parse(localStorageMock.getItem(EMPLOYEE_STORAGE_KEY)!)[0].id).toBe("original-reference");
+
+        const inactive = { ...getStoredEmployees()![0], status: "inactive" as const };
+        setStoredEmployees([inactive]);
+        expect(getStoredEmployees()).toEqual([inactive]);
+    });
+
+    it("reloads a newly added member with distinct internal and business identifiers", () => {
+        const employee = {
+            id: "employee-generated-uuid", employeeNumber: "TM-12", status: "active" as const,
+            firstName: "Test", lastName: "Member", weeklyTargetMinutes: 600,
+            maxDaysPerWeek: 3, availability: { days: [1, 2, 3] },
+        };
+        setStoredEmployees([employee]);
+        expect(getStoredEmployees()).toEqual([employee]);
     });
 
     it("accepts valid day-specific hours and rejects malformed overrides", () => {
@@ -116,7 +147,9 @@ describe("storageService - Employee Persistence", () => {
             },
         };
         localStorageMock.setItem(EMPLOYEE_STORAGE_KEY, JSON.stringify([employee]));
-        expect(getStoredEmployees()).toEqual([employee]);
+        expect(getStoredEmployees()).toEqual([{
+            ...employee, employeeNumber: employee.id, status: "active",
+        }]);
 
         employee.availability.dayHours[1].latestEnd = "25:00";
         localStorageMock.setItem(EMPLOYEE_STORAGE_KEY, JSON.stringify([employee]));
@@ -341,7 +374,9 @@ describe("storageService - Employee Persistence", () => {
             JSON.stringify(employees),
         );
 
-        expect(getStoredEmployees()).toEqual(employees);
+        expect(getStoredEmployees()).toEqual(employees.map((employee) => ({
+            ...employee, employeeNumber: employee.id, status: "active",
+        })));
     });
 });
 

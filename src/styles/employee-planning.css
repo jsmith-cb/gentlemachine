@@ -6,9 +6,78 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 48px;
+    gap: 16px;
     max-width: 1700px;
     margin-bottom: 28px;
+}
+
+.employee-planning-toolbar > #add-employee,
+.employee-planning-toolbar > #cancel-add-employee {
+    flex: none;
+    align-self: flex-end;
+    height: 44px;
+    min-height: 44px;
+    padding-inline: 12px;
+}
+
+.employee-save-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-left: auto;
+}
+
+.employee-inactivate-button {
+    color: var(--color-danger);
+    border-color: var(--color-danger-border);
+}
+
+.employee-details-actions {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 16px;
+}
+
+.employee-inactivate-dialog {
+    width: min(440px, calc(100% - 32px));
+    max-height: calc(100% - 32px);
+    padding: 24px;
+    color: var(--color-text);
+    background: var(--color-surface);
+    border: 1px solid var(--color-border-subtle);
+    border-radius: 14px;
+    box-shadow: var(--shadow-elevated);
+}
+
+.employee-inactivate-dialog::backdrop {
+    background: var(--color-backdrop);
+}
+
+.employee-inactivate-dialog h2 {
+    margin: 0 0 12px;
+    color: var(--color-text-strong);
+    font-size: 1.2rem;
+}
+
+.employee-inactivate-dialog p {
+    margin: 0 0 24px;
+    color: var(--color-text-secondary);
+    line-height: 1.5;
+}
+
+.employee-inactivate-dialog-actions {
+    display: flex;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.employee-id-note {
+    color: var(--color-text-muted);
+    font-size: .72rem;
+    line-height: 1.4;
 }
 
 .employee-planning-name {
@@ -258,6 +327,11 @@
         flex: none;
     }
 
+    .employee-planning-toolbar > #add-employee,
+    .employee-planning-toolbar > #cancel-add-employee {
+        align-self: stretch;
+    }
+
     .employee-planning-summary,
     .employee-identity-fields {
         grid-template-columns: 1fr;
@@ -383,6 +457,30 @@
 .day-hours-list {
     display: grid;
     gap: 8px;
+}
+
+.day-hours-details {
+    margin-top: 8px;
+}
+
+.day-hours-details > summary {
+    display: list-item;
+    list-style-position: inside;
+    width: 100%;
+    min-height: 40px;
+    padding: 10px 12px;
+    border: 1px solid var(--color-border-control);
+    border-radius: 9px;
+    background: var(--color-surface);
+    cursor: pointer;
+    color: var(--color-text);
+    font-size: .78rem;
+    font-weight: 700;
+    text-align: center;
+}
+
+.day-hours-details[open] > summary {
+    margin-bottom: 12px;
 }
 
 .day-hours-row {

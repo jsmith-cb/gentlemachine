@@ -15,6 +15,7 @@ import {
 import { employeeFullName } from "./employeeIdentity";
 import { availableHoursForDay } from "./availabilityService";
 import { overlapsVacation } from "./vacationService";
+import { activeEmployees } from "./teamService";
 
 import type {
     PlannerState,
@@ -25,6 +26,8 @@ import type {
 export function validateShift(
     state: PlannerState,
     shift: Shift,
+    existingShift = false,
+    today = localTodayDateKey(),
 ): ValidationIssue[] {
     const issues:
         ValidationIssue[] = [];
@@ -38,6 +41,8 @@ export function validateShift(
         state,
         shift,
         issues,
+        existingShift,
+        today,
     );
 
     return issues;
@@ -45,6 +50,7 @@ export function validateShift(
 
 export function validatePlannerState(
     state: PlannerState,
+    today = localTodayDateKey(),
 ): ValidationIssue[] {
     const monthShifts =
         getMonthShifts(
@@ -59,6 +65,8 @@ export function validatePlannerState(
                 validateShift(
                     state,
                     shift,
+                    true,
+                    today,
                 ),
         );
 
@@ -106,6 +114,8 @@ function validateEmployeeAvailability(
     state: PlannerState,
     shift: Shift,
     issues: ValidationIssue[],
+    existingShift: boolean,
+    today: string,
 ): void {
     const employee =
         state.employees.find(
@@ -127,6 +137,19 @@ function validateEmployeeAvailability(
         });
 
         return;
+    }
+
+    if (employee.status === "inactive") {
+        if (!existingShift || shift.date >= today) {
+            issues.push({
+                severity: existingShift ? "warning" : "error",
+                category: "availability",
+                message: `${employeeFullName(employee)} is inactive but has a shift on this day.`,
+                employeeId: employee.id,
+                date: shift.date,
+            });
+        }
+        if (!existingShift) return;
     }
 
     if (overlapsVacation(state.vacations, employee.id, shift.date, shift.date)) {
@@ -232,7 +255,7 @@ function validateMaximumDaysPerWeek(
     ) {
         for (
             const employee
-            of state.employees
+            of activeEmployees(state.employees)
         ) {
             const daysWorked =
                 getEmployeeDaysWorked(
@@ -286,7 +309,7 @@ function validateWeeklyTargets(
             );
 
         if (
-            !employee ||
+            !employee || employee.status === "inactive" ||
             isSingleDayEmployee(
                 employee.availability.days,
             )
@@ -333,6 +356,12 @@ function validateWeeklyTargets(
                 employee.id,
         });
     }
+}
+
+function localTodayDateKey(): string {
+    const now = new Date();
+    return [now.getFullYear(), String(now.getMonth() + 1).padStart(2, "0"),
+        String(now.getDate()).padStart(2, "0")].join("-");
 }
 
 function validateCoverage(

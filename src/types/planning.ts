@@ -14,7 +14,11 @@ export interface EmployeeAvailability {
 }
 
 export interface Employee {
+    /** Immutable Crew-owned identity referenced by shifts and vacations. */
     id: string;
+    /** Merchant-facing identifier; never used as a domain reference. */
+    employeeNumber: string;
+    status: "active" | "inactive";
     firstName: string;
     lastName: string;
     email?: string;

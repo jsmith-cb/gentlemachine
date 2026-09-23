@@ -16,6 +16,8 @@ describe("plannerState - Initial State", () => {
         const providedEmployees: Employee[] = [
             {
                 id: "test-1",
+                employeeNumber: "test-1",
+                status: "active",
                 firstName: "Test",
                 lastName: "Emp 1",
                 weeklyTargetMinutes: 60,

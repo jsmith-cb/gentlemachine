@@ -5,6 +5,8 @@ import type { Employee } from "../types/planning";
 function employee(id: string, firstName: string, lastName: string): Employee {
     return {
         id,
+        employeeNumber: id,
+        status: "active",
         firstName,
         lastName,
         weeklyTargetMinutes: 0,

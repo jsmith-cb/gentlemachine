@@ -5,7 +5,6 @@ import {
 
 import {
     validatePlannerState,
-    validateShift,
 } from "../services/validationService";
 
 import { getStoredShifts, setStoredShifts, getStoredEmployees, getStoredVacations } from "../services/storageService";
@@ -18,9 +17,10 @@ import type {
     EmployeeMonthSummary,
     EmployeeWeekSummary,
     PlannerState,
-    Shift,
     ValidationIssue,
 } from "../types/planning";
+import { attachDayPlanningModal } from "./DayPlanningModal";
+import { applyDayPlanningChanges } from "../services/dayPlanningService";
 
 import {
     renderPlannerCalendar,
@@ -76,8 +76,6 @@ export function renderPlannerPage(
     let activeTab: PlannerTab = "calendar";
     let assistantOpen = false;
     let assistantPosition: { x: number; y: number } | null = null;
-    let shiftEditorPosition: { x: number; y: number } | null = null;
-    let frontWindow: "assistant" | "shift" = "shift";
     let assistantFilter = "all";
     let assistantScrollTop = 0;
 
@@ -183,7 +181,7 @@ export function renderPlannerPage(
         attachNavigationListeners();
         attachTabListeners();
         attachCalendarListeners();
-        attachShiftEditorListeners();
+        attachDayPlannerListeners();
         attachValidationFilterListeners();
         attachPlanningAssistantListeners();
         const savedAssistantScrollTop = assistantScrollTop;
@@ -203,7 +201,7 @@ export function renderPlannerPage(
         if (!trigger || !panel || !handle) return;
 
         const moveTo = attachFloatingWindow(panel, handle, () => assistantPosition,
-            (position) => { assistantPosition = position; }, "assistant");
+            (position) => { assistantPosition = position; });
 
         panel.querySelector<HTMLElement>(".planning-assistant-body")?.addEventListener("scroll", (event) => {
             assistantScrollTop = (event.currentTarget as HTMLElement).scrollTop;
@@ -214,7 +212,6 @@ export function renderPlannerPage(
             panel.hidden = !assistantOpen;
             trigger.setAttribute("aria-expanded", String(assistantOpen));
             if (assistantOpen) {
-                bringToFront("assistant");
                 if (assistantPosition) moveTo(assistantPosition.x, assistantPosition.y);
                 panel.querySelector<HTMLElement>("#planning-assistant-title")?.focus();
             }
@@ -236,20 +233,11 @@ export function renderPlannerPage(
 
     }
 
-    function bringToFront(windowName: "assistant" | "shift"): void {
-        frontWindow = windowName;
-        const assistant = container.querySelector<HTMLElement>("#planning-assistant-window");
-        const shift = container.querySelector<HTMLElement>("#shift-editor-window");
-        if (assistant) assistant.style.zIndex = frontWindow === "assistant" ? "811" : "800";
-        if (shift) shift.style.zIndex = frontWindow === "shift" ? "811" : "800";
-    }
-
     function attachFloatingWindow(
         panel: HTMLElement,
         handle: HTMLElement,
         getPosition: () => { x: number; y: number } | null,
         setPosition: (position: { x: number; y: number }) => void,
-        windowName: "assistant" | "shift",
     ): (x: number, y: number) => void {
         const moveTo = (x: number, y: number): void => {
             const minY = window.innerWidth <= 1290 ? 72 : 16;
@@ -267,8 +255,6 @@ export function renderPlannerPage(
 
         const position = getPosition();
         if (position) moveTo(position.x, position.y);
-        bringToFront(frontWindow);
-        panel.addEventListener("pointerdown", () => bringToFront(windowName));
 
         let drag: { pointerId: number; pointerX: number; pointerY: number; x: number; y: number } | null = null;
         handle.addEventListener("pointerdown", (event) => {
@@ -428,8 +414,6 @@ export function renderPlannerPage(
                     };
 
                     render();
-                    bringToFront("shift");
-                    focusEmployeeField();
                 },
             );
         }
@@ -459,225 +443,29 @@ export function renderPlannerPage(
                     };
 
                     render();
-                    bringToFront("shift");
-                    focusEmployeeField();
                 },
             );
         }
     }
 
-    function attachShiftEditorListeners(): void {
-        const form =
-            container.querySelector<HTMLFormElement>(
-                "#shift-form",
-            );
-
-        const cancelButtons = container.querySelectorAll<HTMLButtonElement>(
-            '[data-action="cancel-shift"]',
-        );
-
-        const deleteButton =
-            container.querySelector<HTMLButtonElement>(
-                '[data-action="delete-shift"]',
-            );
-
-        for (const button of cancelButtons) {
-            button.addEventListener("click", () => {
-                editorMode = null;
-                render();
-            });
-        }
-
-        const panel = container.querySelector<HTMLElement>("#shift-editor-window");
-        const handle = container.querySelector<HTMLElement>("[data-shift-drag-handle]");
-        if (panel && handle) {
-            attachFloatingWindow(panel, handle, () => shiftEditorPosition,
-                (position) => { shiftEditorPosition = position; }, "shift");
-            panel.addEventListener("keydown", (event) => {
-                if (event.key === "Escape") {
-                    event.preventDefault();
-                    cancelButtons[0]?.click();
-                }
-            });
-        }
-		
-		deleteButton?.addEventListener(
-		    "click",
-		    () => {
-		        if (
-		            !editorMode ||
-		            editorMode.type !==
-		                "edit"
-		        ) {
-		            return;
-		        }
-
-		        const shiftId =
-		            editorMode.shiftId;
-
-		        state = {
-		            ...state,
-		            shifts:
-		                state.shifts.filter(
-		                    ({ id }) =>
-		                        id !==
-		                        shiftId,
-		                ),
-		        };
-
-		        setStoredShifts(state.shifts);
-		        editorMode = null;
-
-		        render();
-		    },
-		);
-
-        if (!form) {
-            return;
-        }
-
-        const updateValidation =
-            (): ValidationIssue[] => {
-                const draft =
-                    createShiftFromForm(
-                        form,
-                        editorMode,
-                        state,
-                    );
-
-                if (!draft) {
-                    renderEditorIssues(
-                        container,
-                        [],
-                        false,
-                    );
-
-                    updateSaveButton(
-                        container,
-                        true,
-                    );
-
-                    return [];
-                }
-
-                const issues =
-                    validateShift(
-                        state,
-                        draft,
-                    );
-
-                renderEditorIssues(
-                    container,
-                    issues,
-                    true,
-                );
-
-                updateSaveButton(
-                    container,
-                    issues.some(
-                        ({ severity }) =>
-                            severity ===
-                            "error",
-                    ),
-                );
-
-                return issues;
-            };
-
-        const fields =
-            form.querySelectorAll<
-                HTMLInputElement |
-                HTMLSelectElement
-            >(
-                "input, select",
-            );
-
-        for (
-            const field
-            of fields
-        ) {
-            field.addEventListener(
-                "input",
-                updateValidation,
-            );
-
-            field.addEventListener(
-                "change",
-                updateValidation,
-            );
-        }
-
-        updateValidation();
-
-        form.addEventListener(
-            "submit",
-            (event) => {
-                event.preventDefault();
-
-                const shift =
-                    createShiftFromForm(
-                        form,
-                        editorMode,
-                        state,
-                    );
-
-                if (!shift) {
-                    return;
-                }
-
-                const issues =
-                    validateShift(
-                        state,
-                        shift,
-                    );
-
-                const hasErrors =
-                    issues.some(
-                        ({ severity }) =>
-                            severity ===
-                            "error",
-                    );
-
-                if (hasErrors) {
-                    return;
-                }
-
-                if (
-                    editorMode?.type ===
-                    "edit"
-                ) {
-                    state = {
-                        ...state,
-                        shifts:
-                            state.shifts.map(
-                                (existingShift) =>
-                                    existingShift.id ===
-                                    shift.id
-                                        ? shift
-                                        : existingShift,
-                            ),
-                    };
-
-				setStoredShifts(state.shifts);
-                } else {
-                    state = {
-                        ...state,
-                        shifts: [
-                            ...state.shifts,
-                            shift,
-                        ],
-                    };
-
-				setStoredShifts(state.shifts);
-                }
-
-                editorMode = null;
-
+    function attachDayPlannerListeners(): void {
+        if (!editorMode) return;
+        const mode = editorMode;
+        const dialog = container.querySelector<HTMLDialogElement>("#day-planner-dialog");
+        const date = mode.type === "add" ? mode.date :
+            state.shifts.find(({ id }) => id === mode.shiftId)?.date;
+        if (!dialog || !date) return;
+        attachDayPlanningModal(dialog, state, date,
+            mode.type === "edit" ? mode.shiftId : null,
+            (upserts, deletions) => {
+                state = { ...state, shifts: applyDayPlanningChanges(state.shifts, upserts, deletions) };
+                setStoredShifts(state.shifts);
+                editorMode = { type: "add", date };
                 render();
             },
+            () => { editorMode = null; render(); },
         );
     }
-
     function attachValidationFilterListeners(): void {
         const filterButtons =
             container.querySelectorAll<HTMLButtonElement>(
@@ -764,15 +552,6 @@ export function renderPlannerPage(
         }
     }
 
-    function focusEmployeeField(): void {
-        const employeeSelect =
-            container.querySelector<HTMLSelectElement>(
-                "#shift-employee",
-            );
-
-        employeeSelect?.focus();
-    }
-
     render();
 }
 
@@ -796,141 +575,6 @@ function renderActiveTab(
     return renderPlannerCalendar(state, editorMode, scheduleIssues, assistantOpen);
 }
 
-function createShiftFromForm(
-    form: HTMLFormElement,
-    editorMode:
-        | PlannerEditorMode
-        | null,
-    state: PlannerState,
-): Shift | null {
-    if (!editorMode) {
-        return null;
-    }
-
-    const formData =
-        new FormData(
-            form,
-        );
-
-    const employeeId =
-        String(
-            formData.get(
-                "employeeId",
-            ) ?? "",
-        );
-
-    const start =
-        String(
-            formData.get(
-                "start",
-            ) ?? "",
-        );
-
-    const end =
-        String(
-            formData.get(
-                "end",
-            ) ?? "",
-        );
-
-    if (
-        !employeeId ||
-        !start ||
-        !end
-    ) {
-        return null;
-    }
-
-    if (
-        editorMode.type ===
-        "edit"
-    ) {
-        const existingShift =
-            state.shifts.find(
-                ({ id }) =>
-                    id ===
-                    editorMode.shiftId,
-            );
-
-        if (!existingShift) {
-            return null;
-        }
-
-        return {
-            ...existingShift,
-            employeeId,
-            start,
-            end,
-        };
-    }
-
-    return {
-        id:
-            createShiftId(),
-        employeeId,
-        date:
-            editorMode.date,
-        start,
-        end,
-    };
-}
-
-function renderEditorIssues(
-    container: HTMLElement,
-    issues: ValidationIssue[],
-    hasDraft: boolean,
-): void {
-    const validationContainer =
-        container.querySelector<HTMLElement>(
-            "#shift-validation",
-        );
-
-    if (!validationContainer) {
-        return;
-    }
-
-    if (!hasDraft) {
-        validationContainer.textContent = "";
-        validationContainer.hidden = true;
-        return;
-    }
-
-    validationContainer.hidden = false;
-
-    if (issues.length === 0) {
-        validationContainer.innerHTML =
-            '<p class="validation-message validation-message--success">Available for this day and these hours.</p>';
-        return;
-    }
-
-    validationContainer.innerHTML =
-        issues
-            .map(
-                (issue) => `
-                    <p class="validation-message validation-message--${issue.severity}">
-                        ${issue.severity === "error" ? "Error:" : "Warning:"}
-                        ${issue.message}
-                    </p>
-                `,
-            )
-            .join("");
-}
-
-function updateSaveButton(
-    container: HTMLElement,
-    disabled: boolean,
-): void {
-    const button =
-        container.querySelector<HTMLButtonElement>(
-            "#save-shift-button",
-        );
-
-    if (button) {
-        button.disabled =
-            disabled;
-    }
-}
-
 function changeMonth(
     state: PlannerState,
     amount: number,
@@ -952,23 +596,4 @@ function changeMonth(
             date.getMonth() +
             1,
     };
-}
-
-function createShiftId(): string {
-    if (
-        typeof crypto !==
-            "undefined" &&
-        "randomUUID" in
-            crypto
-    ) {
-        return crypto.randomUUID();
-    }
-
-    return [
-        "shift",
-        Date.now(),
-        Math.random()
-            .toString(16)
-            .slice(2),
-    ].join("-");
 }

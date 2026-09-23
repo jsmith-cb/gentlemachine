@@ -116,6 +116,8 @@ export function getStoredEmployees(): Employee[] | undefined {
                 null !== item &&
                 typeof item.id === "string" &&
                 item.id.trim() !== "" &&
+                (item.employeeNumber === undefined || typeof item.employeeNumber === "string") &&
+                (item.status === undefined || item.status === "active" || item.status === "inactive") &&
                 typeof item.firstName === "string" &&
                 item.firstName.trim() !== "" &&
                 typeof item.lastName === "string" &&
@@ -139,8 +141,20 @@ export function getStoredEmployees(): Employee[] | undefined {
             if (!hasValidAvailabilityHours(item.availability)) return undefined;
         }
 
-        // All entries valid — accept the entire list
-        return parsed as Employee[];
+        const ids = new Set(parsed.map((item) => item.id));
+        if (ids.size !== parsed.length) return undefined;
+
+        // Preserve existing internal IDs so stored shifts and vacations still resolve.
+        // The former editable ID becomes the merchant-facing employee number.
+        const employees: Employee[] = parsed.map((item) => ({
+            ...item,
+            employeeNumber: item.employeeNumber ?? item.id,
+            status: item.status ?? "active",
+        }));
+        if (parsed.some((item) => item.employeeNumber === undefined || item.status === undefined)) {
+            setStoredEmployees(employees);
+        }
+        return employees;
     } catch {
         // Malformed JSON or any other error — fallback to defaults
         return undefined;

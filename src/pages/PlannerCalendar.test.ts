@@ -31,15 +31,15 @@ describe("Planner calendar vacation markers", () => {
         expect(html).not.toContain('class="schedule-status"');
     });
 
-    it("renders an independent modeless shift window alongside the Planning assistant", () => {
+    it("opens the day-planning modal alongside the Planning assistant", () => {
         const state = createInitialPlannerState();
         const html = renderPlannerCalendar(state, { type: "add", date: "2026-09-07" }, [], true);
 
-        expect(html).toContain('id="shift-editor-window" role="dialog"');
-        expect(html).toContain('aria-modal="false" aria-labelledby="shift-editor-title"');
-        expect(html).toContain('data-shift-drag-handle');
-        expect(html).toContain('data-action="cancel-shift"');
+        expect(html).toContain('id="day-planner-dialog"');
+        expect(html).toContain('aria-labelledby="day-planner-title"');
+        expect(html).toContain('data-day-close');
+        expect(html).toContain('Monday, September 7, 2026');
         expect(html).toContain('id="planning-assistant-window"');
-        expect(html).toContain('id="shift-form"');
+        expect(html).not.toContain('id="shift-editor-window"');
     });
 });

@@ -3,6 +3,7 @@ import {
     formatMinutes,
 } from "../services/hoursService";
 import { employeeFullName } from "../services/employeeIdentity";
+import { employeesForPlanningPeriod } from "../services/teamService";
 import type {
     EmployeeWeekSummary,
     PlannerState,
@@ -65,7 +66,8 @@ function renderWeek(
             </div>
 
             <div class="week-employees">
-                ${state.employees.map((employee) => {
+                ${employeesForPlanningPeriod(state.employees, state.shifts,
+                    firstSummary.weekStart, firstSummary.weekEnd).map((employee) => {
                     const summary = weekSummaries.find(
                         ({ employeeId }) => employeeId === employee.id,
                     );
