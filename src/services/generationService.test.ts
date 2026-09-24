@@ -15,8 +15,24 @@ import {
 } from "./hoursService";
 import type { Employee, StoreHours, VacationPeriod } from "../types/planning";
 
-const STORE_HOURS: StoreHours = { open: "10:00", close: "20:00" };
-const EIGHT_HOUR_STORE_HOURS: StoreHours = { open: "10:00", close: "18:00" };
+const STORE_OPEN = "10:00";
+const STORE_CLOSE = "20:00";
+const EIGHT_HOUR_STORE_CLOSE = "18:00";
+function storeHours(open: string, close: string): StoreHours {
+    return {
+        days: [
+            { dayOfWeek: 0, isOpen: false },
+            { dayOfWeek: 1, isOpen: true, openTime: open, closeTime: close },
+            { dayOfWeek: 2, isOpen: true, openTime: open, closeTime: close },
+            { dayOfWeek: 3, isOpen: true, openTime: open, closeTime: close },
+            { dayOfWeek: 4, isOpen: true, openTime: open, closeTime: close },
+            { dayOfWeek: 5, isOpen: true, openTime: open, closeTime: close },
+            { dayOfWeek: 6, isOpen: true, openTime: open, closeTime: close },
+        ],
+    };
+}
+const STORE_HOURS = storeHours(STORE_OPEN, STORE_CLOSE);
+const EIGHT_HOUR_STORE_HOURS = storeHours(STORE_OPEN, EIGHT_HOUR_STORE_CLOSE);
 
 function makeEmployee(overrides: Partial<Employee> = {}): Employee {
     return {
@@ -171,8 +187,8 @@ describe("generateShifts", () => {
         const employees = [makeEmployee()];
         const result = generateShifts(employees, [], STORE_HOURS, 2026, 3, []);
         for (const shift of result.shifts) {
-            expect(shift.start).toBe(STORE_HOURS.open);
-            expect(timeToMinutes(shift.end)).toBeLessThanOrEqual(timeToMinutes(STORE_HOURS.close));
+            expect(shift.start).toBe(STORE_OPEN);
+            expect(timeToMinutes(shift.end)).toBeLessThanOrEqual(timeToMinutes(STORE_CLOSE));
         }
     });
 
@@ -330,11 +346,11 @@ describe("generateShifts", () => {
             const monday = result.shifts.filter(({ date }) => date === "2026-03-02");
 
             expect(monday).toHaveLength(2);
-            expect(monday.some(({ start }) => start !== STORE_HOURS.open)).toBe(true);
+            expect(monday.some(({ start }) => start !== STORE_OPEN)).toBe(true);
             expect(Math.min(...monday.map(({ start }) => timeToMinutes(start))))
-                .toBe(timeToMinutes(STORE_HOURS.open));
+                .toBe(timeToMinutes(STORE_OPEN));
             expect(Math.max(...monday.map(({ end }) => timeToMinutes(end))))
-                .toBe(timeToMinutes(STORE_HOURS.close));
+                .toBe(timeToMinutes(STORE_CLOSE));
         });
 
         it("uses a constrained employee where they can contribute and flexibility later", () => {
@@ -358,7 +374,7 @@ describe("generateShifts", () => {
             expect(constrainedShift).toBeDefined();
             expect(constrainedShift?.end).toBe("15:00");
             expect(flexibleShift).toBeDefined();
-            expect(flexibleShift?.end).toBe(STORE_HOURS.close);
+            expect(flexibleShift?.end).toBe(STORE_CLOSE);
         });
 
         it("uses authoritative adjusted weekly targets without massively overscheduling", () => {
@@ -462,7 +478,7 @@ describe("generateShifts", () => {
             const result = generateShifts([employee], [], EIGHT_HOUR_STORE_HOURS, 2026, 3, []);
             const shift = result.shifts.find(({ date }) => date === "2026-03-02");
 
-            expect(shift?.end).not.toBe(EIGHT_HOUR_STORE_HOURS.close);
+            expect(shift?.end).not.toBe(EIGHT_HOUR_STORE_CLOSE);
             expect(getPaidShiftMinutes(shift!)).toBeLessThanOrEqual(employee.weeklyTargetMinutes);
         });
 
@@ -769,9 +785,9 @@ describe("generateShifts", () => {
             const earlyShift = monday.find(({ employeeId }) => employeeId === early.id);
             const flexibleShift = monday.find(({ employeeId }) => employeeId === flexible.id);
 
-            expect(earlyShift?.start).toBe(STORE_HOURS.open);
+            expect(earlyShift?.start).toBe(STORE_OPEN);
             expect(timeToMinutes(earlyShift!.end)).toBeLessThanOrEqual(timeToMinutes("17:00"));
-            expect(flexibleShift?.end).toBe(STORE_HOURS.close);
+            expect(flexibleShift?.end).toBe(STORE_CLOSE);
         });
 
         it("uses a later-starting employee for suitable later coverage", () => {
@@ -792,8 +808,8 @@ describe("generateShifts", () => {
                 ({ employeeId, date }) => employeeId === late.id && date === "2026-03-02",
             );
 
-            expect(timeToMinutes(lateShift!.start)).toBeGreaterThan(timeToMinutes(STORE_HOURS.open));
-            expect(lateShift?.end).toBe(STORE_HOURS.close);
+            expect(timeToMinutes(lateShift!.start)).toBeGreaterThan(timeToMinutes(STORE_OPEN));
+            expect(lateShift?.end).toBe(STORE_CLOSE);
         });
     });
 });

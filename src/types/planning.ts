@@ -1,6 +1,17 @@
+export type Weekday = 0 | 1 | 2 | 3 | 4 | 5 | 6;
+
+export type StoreOperatingDay = {
+    dayOfWeek: Weekday;
+    isOpen: true;
+    openTime: string;
+    closeTime: string;
+} | {
+    dayOfWeek: Weekday;
+    isOpen: false;
+};
+
 export interface StoreHours {
-    open: string;
-    close: string;
+    days: StoreOperatingDay[];
 }
 
 export interface EmployeeAvailability {

@@ -3,6 +3,7 @@ import { availableTeamForDay } from "../services/dayPlanningService";
 import { isValidTime } from "../services/availabilityService";
 import { timeToMinutes } from "../services/hoursService";
 import { validateShift } from "../services/validationService";
+import { getOperatingHoursForDate } from "../services/storeHoursService";
 import type { PlannerState, Shift } from "../types/planning";
 
 const SLOT_MINUTES = 30;
@@ -24,11 +25,12 @@ function dateLabel(date: string): string {
 }
 
 export function renderDayPlanningModal(state: PlannerState, date: string): string {
+    const operating = getOperatingHoursForDate(state.storeHours, date);
     return `
         <dialog class="day-planner-dialog" id="day-planner-dialog" aria-labelledby="day-planner-title">
             <div class="day-planner-header">
                 <div><p class="section-label">Day planning</p><h2 id="day-planner-title">${dateLabel(date)}</h2>
-                    <span>${escapeHtml(state.storeHours.open)}–${escapeHtml(state.storeHours.close)}</span></div>
+                    <span>${operating ? `${escapeHtml(operating.open)}–${escapeHtml(operating.close)}` : "Closed"}</span></div>
                 <button type="button" class="day-planner-close" data-day-close aria-label="Close day planning">×</button>
             </div>
             <div class="day-planner-content"></div>
@@ -44,9 +46,13 @@ export function attachDayPlanningModal(
     onSave: (upserts: Shift[], deletions: string[]) => void,
     onClose: () => void,
 ): void {
+    const operating = getOperatingHoursForDate(state.storeHours, date);
+    if (!operating) return;
+    const storeOpen = operating.open;
+    const storeClose = operating.close;
     const availableTeam = availableTeamForDay(state, date);
-    const opening = timeToMinutes(state.storeHours.open);
-    const closing = timeToMinutes(state.storeHours.close);
+    const opening = timeToMinutes(storeOpen);
+    const closing = timeToMinutes(storeClose);
     const slotCount = Math.ceil((closing - opening) / SLOT_MINUTES);
     const dayShifts = state.shifts.filter((shift) => shift.date === date);
     const initialShift = dayShifts.find((shift) => shift.id === initialShiftId);
@@ -133,8 +139,8 @@ export function attachDayPlanningModal(
                         ? `<option value="${escapeHtml(draft.employeeId)}" selected disabled>${escapeHtml(employee ? employeeFullName(employee) : draft.employeeId)} (unavailable)</option>` : ""}
                     ${availableTeam.map(({ employee: available }) => `<option value="${escapeHtml(available.id)}" ${available.id === draft?.employeeId ? "selected" : ""}>${escapeHtml(employeeFullName(available))}</option>`).join("")}
                 </select></label>
-                <label>Start <input type="time" name="start" value="${escapeHtml(draft.start)}" min="${state.storeHours.open}" max="${state.storeHours.close}" required></label>
-                <label>End <input type="time" name="end" value="${escapeHtml(draft.end)}" min="${state.storeHours.open}" max="${state.storeHours.close}" required></label>
+                <label>Start <input type="time" name="start" value="${escapeHtml(draft.start)}" min="${storeOpen}" max="${storeClose}" required></label>
+                <label>End <input type="time" name="end" value="${escapeHtml(draft.end)}" min="${storeOpen}" max="${storeClose}" required></label>
             </div>
             <div class="day-planner-issues" role="status">${issue ? escapeHtml(issue) : "Available for these hours."}</div>
             <div class="day-planner-editor-actions">
@@ -162,7 +168,7 @@ export function attachDayPlanningModal(
             <section class="day-planner-timeline-section" aria-label="Day timeline">
                 <h3>Day timeline</h3>
                 <div class="day-planner-scroll" tabindex="0" aria-label="Scroll day timeline"><div class="day-planner-timeline" data-timeline>
-                    ${slots()}${shiftBlocks()}<div class="day-planner-closing">${state.storeHours.close}</div>
+                    ${slots()}${shiftBlocks()}<div class="day-planner-closing">${storeClose}</div>
                 </div></div>
             </section>
             <aside class="day-planner-team" aria-label="Available team"><h3>Available team</h3>

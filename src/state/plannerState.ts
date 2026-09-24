@@ -1,3 +1,5 @@
+import { DEFAULT_STORE_HOURS } from "../services/storeHoursService";
+
 import type {
     BreakRule,
     Employee,
@@ -7,10 +9,7 @@ import type {
     VacationPeriod,
 } from "../types/planning";
 
-export const STORE_HOURS: StoreHours = {
-    open: "10:30",
-    close: "20:30",
-};
+export const STORE_HOURS: StoreHours = DEFAULT_STORE_HOURS;
 
 export const BREAK_RULES: BreakRule[] = [
     {
@@ -117,13 +116,14 @@ export function createInitialPlannerState(
     providedShifts?: Shift[],
     providedEmployees?: Employee[],
     providedVacations?: VacationPeriod[],
+    providedStoreHours: StoreHours = DEFAULT_STORE_HOURS,
 ): PlannerState {
     const now = new Date();
 
     return {
         selectedYear: now.getFullYear(),
         selectedMonth: now.getMonth() + 1,
-        storeHours: STORE_HOURS,
+        storeHours: providedStoreHours,
         employees: providedEmployees ?? EMPLOYEES,
         shifts: providedShifts ?? [],
         vacations: providedVacations ?? [],

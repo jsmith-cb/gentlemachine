@@ -1,9 +1,9 @@
 import {
     createDateKey,
-    getDayOfWeek,
     minutesToTime,
     timeToMinutes,
 } from "./hoursService";
+import { getOperatingHoursForDate } from "./storeHoursService";
 
 import type {
     CoverageGap,
@@ -42,13 +42,7 @@ export function getCoverageGapsForMonth(
                 day,
             );
 
-        if (
-            getDayOfWeek(
-                date,
-            ) === 0
-        ) {
-            continue;
-        }
+        if (!getOperatingHoursForDate(state.storeHours, date)) continue;
 
         gaps.push(
             ...getCoverageGapsForDate(
@@ -65,15 +59,10 @@ export function getCoverageGapsForDate(
     state: PlannerState,
     date: string,
 ): CoverageGap[] {
-    const storeOpen =
-        timeToMinutes(
-            state.storeHours.open,
-        );
-
-    const storeClose =
-        timeToMinutes(
-            state.storeHours.close,
-        );
+    const operating = getOperatingHoursForDate(state.storeHours, date);
+    if (!operating) return [];
+    const storeOpen = timeToMinutes(operating.open);
+    const storeClose = timeToMinutes(operating.close);
 
     const intervals:
         CoverageInterval[] =
@@ -119,9 +108,9 @@ export function getCoverageGapsForDate(
             {
                 date,
                 start:
-                    state.storeHours.open,
+                    operating.open,
                 end:
-                    state.storeHours.close,
+                    operating.close,
             },
         ];
     }
@@ -171,7 +160,7 @@ export function getCoverageGapsForDate(
                     coveredUntil,
                 ),
             end:
-                state.storeHours.close,
+                operating.close,
         });
     }
 

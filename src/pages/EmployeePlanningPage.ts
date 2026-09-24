@@ -12,7 +12,7 @@ import { activeEmployees, createTeamMemberDraft, deactivateTeamMember } from "..
 import { hasValidAvailabilityHours } from "../services/availabilityService";
 import { isValidVacationPeriod, overlapsVacation } from "../services/vacationService";
 
-import { getStoredShifts, getStoredEmployees, getStoredVacations, setStoredEmployees, setStoredVacations } from "../services/storageService";
+import { getStoredShifts, getStoredEmployees, getStoredVacations, getStoredStoreHours, setStoredEmployees, setStoredVacations } from "../services/storageService";
 
 import type { Employee, PlannerState } from "../types/planning";
 
@@ -31,7 +31,9 @@ export function renderEmployeePlanningPage(
     const storedEmployees = getStoredEmployees();
     const storedVacations = getStoredVacations();
 
-    state = createInitialPlannerState(storedShifts, storedEmployees, storedVacations);
+    state = createInitialPlannerState(
+        storedShifts, storedEmployees, storedVacations, getStoredStoreHours(),
+    );
 
     newEmployeeDraft = null;
     selectedEmployeeId = employeeSelectOptions(activeEmployees(state.employees))[0]?.employee.id ?? null;

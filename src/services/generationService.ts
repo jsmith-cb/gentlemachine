@@ -12,6 +12,11 @@ import { getCoverageGapsForDate } from "./coverageService";
 import { overlapsVacation } from "./vacationService";
 import { activeEmployees } from "./teamService";
 import {
+    getOpenOperatingDays,
+    getOperatingDay,
+    getOperatingHoursForDate,
+} from "./storeHoursService";
+import {
     exceedsMaximumStandardShift,
     MAXIMUM_STANDARD_SHIFT_MINUTES,
 } from "./shiftRules";
@@ -30,7 +35,6 @@ export interface GenerationResult {
 
 export type GenerationFlexibility = "hour-constrained" | "day-constrained" | "general";
 
-const NORMAL_PLANNING_DAYS = [1, 2, 3, 4, 5, 6] as const;
 const MINIMUM_GENERATED_FINAL_SHIFT_PAID_MINUTES = 2 * 60;
 const GENERATION_SLOT_MINUTES = 30;
 // A gap smaller than a plausible standalone generated shift may be closed by
@@ -47,11 +51,17 @@ function minTime(a: string, b: string): string {
     return timeToMinutes(a) <= timeToMinutes(b) ? a : b;
 }
 
-function legalWindow(employee: Employee, storeHours: StoreHours): { start: string; end: string } {
+function legalWindow(
+    employee: Employee,
+    storeHours: StoreHours,
+    date: string,
+): { start: string; end: string } | null {
+    const operating = getOperatingHoursForDate(storeHours, date);
+    if (!operating) return null;
     const { earliestStart, latestEnd } = employee.availability;
     return {
-        start: earliestStart ? maxTime(earliestStart, storeHours.open) : storeHours.open,
-        end: latestEnd ? minTime(latestEnd, storeHours.close) : storeHours.close,
+        start: earliestStart ? maxTime(earliestStart, operating.open) : operating.open,
+        end: latestEnd ? minTime(latestEnd, operating.close) : operating.close,
     };
 }
 
@@ -75,14 +85,21 @@ export function classifyGenerationFlexibility(
     employee: Employee,
     storeHours: StoreHours,
 ): GenerationFlexibility {
-    const hourConstrained = employee.availability.days.some(() => {
-        const { start, end } = legalWindow(employee, storeHours);
-        return start !== storeHours.open || end !== storeHours.close;
+    const hourConstrained = getOpenOperatingDays(storeHours).some((dayOfWeek) => {
+        const operatingDay = getOperatingDay(storeHours, dayOfWeek);
+        if (!operatingDay?.isOpen) return false;
+        const start = employee.availability.earliestStart
+            ? maxTime(employee.availability.earliestStart, operatingDay.openTime)
+            : operatingDay.openTime;
+        const end = employee.availability.latestEnd
+            ? minTime(employee.availability.latestEnd, operatingDay.closeTime)
+            : operatingDay.closeTime;
+        return start !== operatingDay.openTime || end !== operatingDay.closeTime;
     });
     if (hourConstrained) return "hour-constrained";
 
     const availableDays = new Set(employee.availability.days);
-    if (NORMAL_PLANNING_DAYS.some((day) => !availableDays.has(day))) return "day-constrained";
+    if (getOpenOperatingDays(storeHours).some((day) => !availableDays.has(day))) return "day-constrained";
     return "general";
 }
 
@@ -132,8 +149,11 @@ function datesInPlanningWeek(
     weekStart: string,
     year: number,
     month: number,
+    openDays: readonly number[],
 ): string[] {
-    return Array.from({ length: 6 }, (_, offset) => addDays(weekStart, offset))
+    return [...openDays]
+        .sort((left, right) => ((left + 6) % 7) - ((right + 6) % 7))
+        .map((day) => addDays(weekStart, (day + 6) % 7))
         .filter((date) => date.startsWith(`${year}-${String(month).padStart(2, "0")}-`));
 }
 
@@ -205,7 +225,8 @@ function bestShiftForEmployee(
     if (remainingUsableDates === 0 ||
         remainingWeeklyMinutes < MINIMUM_GENERATED_FINAL_SHIFT_PAID_MINUTES) return null;
 
-    const window = legalWindow(employee, storeHours);
+    const window = legalWindow(employee, storeHours, date);
+    if (!window) return null;
     const windowStart = roundUpToSlot(timeToMinutes(window.start));
     const windowEnd = roundDownToSlot(timeToMinutes(window.end));
     if (windowEnd - windowStart < MINIMUM_GENERATED_FINAL_SHIFT_PAID_MINUTES) return null;
@@ -226,8 +247,9 @@ function bestShiftForEmployee(
     let bestPreferred = 0;
     let bestPaid = 0;
     const preferred = preferredWindow(employee, getDayOfWeek(date), window);
-    const placeLater = timeToMinutes(gaps[0]?.start ?? storeHours.open) >
-        timeToMinutes(storeHours.open);
+    const operating = getOperatingHoursForDate(storeHours, date)!;
+    const placeLater = timeToMinutes(gaps[0]?.start ?? operating.open) >
+        timeToMinutes(operating.open);
 
     for (let start = windowStart; start < windowEnd; start += GENERATION_SLOT_MINUTES) {
         for (
@@ -295,7 +317,8 @@ function extendShiftForSmallCoverageGap(
             }
             const employee = active.find(({ id }) => id === shift.employeeId);
             if (!employee || overlapsVacation(vacations, employee.id, date, date)) return [];
-            const legal = legalWindow(employee, storeHours);
+            const legal = legalWindow(employee, storeHours, date);
+            if (!legal) return [];
             const extended: Shift = timeToMinutes(shift.end) === gapStart
                 ? { ...shift, end: gap.end }
                 : { ...shift, start: gap.start };
@@ -341,12 +364,14 @@ function compareCoverageCandidates(
     gaps: Array<{ start: string; end: string }>,
     storeHours: StoreHours,
 ): number {
-    const focus = timeToMinutes(gaps[0]?.start ?? storeHours.open);
+    const operating = getOperatingHoursForDate(storeHours, left.shift.date);
+    if (!operating) return 0;
+    const focus = timeToMinutes(gaps[0]?.start ?? operating.open);
     const leftReachesFocus = left.legalStart <= focus;
     const rightReachesFocus = right.legalStart <= focus;
     if (leftReachesFocus !== rightReachesFocus) return leftReachesFocus ? -1 : 1;
 
-    if (focus === timeToMinutes(storeHours.open)) {
+    if (focus === timeToMinutes(operating.open)) {
         const earlierEnd = left.legalEnd - right.legalEnd;
         if (earlierEnd !== 0) return earlierEnd;
     } else {
@@ -393,7 +418,8 @@ export function findContractExtensionCandidate(
 ): Shift | null {
     if (remainingTargetMinutes <= 0) return null;
 
-    const legal = legalWindow(employee, storeHours);
+    const legal = legalWindow(employee, storeHours, shift.date);
+    if (!legal) return null;
     const legalStart = roundUpToSlot(timeToMinutes(legal.start));
     const legalEnd = roundDownToSlot(timeToMinutes(legal.end));
     const originalPaid = getPaidShiftMinutes(shift);
@@ -446,7 +472,8 @@ function extendGeneratedShiftTowardTarget(
         if (!shift) continue;
         if (shift.employeeId !== employee.id || getWeekStartDate(shift.date) !== weekStart) continue;
         const originalPaid = getPaidShiftMinutes(shift);
-        const legal = legalWindow(employee, storeHours);
+        const legal = legalWindow(employee, storeHours, shift.date);
+        if (!legal) continue;
         const preferred = preferredWindow(employee, getDayOfWeek(shift.date), legal);
         const candidate = findContractExtensionCandidate(
             employee, storeHours, shift, remainingTargetMinutes,
@@ -517,11 +544,13 @@ function fulfillWeeklyTargets(
             );
             const date = availableDates[0];
             if (!date) break;
+            const operating = getOperatingHoursForDate(storeHours, date);
+            if (!operating) break;
             const candidate = bestShiftForEmployee(
                 employee,
                 date,
                 storeHours,
-                [{ start: storeHours.open, end: storeHours.close }],
+                [{ start: operating.open, end: operating.close }],
                 remaining,
                 Math.min(availableDates.length, employee.maxDaysPerWeek - daysWorked),
             );
@@ -546,9 +575,15 @@ export function generateShifts(
     const active = activeEmployees(employees);
     const generated: Shift[] = [];
 
-    for (const weekStart of getWeekStartsForMonth(year, month)) {
-        const weekEnd = addDays(weekStart, 5);
-        const dates = datesInPlanningWeek(weekStart, year, month);
+    const openDays = getOpenOperatingDays(storeHours);
+    for (const weekStart of getWeekStartsForMonth(year, month, openDays)) {
+        const lastOpenDayOffset = Math.max(
+            ...openDays.map((day) => (day + 6) % 7),
+        );
+        const weekEnd = addDays(weekStart, lastOpenDayOffset);
+        const dates = datesInPlanningWeek(
+            weekStart, year, month, openDays,
+        );
         const weeklyTargets = new Map(active.map((employee) => [
             employee.id,
             getAdjustedWeeklyTargetMinutes(employee, vacations, weekStart, weekEnd),
@@ -556,7 +591,7 @@ export function generateShifts(
 
         for (const date of dates) {
             const dayOfWeek = getDayOfWeek(date);
-            if (dayOfWeek === 0) continue;
+            if (!openDays.some((day) => day === dayOfWeek)) continue;
 
             while (true) {
                 const allShifts = [...existingShifts, ...generated];

@@ -20,6 +20,7 @@ import {
     exceedsMaximumStandardShift,
     MAXIMUM_STANDARD_SHIFT_MINUTES,
 } from "./shiftRules";
+import { getOperatingHoursForDate } from "./storeHoursService";
 
 import type {
     PlannerState,
@@ -41,6 +42,8 @@ export function validateShift(
         issues,
     );
 
+    validateStoreHours(state, shift, issues);
+
     validateEmployeeAvailability(
         state,
         shift,
@@ -50,6 +53,34 @@ export function validateShift(
     );
 
     return issues;
+}
+
+function validateStoreHours(
+    state: PlannerState,
+    shift: Shift,
+    issues: ValidationIssue[],
+): void {
+    const operating = getOperatingHoursForDate(state.storeHours, shift.date);
+    if (!operating) {
+        issues.push({
+            severity: "error",
+            category: "shift",
+            message: "The store is closed on this day.",
+            employeeId: shift.employeeId,
+            date: shift.date,
+        });
+        return;
+    }
+    if (timeToMinutes(shift.start) < timeToMinutes(operating.open) ||
+        timeToMinutes(shift.end) > timeToMinutes(operating.close)) {
+        issues.push({
+            severity: "error",
+            category: "shift",
+            message: `Shift must stay within store hours ${operating.open}–${operating.close}.`,
+            employeeId: shift.employeeId,
+            date: shift.date,
+        });
+    }
 }
 
 export function validatePlannerState(

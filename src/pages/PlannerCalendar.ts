@@ -6,15 +6,12 @@ import type {
 import { employeeFullName } from "../services/employeeIdentity";
 import { vacationEmployeesOnDate } from "../services/vacationService";
 import { renderDayPlanningModal } from "./DayPlanningModal";
+import {
+    getOpenOperatingDays,
+    getOperatingHoursForDate,
+} from "../services/storeHoursService";
 
-const OPEN_DAY_LABELS = [
-    "Mon",
-    "Tue",
-    "Wed",
-    "Thu",
-    "Fri",
-    "Sat",
-] as const;
+const DAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const;
 
 function escapeHtml(value: string): string {
     return value.replace(/&/g, "&amp;").replace(/</g, "&lt;")
@@ -38,6 +35,12 @@ export function renderPlannerCalendar(
     assistantOpen = false,
     generationFeedback: string | null = null,
 ): string {
+    const openDays = getOpenOperatingDays(state.storeHours);
+    const openRanges = state.storeHours.days.filter((day) => day.isOpen)
+        .map((day) => `${day.openTime}–${day.closeTime}`);
+    const hoursSummary = new Set(openRanges).size === 1
+        ? openRanges[0]
+        : "Varies by day";
     const planningPeriodIsEmpty = !state.shifts.some(
         ({ date }) => date.startsWith(
             `${state.selectedYear}-${String(state.selectedMonth).padStart(2, "0")}-`,
@@ -49,9 +52,8 @@ export function renderPlannerCalendar(
             <div class="planner-schedule-facts">
                 <p class="store-hours">
                     Store hours
-                    <strong>${state.storeHours.open}–${state.storeHours.close}</strong>
+                    <strong>${hoursSummary}</strong>
                 </p>
-                <p class="closed-note">Sunday closed</p>
             </div>
             <button class="planning-assistant-trigger" type="button"
                 data-action="toggle-planning-assistant" aria-controls="planning-assistant-window"
@@ -64,12 +66,12 @@ export function renderPlannerCalendar(
         </div>
 
         <div class="calendar-scroll">
-            <div class="calendar">
+            <div class="calendar" style="--calendar-columns:${openDays.length}">
                 <div class="calendar-weekdays">
-                    ${OPEN_DAY_LABELS.map(
+                    ${openDays.map(
                         (day) => `
                             <div class="weekday-label">
-                                ${day}
+                                ${DAY_LABELS[day]}
                             </div>
                         `,
                     ).join("")}
@@ -235,7 +237,9 @@ function renderCalendarDays(
             state.selectedMonth - 1,
             day,
         );
-        if (date.getDay() !== 0) openDates.push(day);
+        if (getOperatingHoursForDate(state.storeHours, dateKeyFromLocalDate(date))) {
+            openDates.push(day);
+        }
     }
 
     const firstOpenDay = openDates[0];
@@ -259,6 +263,11 @@ function renderCalendarDays(
     return placeholders + openDates
         .map((day) => renderCalendarDay(state, day, editorMode))
         .join("");
+}
+
+function dateKeyFromLocalDate(date: Date): string {
+    return [date.getFullYear(), String(date.getMonth() + 1).padStart(2, "0"),
+        String(date.getDate()).padStart(2, "0")].join("-");
 }
 
 function renderCalendarDay(

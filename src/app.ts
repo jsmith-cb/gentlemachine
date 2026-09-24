@@ -7,6 +7,14 @@ import {
 } from "./pages/EmployeePlanningPage";
 
 import {
+    renderSchedulePage,
+} from "./pages/SchedulePage";
+
+import {
+    renderSettingsPage,
+} from "./pages/SettingsPage";
+
+import {
     bindSidebar,
     createSidebar,
 } from "./components/Sidebar";
@@ -90,7 +98,7 @@ export function renderApp(
         () => sidebarController.close(),
     );
 
-    renderPlannerPage(
+    renderSchedulePage(
         pageContent,
     );
 }
@@ -104,22 +112,51 @@ function attachNavigationListeners(
         "#sidebar-planner-button",
     );
 
+    const sidebarScheduleButton = sidebar.querySelector<HTMLButtonElement>(
+        "#sidebar-schedule-button",
+    );
+
     const sidebarEmployeePlanningButton = sidebar.querySelector<HTMLButtonElement>(
         "#sidebar-employee-planning-button",
     );
 
+    const sidebarSettingsButton = sidebar.querySelector<HTMLButtonElement>(
+        "#sidebar-settings-button",
+    );
+
     if (
+        !sidebarScheduleButton ||
         !sidebarPlannerButton ||
-        !sidebarEmployeePlanningButton
+        !sidebarEmployeePlanningButton ||
+        !sidebarSettingsButton
     ) {
         throw new Error("Sidebar navigation button not found");
     }
 
+    const setActive = (active: HTMLButtonElement): void => {
+        for (const button of [
+            sidebarScheduleButton,
+            sidebarPlannerButton,
+            sidebarEmployeePlanningButton,
+            sidebarSettingsButton,
+        ]) {
+            button.classList.toggle("active", button === active);
+        }
+    };
+
+    sidebarScheduleButton.addEventListener(
+        "click",
+        () => {
+            setActive(sidebarScheduleButton);
+            closeSidebar();
+            renderSchedulePage(pageContent);
+        },
+    );
+
     sidebarPlannerButton.addEventListener(
         "click",
         () => {
-            sidebarPlannerButton.classList.add("active");
-            sidebarEmployeePlanningButton.classList.remove("active");
+            setActive(sidebarPlannerButton);
 
             closeSidebar();
             renderPlannerPage(pageContent);
@@ -129,11 +166,19 @@ function attachNavigationListeners(
     sidebarEmployeePlanningButton.addEventListener(
         "click",
         () => {
-            sidebarPlannerButton.classList.remove("active");
-            sidebarEmployeePlanningButton.classList.add("active");
+            setActive(sidebarEmployeePlanningButton);
 
             closeSidebar();
             renderEmployeePlanningPage(pageContent);
+        },
+    );
+
+    sidebarSettingsButton.addEventListener(
+        "click",
+        () => {
+            setActive(sidebarSettingsButton);
+            closeSidebar();
+            renderSettingsPage(pageContent);
         },
     );
 }

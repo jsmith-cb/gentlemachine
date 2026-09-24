@@ -1,14 +1,38 @@
-import type { Shift, Employee, VacationPeriod } from "../types/planning";
+import type { Shift, Employee, VacationPeriod, StoreHours } from "../types/planning";
 import { isValidVacationPeriod } from "./vacationService";
 import { hasValidAvailabilityHours } from "./availabilityService";
+import { cloneStoreHours, DEFAULT_STORE_HOURS, isValidStoreHours } from "./storeHoursService";
 
-export type StorageKey = "shifts" | "employees" | "vacations";
+export type StorageKey = "shifts" | "employees" | "vacations" | "storeHours";
 
 const STORAGE_KEYS: Record<StorageKey, string> = {
     shifts: "@pp_crew_shifts",
     employees: "@pp_crew_employees",
     vacations: "@pp_crew_vacations",
+    storeHours: "@pp_crew_store_hours",
 };
+
+export function getStoredStoreHours(): StoreHours {
+    try {
+        const raw = localStorage.getItem(STORAGE_KEYS.storeHours);
+        if (!raw) return cloneStoreHours(DEFAULT_STORE_HOURS);
+        const parsed: unknown = JSON.parse(raw);
+        return isValidStoreHours(parsed)
+            ? cloneStoreHours(parsed)
+            : cloneStoreHours(DEFAULT_STORE_HOURS);
+    } catch {
+        return cloneStoreHours(DEFAULT_STORE_HOURS);
+    }
+}
+
+export function setStoredStoreHours(storeHours: StoreHours): void {
+    if (!isValidStoreHours(storeHours)) throw new Error("Invalid Store Hours configuration.");
+    try {
+        localStorage.setItem(STORAGE_KEYS.storeHours, JSON.stringify(storeHours));
+    } catch {
+        // Match the existing local-storage persistence behavior.
+    }
+}
 
 export function getStoredVacations(): VacationPeriod[] {
     try {

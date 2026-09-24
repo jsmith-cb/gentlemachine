@@ -7,7 +7,7 @@ import {
     validatePlannerState,
 } from "../services/validationService";
 
-import { getStoredShifts, setStoredShifts, getStoredEmployees, getStoredVacations } from "../services/storageService";
+import { getStoredShifts, setStoredShifts, getStoredEmployees, getStoredVacations, getStoredStoreHours } from "../services/storageService";
 
 import {
     createInitialPlannerState,
@@ -106,7 +106,9 @@ export function renderPlannerPage(
     const storedShifts = getStoredShifts();
     const storedEmployees = getStoredEmployees();
 
-    let state = createInitialPlannerState(storedShifts, storedEmployees, getStoredVacations());
+    let state = createInitialPlannerState(
+        storedShifts, storedEmployees, getStoredVacations(), getStoredStoreHours(),
+    );
 
     let editorMode:
         | PlannerEditorMode

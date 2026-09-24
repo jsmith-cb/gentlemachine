@@ -41,6 +41,14 @@ export function createSidebar(): SidebarElements {
         <nav class="sidebar-nav" aria-label="Pages">
             <button
                 class="sidebar-button active"
+                id="sidebar-schedule-button"
+                type="button"
+            >
+                Schedule
+            </button>
+
+            <button
+                class="sidebar-button"
                 id="sidebar-planner-button"
                 type="button"
             >
@@ -53,6 +61,14 @@ export function createSidebar(): SidebarElements {
                 type="button"
             >
                 Team
+            </button>
+
+            <button
+                class="sidebar-button"
+                id="sidebar-settings-button"
+                type="button"
+            >
+                Settings
             </button>
         </nav>
     `;

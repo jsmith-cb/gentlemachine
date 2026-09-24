@@ -1,5 +1,6 @@
 import { BREAK_RULES } from "../state/plannerState";
 import { overlapsVacation } from "./vacationService";
+import { getOpenOperatingDays } from "./storeHoursService";
 
 import type {
     EmployeeMonthSummary,
@@ -284,6 +285,7 @@ export function getEmployeeWeekSummaries(
         getWeekStartsForMonth(
             state.selectedYear,
             state.selectedMonth,
+            getOpenOperatingDays(state.storeHours),
         );
 
     const summaries:
@@ -364,6 +366,7 @@ export function getEmployeeWeekSummaries(
 export function getWeekStartsForMonth(
     year: number,
     month: number,
+    openDays: readonly number[],
 ): string[] {
     const daysInMonth =
         new Date(
@@ -389,11 +392,7 @@ export function getWeekStartsForMonth(
                 day,
             );
 
-        if (
-            getDayOfWeek(
-                date,
-            ) === 0
-        ) {
+        if (!openDays.includes(getDayOfWeek(date))) {
             continue;
         }
 

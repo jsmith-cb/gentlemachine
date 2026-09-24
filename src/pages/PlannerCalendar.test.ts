@@ -18,12 +18,11 @@ describe("Planner calendar vacation markers", () => {
         expect(state.shifts).toHaveLength(1);
     });
 
-    it("places Sunday closed beside store hours and offers a modeless Planning assistant", () => {
+    it("shows configured store hours and offers a modeless Planning assistant", () => {
         const state = createInitialPlannerState();
         const html = renderPlannerCalendar(state, null, [], true);
 
         expect(html).toContain('class="planner-schedule-facts"');
-        expect(html).toContain("Sunday closed");
         expect(html).toContain('data-action="toggle-planning-assistant"');
         expect(html).toContain('aria-expanded="true"');
         expect(html).toContain('class="planning-assistant-window"');

@@ -1,0 +1,143 @@
+.settings-page {
+    width: 100%;
+    max-width: 1100px;
+    min-width: 0;
+    margin: 0 auto;
+}
+
+.store-hours-settings {
+    overflow: hidden;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: 14px;
+    box-shadow: var(--shadow-card);
+}
+
+.settings-section-heading {
+    padding: 22px 24px;
+    border-bottom: 1px solid var(--color-border);
+}
+
+.settings-section-heading h3,
+.settings-section-heading p {
+    margin: 0;
+}
+
+.settings-section-heading h3 {
+    color: var(--color-text-strong);
+    font-size: 1.15rem;
+}
+
+.settings-section-heading p {
+    margin-top: 6px;
+    color: var(--color-text-muted);
+}
+
+.store-hours-days {
+    display: grid;
+}
+
+.store-hours-day {
+    display: grid;
+    grid-template-columns: minmax(130px, .8fr) 100px minmax(320px, 1fr) 90px;
+    align-items: center;
+    gap: 20px;
+    min-width: 0;
+    margin: 0;
+    padding: 16px 24px;
+    border: 0;
+}
+
+.store-hours-day + .store-hours-day {
+    border-top: 1px solid var(--color-border-subtle);
+}
+
+.store-hours-day legend {
+    display: contents;
+    color: var(--color-text-strong);
+    font-weight: 750;
+}
+
+.store-day-toggle {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 700;
+}
+
+.store-day-toggle input {
+    width: 18px;
+    height: 18px;
+    accent-color: var(--color-primary);
+}
+
+.store-day-times {
+    display: grid;
+    grid-template-columns: minmax(120px, 1fr) auto minmax(120px, 1fr);
+    align-items: end;
+    gap: 10px;
+}
+
+.store-day-times label {
+    display: grid;
+    gap: 5px;
+    color: var(--color-text-muted);
+    font-size: .72rem;
+    font-weight: 700;
+}
+
+.store-day-times input {
+    min-width: 0;
+    min-height: 42px;
+    padding: 8px 10px;
+    color: var(--color-text);
+    background: var(--color-surface-subtle);
+    border: 1px solid var(--color-border-control);
+    border-radius: 8px;
+}
+
+.store-day-closed {
+    color: var(--color-text-muted);
+    font-weight: 700;
+}
+
+.settings-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 18px;
+    padding: 18px 24px;
+    background: var(--color-surface-subtle);
+    border-top: 1px solid var(--color-border);
+}
+
+.settings-feedback {
+    margin: 0 auto 0 0;
+    color: var(--color-success);
+}
+
+@media (max-width: 760px) {
+    .store-hours-day {
+        grid-template-columns: 1fr auto;
+        gap: 12px;
+        padding: 18px;
+    }
+
+    .store-hours-day legend {
+        display: block;
+    }
+
+    .store-day-times {
+        grid-column: 1 / -1;
+    }
+
+    .store-day-closed {
+        grid-column: 1 / -1;
+    }
+
+    .settings-actions {
+        align-items: stretch;
+        flex-direction: column;
+    }
+}
+

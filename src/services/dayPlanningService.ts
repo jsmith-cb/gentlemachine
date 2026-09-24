@@ -1,6 +1,7 @@
 import { legalAvailabilityHours } from "./availabilityService";
 import { getDayOfWeek, timeToMinutes } from "./hoursService";
 import { overlapsVacation } from "./vacationService";
+import { getOperatingHoursForDate } from "./storeHoursService";
 import type { Employee, PlannerState, Shift } from "../types/planning";
 
 export interface DayPlanningAvailability {
@@ -13,8 +14,10 @@ export interface DayPlanningAvailability {
 /** A read model for the Planner UI; Team availability remains authoritative. */
 export function availableTeamForDay(state: PlannerState, date: string): DayPlanningAvailability[] {
     const day = getDayOfWeek(date);
-    const opening = timeToMinutes(state.storeHours.open);
-    const closing = timeToMinutes(state.storeHours.close);
+    const operating = getOperatingHoursForDate(state.storeHours, date);
+    if (!operating) return [];
+    const opening = timeToMinutes(operating.open);
+    const closing = timeToMinutes(operating.close);
     return state.employees.flatMap((employee) => {
         if (employee.status !== "active" || !employee.availability.days.includes(day) ||
             overlapsVacation(state.vacations, employee.id, date, date)) return [];
