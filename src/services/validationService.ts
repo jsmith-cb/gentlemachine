@@ -13,9 +13,13 @@ import {
     getCoverageGapsForMonth,
 } from "./coverageService";
 import { employeeFullName } from "./employeeIdentity";
-import { availableHoursForDay } from "./availabilityService";
+import { legalAvailabilityHours } from "./availabilityService";
 import { overlapsVacation } from "./vacationService";
 import { activeEmployees } from "./teamService";
+import {
+    exceedsMaximumStandardShift,
+    MAXIMUM_STANDARD_SHIFT_MINUTES,
+} from "./shiftRules";
 
 import type {
     PlannerState,
@@ -108,6 +112,16 @@ function validateShiftTime(
                 shift.date,
         });
     }
+
+    if (exceedsMaximumStandardShift(shift)) {
+        issues.push({
+            severity: "error",
+            category: "shift",
+            message: `Shift cannot exceed ${MAXIMUM_STANDARD_SHIFT_MINUTES / 60} hours.`,
+            employeeId: shift.employeeId,
+            date: shift.date,
+        });
+    }
 }
 
 function validateEmployeeAvailability(
@@ -184,7 +198,7 @@ function validateEmployeeAvailability(
         });
     }
 
-    const { earliestStart, latestEnd } = availableHoursForDay(employee.availability, dayOfWeek);
+    const { earliestStart, latestEnd } = legalAvailabilityHours(employee.availability);
 
     if (
         earliestStart &&

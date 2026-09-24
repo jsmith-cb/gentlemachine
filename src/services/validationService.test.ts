@@ -66,3 +66,35 @@ describe("vacation shift validation", () => {
         }));
     });
 });
+
+describe("standard shift duration validation", () => {
+    it("allows an eight-hour shift", () => {
+        const state = createInitialPlannerState();
+        const issues = validateShift(state, {
+            id: "eight-hours",
+            employeeId: "a",
+            date: "2026-09-07",
+            start: "10:30",
+            end: "18:30",
+        });
+
+        expect(issues.some(({ message }) => message.includes("exceed 8 hours"))).toBe(false);
+    });
+
+    it("rejects a shift longer than eight hours", () => {
+        const state = createInitialPlannerState();
+        const issues = validateShift(state, {
+            id: "over-eight-hours",
+            employeeId: "a",
+            date: "2026-09-07",
+            start: "10:30",
+            end: "19:00",
+        });
+
+        expect(issues).toContainEqual(expect.objectContaining({
+            severity: "error",
+            category: "shift",
+            message: "Shift cannot exceed 8 hours.",
+        }));
+    });
+});

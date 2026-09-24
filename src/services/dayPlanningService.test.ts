@@ -3,7 +3,7 @@ import { applyDayPlanningChanges, availableTeamForDay } from "./dayPlanningServi
 import { createInitialPlannerState } from "../state/plannerState";
 
 describe("day planning availability", () => {
-    it("uses day-specific hours and excludes vacation and inactive team members", () => {
+    it("uses legal default hours and excludes vacation and inactive team members", () => {
         const state = createInitialPlannerState([], undefined, []);
         const employee = state.employees[0]!;
         state.employees = [
@@ -13,7 +13,7 @@ describe("day planning availability", () => {
         ];
         state.vacations = [{ id: "v", employeeId: "vacation", startDate: "2026-09-21", endDate: "2026-09-21" }];
         expect(availableTeamForDay(state, "2026-09-21").map(({ employee, start, end }) =>
-            [employee.id, start, end])).toEqual([["available", "12:00", "18:00"]]);
+            [employee.id, start, end])).toEqual([["available", "10:30", "20:30"]]);
     });
 });
 

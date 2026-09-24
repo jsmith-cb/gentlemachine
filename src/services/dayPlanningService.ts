@@ -1,4 +1,4 @@
-import { availableHoursForDay } from "./availabilityService";
+import { legalAvailabilityHours } from "./availabilityService";
 import { getDayOfWeek, timeToMinutes } from "./hoursService";
 import { overlapsVacation } from "./vacationService";
 import type { Employee, PlannerState, Shift } from "../types/planning";
@@ -18,7 +18,7 @@ export function availableTeamForDay(state: PlannerState, date: string): DayPlann
     return state.employees.flatMap((employee) => {
         if (employee.status !== "active" || !employee.availability.days.includes(day) ||
             overlapsVacation(state.vacations, employee.id, date, date)) return [];
-        const hours = availableHoursForDay(employee.availability, day);
+        const hours = legalAvailabilityHours(employee.availability);
         const start = Math.max(opening, hours.earliestStart ? timeToMinutes(hours.earliestStart) : opening);
         const end = Math.min(closing, hours.latestEnd ? timeToMinutes(hours.latestEnd) : closing);
         if (start >= end) return [];

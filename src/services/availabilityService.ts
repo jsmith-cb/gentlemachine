@@ -17,6 +17,15 @@ export function availableHoursForDay(
     };
 }
 
+export function legalAvailabilityHours(
+    availability: EmployeeAvailability,
+): { earliestStart?: string; latestEnd?: string } {
+    return {
+        earliestStart: availability.earliestStart,
+        latestEnd: availability.latestEnd,
+    };
+}
+
 export function hasValidAvailabilityHours(availability: EmployeeAvailability): boolean {
     if (availability.earliestStart !== undefined &&
         (typeof availability.earliestStart !== "string" || !isValidTime(availability.earliestStart))) return false;

@@ -87,6 +87,7 @@ export function generateDraftForEmptyPlanningPeriod(state: PlannerState): {
         state.storeHours,
         state.selectedYear,
         state.selectedMonth,
+        state.shifts,
     );
 
     if (shifts.length === 0) {

@@ -22,18 +22,18 @@ describe("day-specific availability", () => {
         expect(hasValidAvailabilityHours({ ...availability, dayHours: { 3: { earliestStart: "08:00" } } })).toBe(false);
     });
 
-    it("validates shifts against the relevant day's hours", () => {
+    it("uses default hours as legal boundaries and treats day-specific hours as preferences", () => {
         const state = createInitialPlannerState();
         state.employees = [{ ...state.employees[0], availability }];
         expect(validateShift(state, {
             id: "mon", employeeId: "a", date: "2026-09-07", start: "09:00", end: "13:00",
-        })).toEqual([]);
+        }).some((issue) => issue.message.includes("cannot start before 10:00"))).toBe(true);
         expect(validateShift(state, {
             id: "tue", employeeId: "a", date: "2026-09-08", start: "09:00", end: "13:00",
         }).some((issue) => issue.message.includes("cannot start before 10:00"))).toBe(true);
         expect(validateShift(state, {
-            id: "mon-late", employeeId: "a", date: "2026-09-07", start: "09:00", end: "15:00",
-        }).some((issue) => issue.message.includes("cannot work after 14:00"))).toBe(true);
+            id: "mon-late", employeeId: "a", date: "2026-09-07", start: "10:00", end: "17:00",
+        }).some((issue) => issue.message.includes("cannot work after 14:00"))).toBe(false);
         expect(validateShift(state, {
             id: "wed", employeeId: "a", date: "2026-09-09", start: "10:00", end: "13:00",
         }).some((issue) => issue.message.includes("not available on this day"))).toBe(true);
