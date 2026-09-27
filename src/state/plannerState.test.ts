@@ -21,6 +21,7 @@ describe("plannerState - Initial State", () => {
                 firstName: "Test",
                 lastName: "Emp 1",
                 weeklyTargetMinutes: 60,
+                maximumPaidMinutesPerDay: 8 * 60,
                 maxDaysPerWeek: 5,
                 availability: {
                     days: [1, 2],

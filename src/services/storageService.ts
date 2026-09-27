@@ -1,16 +1,43 @@
-import type { Shift, Employee, VacationPeriod, StoreHours } from "../types/planning";
+import type { Shift, Employee, VacationPeriod, StoreHours, SoftRuleSettings } from "../types/planning";
 import { isValidVacationPeriod } from "./vacationService";
 import { hasValidAvailabilityHours } from "./availabilityService";
 import { cloneStoreHours, DEFAULT_STORE_HOURS, isValidStoreHours } from "./storeHoursService";
+import {
+    cloneSoftRuleSettings, DEFAULT_SOFT_RULE_SETTINGS, isValidSoftRuleSettings,
+} from "./softRulesService";
+import { isValidMaximumPaidMinutesPerDayOverride } from "./shiftRules";
 
-export type StorageKey = "shifts" | "employees" | "vacations" | "storeHours";
+export type StorageKey = "shifts" | "employees" | "vacations" | "storeHours" | "softRules";
 
 const STORAGE_KEYS: Record<StorageKey, string> = {
     shifts: "@pp_crew_shifts",
     employees: "@pp_crew_employees",
     vacations: "@pp_crew_vacations",
     storeHours: "@pp_crew_store_hours",
+    softRules: "@pp_crew_soft_rules",
 };
+
+export function getStoredSoftRuleSettings(): SoftRuleSettings {
+    try {
+        const raw = localStorage.getItem(STORAGE_KEYS.softRules);
+        if (!raw) return cloneSoftRuleSettings(DEFAULT_SOFT_RULE_SETTINGS);
+        const parsed: unknown = JSON.parse(raw);
+        return isValidSoftRuleSettings(parsed)
+            ? cloneSoftRuleSettings(parsed)
+            : cloneSoftRuleSettings(DEFAULT_SOFT_RULE_SETTINGS);
+    } catch {
+        return cloneSoftRuleSettings(DEFAULT_SOFT_RULE_SETTINGS);
+    }
+}
+
+export function setStoredSoftRuleSettings(settings: SoftRuleSettings): void {
+    if (!isValidSoftRuleSettings(settings)) throw new Error("Invalid Soft Rules configuration.");
+    try {
+        localStorage.setItem(STORAGE_KEYS.softRules, JSON.stringify(settings));
+    } catch {
+        // Match the existing local-storage persistence behavior.
+    }
+}
 
 export function getStoredStoreHours(): StoreHours {
     try {
@@ -150,13 +177,17 @@ export function getStoredEmployees(): Employee[] | undefined {
                 (item.telephoneNumber === undefined || typeof item.telephoneNumber === "string") &&
                 Number.isFinite(item.weeklyTargetMinutes) &&
                 item.weeklyTargetMinutes >= 0 &&
+                (item.maximumPaidMinutesPerDay === undefined ||
+                    isValidMaximumPaidMinutesPerDayOverride(
+                        item.maximumPaidMinutesPerDay,
+                    )) &&
                 Number.isInteger(item.maxDaysPerWeek) &&
                 item.maxDaysPerWeek >= 1 &&
                 item.maxDaysPerWeek <= 7 &&
                 typeof item.availability === "object" &&
                 null !== item.availability &&
                 Array.isArray(item.availability.days) &&
-                item.availability.days.every((d: number) => Number.isInteger(d) && d >= 1 && d <= 7);
+                item.availability.days.every((d: number) => Number.isInteger(d) && d >= 0 && d <= 6);
 
             if (!valid) {
                 return undefined;

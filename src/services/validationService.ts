@@ -1,6 +1,8 @@
 import {
     getDayOfWeek,
+    getAdjustedMonthlyTargetMinutes,
     getEmployeeDaysWorked,
+    getEmployeeScheduledMinutes,
     getEmployeeWeekSummaries,
     getMonthShifts,
     getShiftDurationMinutes,
@@ -17,10 +19,15 @@ import { legalAvailabilityHours } from "./availabilityService";
 import { overlapsVacation } from "./vacationService";
 import { activeEmployees } from "./teamService";
 import {
+    exceedsEmployeeDailyPaidMaximum,
     exceedsMaximumStandardShift,
+    getEmployeePaidMinutesForDate,
+    getEffectiveMaximumPaidMinutesPerDay,
     MAXIMUM_STANDARD_SHIFT_MINUTES,
+    shiftsWithCandidate,
 } from "./shiftRules";
 import { getOperatingHoursForDate } from "./storeHoursService";
+import { getOpenOperatingDays } from "./storeHoursService";
 
 import type {
     PlannerState,
@@ -50,6 +57,10 @@ export function validateShift(
         issues,
         existingShift,
         today,
+    );
+
+    if (!existingShift) validateDailyPaidMaximum(
+        state, shift, shiftsWithCandidate(state.shifts, shift), issues,
     );
 
     return issues;
@@ -110,10 +121,14 @@ export function validatePlannerState(
         issues,
     );
 
+    validateDailyPaidMaximums(state, issues);
+
     validateWeeklyTargets(
         state,
         issues,
     );
+
+    validateMonthlyTargets(state, issues);
 
     validateCoverage(
         state,
@@ -121,6 +136,70 @@ export function validatePlannerState(
     );
 
     return issues;
+}
+
+function validateDailyPaidMaximum(
+    state: PlannerState,
+    shift: Shift,
+    shifts: readonly Shift[],
+    issues: ValidationIssue[],
+): void {
+    const employee = state.employees.find(({ id }) => id === shift.employeeId);
+    if (!employee || !exceedsEmployeeDailyPaidMaximum(employee, shifts, shift.date)) return;
+    const total = getEmployeePaidMinutesForDate(shifts, employee.id, shift.date);
+    issues.push({
+        severity: "error",
+        category: "hours",
+        message: `${employeeFullName(employee)} has ${formatDuration(total)} paid hours on this day. ` +
+            `Maximum is ${formatDuration(getEffectiveMaximumPaidMinutesPerDay(employee))}.`,
+        employeeId: employee.id,
+        date: shift.date,
+    });
+}
+
+function validateDailyPaidMaximums(
+    state: PlannerState,
+    issues: ValidationIssue[],
+): void {
+    const seen = new Set<string>();
+    for (const shift of getMonthShifts(
+        state.shifts, state.selectedYear, state.selectedMonth,
+    )) {
+        const key = `${shift.employeeId}:${shift.date}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        validateDailyPaidMaximum(state, shift, state.shifts, issues);
+    }
+}
+
+function formatDuration(minutes: number): string {
+    return `${Math.floor(minutes / 60)}:${String(minutes % 60).padStart(2, "0")}`;
+}
+
+function validateMonthlyTargets(
+    state: PlannerState,
+    issues: ValidationIssue[],
+): void {
+    const monthShifts = getMonthShifts(
+        state.shifts, state.selectedYear, state.selectedMonth,
+    );
+    for (const employee of activeEmployees(state.employees)) {
+        const scheduled = getEmployeeScheduledMinutes(employee.id, monthShifts);
+        const target = getAdjustedMonthlyTargetMinutes(
+            employee, state.vacations, state.selectedYear, state.selectedMonth,
+        );
+        const difference = scheduled - target;
+        if (difference === 0) continue;
+        const absolute = Math.abs(difference);
+        const formatted = `${Math.floor(absolute / 60)}:${String(absolute % 60).padStart(2, "0")}`;
+        issues.push({
+            severity: "warning",
+            category: "hours",
+            message: `${employeeFullName(employee)} is ${formatted} ` +
+                `${difference < 0 ? "under" : "over"} their adjusted monthly target.`,
+            employeeId: employee.id,
+        });
+    }
 }
 
 function validateShiftTime(
@@ -488,11 +567,8 @@ function weekIntersectsSelectedMonth(
             date,
         );
 
-    for (
-        let offset = 0;
-        offset < 6;
-        offset += 1
-    ) {
+    for (const dayOfWeek of getOpenOperatingDays(state.storeHours)) {
+        const offset = (dayOfWeek + 6) % 7;
         const value =
             new Date(
                 `${weekStart}T00:00:00Z`,

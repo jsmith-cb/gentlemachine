@@ -12,7 +12,7 @@ import {
 } from "../services/storageService";
 import { getOpenOperatingDays } from "../services/storeHoursService";
 
-import type { Employee, Shift } from "../types/planning";
+import type { Employee, Shift, StoreHours } from "../types/planning";
 
 const MONTH_NAMES = [
     "January", "February", "March", "April", "May", "June",
@@ -102,9 +102,9 @@ export function buildScheduleWeeks(
     year: number,
     month: number,
     employeeId: string | null,
-    openDays: readonly number[],
+    storeHours: StoreHours,
 ): ScheduleWeek[] {
-    const operatingDays = orderedOpenDays(openDays);
+    const operatingDays = orderedOpenDays(getOpenOperatingDays(storeHours));
     if (operatingDays.length === 0) return [];
 
     const monthShifts = shifts.filter((shift) =>
@@ -298,7 +298,7 @@ export function renderSchedulePage(container: HTMLElement): void {
             selectedYear,
             selectedMonth,
             selectedEmployeeId,
-            getOpenOperatingDays(storeHours),
+            storeHours,
         );
 
         container.innerHTML = `

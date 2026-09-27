@@ -14,6 +14,10 @@ export interface StoreHours {
     days: StoreOperatingDay[];
 }
 
+export interface SoftRuleSettings {
+    oneWeekendOffPerMonth: boolean;
+}
+
 export interface EmployeeAvailability {
     days: number[];
     earliestStart?: string;
@@ -35,6 +39,8 @@ export interface Employee {
     email?: string;
     telephoneNumber?: string;
     weeklyTargetMinutes: number;
+    /** Optional employee override; may only reduce Crew's default daily maximum. */
+    maximumPaidMinutesPerDay?: number;
     maxDaysPerWeek: number;
     availability: EmployeeAvailability;
 }
@@ -63,6 +69,7 @@ export interface PlannerState {
     selectedYear: number;
     selectedMonth: number;
     storeHours: StoreHours;
+    softRules: SoftRuleSettings;
     employees: Employee[];
     shifts: Shift[];
     vacations: VacationPeriod[];
@@ -100,7 +107,8 @@ export type ValidationCategory =
     | "shift"
     | "availability"
     | "coverage"
-    | "hours";
+    | "hours"
+    | "soft-rule";
 
 export interface ValidationIssue {
     severity: ValidationSeverity;

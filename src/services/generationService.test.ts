@@ -6,6 +6,7 @@ import {
     orderEmployeesForGeneration,
 } from "./generationService";
 import {
+    getAdjustedMonthlyTargetMinutes,
     getAdjustedWeeklyTargetMinutes,
     getDayOfWeek,
     getPaidShiftMinutes,
@@ -14,6 +15,8 @@ import {
     timeToMinutes,
 } from "./hoursService";
 import type { Employee, StoreHours, VacationPeriod } from "../types/planning";
+import { createInitialPlannerState } from "../state/plannerState";
+import { evaluateSoftRules } from "./softRulesService";
 
 const STORE_OPEN = "10:00";
 const STORE_CLOSE = "20:00";
@@ -42,6 +45,7 @@ function makeEmployee(overrides: Partial<Employee> = {}): Employee {
         firstName: "Test",
         lastName: "Employee",
         weeklyTargetMinutes: 30 * 60,
+        maximumPaidMinutesPerDay: 8 * 60,
         maxDaysPerWeek: 5,
         availability: { days: [1, 2, 3, 4, 5] },
         ...overrides,
@@ -49,6 +53,112 @@ function makeEmployee(overrides: Partial<Employee> = {}): Employee {
 }
 
 describe("generateShifts", () => {
+    describe("employee daily paid-hours maximum", () => {
+        it("counts existing scheduled time and does not add work beyond remaining daily capacity", () => {
+            const employee = makeEmployee({
+                weeklyTargetMinutes: 40 * 60,
+                maximumPaidMinutesPerDay: 3 * 60,
+                availability: { days: [1, 2, 3, 4, 5] },
+            });
+            const existing = [{
+                id: "existing", employeeId: employee.id, date: "2026-03-02",
+                start: "10:00", end: "12:00",
+            }];
+
+            const result = generateShifts(
+                [employee], [], STORE_HOURS, 2026, 3, existing,
+            );
+            const mondayPaid = [...existing, ...result.shifts]
+                .filter(({ date }) => date === "2026-03-02")
+                .reduce((total, shift) => total + getPaidShiftMinutes(shift), 0);
+
+            expect(mondayPaid).toBeLessThanOrEqual(employee.maximumPaidMinutesPerDay!);
+        });
+
+        it("leaves coverage short rather than exceeding the employee maximum", () => {
+            const employee = makeEmployee({
+                weeklyTargetMinutes: 40 * 60,
+                maximumPaidMinutesPerDay: 2 * 60,
+                maxDaysPerWeek: 5,
+            });
+            const result = generateShifts(
+                [employee], [], EIGHT_HOUR_STORE_HOURS, 2026, 3, [],
+            );
+            const firstMonday = result.shifts.filter(({ date }) => date === "2026-03-02");
+            expect(firstMonday.reduce(
+                (total, shift) => total + getPaidShiftMinutes(shift), 0,
+            )).toBeLessThanOrEqual(2 * 60);
+            expect(firstMonday.some(({ end }) => end === EIGHT_HOUR_STORE_CLOSE)).toBe(false);
+        });
+
+        it("does not exceed the daily maximum while fulfilling target hours", () => {
+            const employee = makeEmployee({
+                weeklyTargetMinutes: 40 * 60,
+                maximumPaidMinutesPerDay: 3 * 60,
+                maxDaysPerWeek: 6,
+                availability: { days: [1, 2, 3, 4, 5, 6] },
+            });
+            const result = generateShifts([employee], [], STORE_HOURS, 2026, 3, []);
+            const paidByDate = new Map<string, number>();
+            for (const shift of result.shifts) {
+                paidByDate.set(
+                    shift.date,
+                    (paidByDate.get(shift.date) ?? 0) + getPaidShiftMinutes(shift),
+                );
+            }
+            expect([...paidByDate.values()].every((minutes) => minutes <= 3 * 60)).toBe(true);
+        });
+    });
+
+    it("uses the shared weekend rule to protect an applicable weekend when coverage permits", () => {
+        const configured: StoreHours = {
+            days: [
+                { dayOfWeek: 0, isOpen: true, openTime: "10:00", closeTime: "12:00" },
+                ...([1, 2, 3, 4, 5] as const).map((dayOfWeek) => ({
+                    dayOfWeek, isOpen: false as const,
+                })),
+                { dayOfWeek: 6, isOpen: true, openTime: "10:00", closeTime: "12:00" },
+            ],
+        };
+        const employees = [
+            makeEmployee({ id: "a", employeeNumber: "a", weeklyTargetMinutes: 4 * 60,
+                availability: { days: [6, 0] } }),
+            makeEmployee({ id: "b", employeeNumber: "b", weeklyTargetMinutes: 4 * 60,
+                availability: { days: [6, 0] } }),
+        ];
+        const settings = { oneWeekendOffPerMonth: true };
+
+        const result = generateShifts(
+            employees, [], configured, 2026, 3, [], settings,
+        );
+        const state = createInitialPlannerState(
+            result.shifts, employees, [], configured, settings,
+        );
+        state.selectedYear = 2026; state.selectedMonth = 3;
+
+        expect(evaluateSoftRules(state)).toEqual([]);
+    });
+
+    it("uses configured operating days and per-day hours", () => {
+        const configured = storeHours("10:00", "20:00");
+        configured.days = configured.days.map((day) => day.dayOfWeek === 1
+            ? { dayOfWeek: 1, isOpen: true, openTime: "09:00", closeTime: "18:00" }
+            : day.dayOfWeek === 3
+                ? { dayOfWeek: 3, isOpen: false }
+                : day);
+        const employee = makeEmployee({
+            weeklyTargetMinutes: 60 * 60,
+            maxDaysPerWeek: 6,
+            availability: { days: [1, 2, 3, 4, 5, 6] },
+        });
+
+        const result = generateShifts([employee], [], configured, 2026, 3, []);
+
+        expect(result.shifts.some(({ date }) => getDayOfWeek(date) === 3)).toBe(false);
+        const monday = result.shifts.find(({ date }) => date === "2026-03-02");
+        expect(monday?.start).toBe("09:00");
+        expect(timeToMinutes(monday!.end)).toBeLessThanOrEqual(timeToMinutes("18:00"));
+    });
     it("never generates a shift longer than eight hours", () => {
         const employee = makeEmployee({
             weeklyTargetMinutes: 60 * 60,
@@ -439,8 +549,8 @@ describe("generateShifts", () => {
         });
     });
 
-    describe("coverage overage", () => {
-        it("extends a bordering shift by the smallest modest overage needed for coverage", () => {
+    describe("generated weekly target ceiling", () => {
+        it("leaves coverage unresolved rather than exceeding the adjusted weekly target", () => {
             const employee = makeEmployee({
                 weeklyTargetMinutes: 6 * 60,
                 maxDaysPerWeek: 1,
@@ -450,11 +560,14 @@ describe("generateShifts", () => {
             const result = generateShifts([employee], [], EIGHT_HOUR_STORE_HOURS, 2026, 3, []);
             const firstMonday = result.shifts.find(({ date }) => date === "2026-03-02");
 
-            expect(firstMonday).toMatchObject({ start: "10:00", end: "18:00" });
-            expect(getPaidShiftMinutes(firstMonday!)).toBe(7 * 60);
+            expect(firstMonday).toBeDefined();
+            expect(getPaidShiftMinutes(firstMonday!)).toBeLessThanOrEqual(
+                employee.weeklyTargetMinutes,
+            );
+            expect(firstMonday?.end).not.toBe(EIGHT_HOUR_STORE_CLOSE);
         });
 
-        it("does not add target overage when coverage is already satisfied", () => {
+        it("may complete coverage when doing so stays within the weekly target", () => {
             const employee = makeEmployee({
                 weeklyTargetMinutes: 7 * 60,
                 maxDaysPerWeek: 1,
@@ -493,6 +606,31 @@ describe("generateShifts", () => {
 
             expect(result.shifts.every(({ end }) => timeToMinutes(end) <= timeToMinutes("19:00")))
                 .toBe(true);
+        });
+
+        it("does not exceed the vacation-adjusted monthly target across partial weeks", () => {
+            const employee = makeEmployee({
+                weeklyTargetMinutes: 20 * 60,
+                maxDaysPerWeek: 5,
+                availability: { days: [1, 2, 3, 4, 5] },
+            });
+            const vacations: VacationPeriod[] = [{
+                id: "vacation",
+                employeeId: employee.id,
+                startDate: "2026-03-09",
+                endDate: "2026-03-13",
+            }];
+
+            const result = generateShifts(
+                [employee], vacations, STORE_HOURS, 2026, 3, [],
+            );
+            const generatedPaid = result.shifts.reduce(
+                (total, shift) => total + getPaidShiftMinutes(shift), 0,
+            );
+
+            expect(generatedPaid).toBeLessThanOrEqual(
+                getAdjustedMonthlyTargetMinutes(employee, vacations, 2026, 3),
+            );
         });
     });
 

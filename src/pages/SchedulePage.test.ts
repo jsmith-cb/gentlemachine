@@ -5,8 +5,8 @@ import {
 } from "./SchedulePage";
 
 import type { Employee, Shift } from "../types/planning";
+import { cloneStoreHours, DEFAULT_STORE_HOURS } from "../services/storeHoursService";
 
-const OPEN_DAYS = [1, 2, 3, 4, 5, 6];
 
 function employee(id: string, status: Employee["status"] = "active"): Employee {
     return {
@@ -16,6 +16,7 @@ function employee(id: string, status: Employee["status"] = "active"): Employee {
         firstName: id === "a" ? "Alice" : "Ben",
         lastName: "Crew",
         weeklyTargetMinutes: 0,
+        maximumPaidMinutesPerDay: 8 * 60,
         maxDaysPerWeek: 5,
         availability: { days: [1, 2, 3, 4, 5] },
     };
@@ -34,7 +35,7 @@ const SHIFTS: Shift[] = [
 describe("Schedule presentation", () => {
     it("creates employee rows and configured operating-day columns", () => {
         const weeks = buildScheduleWeeks(
-            SHIFTS, EMPLOYEES, 2026, 9, null, OPEN_DAYS,
+            SHIFTS, EMPLOYEES, 2026, 9, null, DEFAULT_STORE_HOURS,
         );
 
         expect(weeks).toHaveLength(1);
@@ -56,7 +57,7 @@ describe("Schedule presentation", () => {
 
     it("maps and orders every shift in the correct employee/day cell", () => {
         const [week] = buildScheduleWeeks(
-            SHIFTS, EMPLOYEES, 2026, 9, null, OPEN_DAYS,
+            SHIFTS, EMPLOYEES, 2026, 9, null, DEFAULT_STORE_HOURS,
         );
         const aliceMonday = week?.rows
             .find(({ employeeId }) => employeeId === "a")
@@ -74,8 +75,15 @@ describe("Schedule presentation", () => {
     });
 
     it("derives columns from configured open days rather than a Schedule weekday rule", () => {
+        const configured = cloneStoreHours(DEFAULT_STORE_HOURS);
+        configured.days = configured.days.map((day) =>
+            [1, 4, 6].includes(day.dayOfWeek)
+                ? day.isOpen ? day : { dayOfWeek: day.dayOfWeek, isOpen: true,
+                    openTime: "10:30", closeTime: "20:30" }
+                : { dayOfWeek: day.dayOfWeek, isOpen: false },
+        );
         const [week] = buildScheduleWeeks(
-            SHIFTS, EMPLOYEES, 2026, 9, null, [1, 4, 6],
+            SHIFTS, EMPLOYEES, 2026, 9, null, configured,
         );
 
         expect(week?.columns.map(({ date }) => date)).toEqual([
@@ -89,10 +97,10 @@ describe("Schedule presentation", () => {
 
     it("keeps cross-month columns while scoping shift data to the selected month", () => {
         const [september] = buildScheduleWeeks(
-            SHIFTS, EMPLOYEES, 2026, 9, null, OPEN_DAYS,
+            SHIFTS, EMPLOYEES, 2026, 9, null, DEFAULT_STORE_HOURS,
         );
         const [october] = buildScheduleWeeks(
-            SHIFTS, EMPLOYEES, 2026, 10, null, OPEN_DAYS,
+            SHIFTS, EMPLOYEES, 2026, 10, null, DEFAULT_STORE_HOURS,
         );
 
         expect(september?.weekStart).toBe("2026-09-28");
@@ -107,7 +115,7 @@ describe("Schedule presentation", () => {
 
     it("filters the matrix to one employee without a separate representation", () => {
         const weeks = buildScheduleWeeks(
-            SHIFTS, EMPLOYEES, 2026, 9, "a", OPEN_DAYS,
+            SHIFTS, EMPLOYEES, 2026, 9, "a", DEFAULT_STORE_HOURS,
         );
 
         expect(weeks[0]?.rows.map(({ employeeId }) => employeeId)).toEqual(["a"]);
@@ -122,18 +130,18 @@ describe("Schedule presentation", () => {
 
     it("returns an empty projection for a month without shifts", () => {
         expect(buildScheduleWeeks(
-            SHIFTS, EMPLOYEES, 2026, 11, null, OPEN_DAYS,
+            SHIFTS, EMPLOYEES, 2026, 11, null, DEFAULT_STORE_HOURS,
         )).toEqual([]);
     });
 
     it("does not mutate canonical shifts, employees, or configured open days", () => {
         const shifts = structuredClone(SHIFTS);
         const employees = structuredClone(EMPLOYEES);
-        const openDays = [...OPEN_DAYS];
-        const before = JSON.stringify({ shifts, employees, openDays });
+        const storeHours = cloneStoreHours(DEFAULT_STORE_HOURS);
+        const before = JSON.stringify({ shifts, employees, storeHours });
 
-        buildScheduleWeeks(shifts, employees, 2026, 9, null, openDays);
+        buildScheduleWeeks(shifts, employees, 2026, 9, null, storeHours);
 
-        expect(JSON.stringify({ shifts, employees, openDays })).toBe(before);
+        expect(JSON.stringify({ shifts, employees, storeHours })).toBe(before);
     });
 });

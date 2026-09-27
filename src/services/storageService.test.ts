@@ -7,10 +7,16 @@ import {
 
 import {
     getStoredEmployees,
+    getStoredStoreHours,
+    getStoredSoftRuleSettings,
     getStoredVacations,
     setStoredEmployees,
+    setStoredStoreHours,
+    setStoredSoftRuleSettings,
     setStoredVacations,
 } from "./storageService";
+import { cloneStoreHours, DEFAULT_STORE_HOURS } from "./storeHoursService";
+import { DEFAULT_SOFT_RULE_SETTINGS } from "./softRulesService";
 
 const EMPLOYEE_STORAGE_KEY = "@pp_crew_employees";
 
@@ -86,6 +92,37 @@ describe("storageService - Employee Persistence", () => {
         })));
     });
 
+    it("persists a reduced employee daily-hours override", () => {
+        const employee = {
+            id: "daily-limit", employeeNumber: "DL", status: "active" as const,
+            firstName: "Daily", lastName: "Limit", weeklyTargetMinutes: 20 * 60,
+            maximumPaidMinutesPerDay: 6 * 60,
+            maxDaysPerWeek: 5, availability: { days: [1, 2, 3, 4, 5] },
+        };
+        setStoredEmployees([employee]);
+        expect(getStoredEmployees()).toEqual([employee]);
+    });
+
+    it("rejects a daily-hours override above Crew's eight-hour default", () => {
+        localStorageMock.setItem(EMPLOYEE_STORAGE_KEY, JSON.stringify([{
+            id: "daily-limit", employeeNumber: "DL", status: "active",
+            firstName: "Daily", lastName: "Limit", weeklyTargetMinutes: 20 * 60,
+            maximumPaidMinutesPerDay: 9 * 60,
+            maxDaysPerWeek: 5, availability: { days: [1, 2, 3, 4, 5] },
+        }]));
+        expect(getStoredEmployees()).toBeUndefined();
+    });
+
+    it("rejects a daily-hours override outside 30-minute increments", () => {
+        localStorageMock.setItem(EMPLOYEE_STORAGE_KEY, JSON.stringify([{
+            id: "daily-limit", employeeNumber: "DL", status: "active",
+            firstName: "Daily", lastName: "Limit", weeklyTargetMinutes: 20 * 60,
+            maximumPaidMinutesPerDay: 370,
+            maxDaysPerWeek: 5, availability: { days: [1, 2, 3, 4, 5] },
+        }]));
+        expect(getStoredEmployees()).toBeUndefined();
+    });
+
     it("persists optional employee contact details without changing employee identity", () => {
         const employee = {
             id: "e1",
@@ -126,6 +163,7 @@ describe("storageService - Employee Persistence", () => {
         const employee = {
             id: "employee-generated-uuid", employeeNumber: "TM-12", status: "active" as const,
             firstName: "Test", lastName: "Member", weeklyTargetMinutes: 600,
+            maximumPaidMinutesPerDay: 8 * 60,
             maxDaysPerWeek: 3, availability: { days: [1, 2, 3] },
         };
         setStoredEmployees([employee]);
@@ -402,5 +440,52 @@ describe("storageService - Vacation Persistence", () => {
             endDate: "2026-10-02",
         }]));
         expect(getStoredVacations()).toEqual([]);
+    });
+});
+
+describe("storageService - Store Hours Persistence", () => {
+    beforeEach(() => localStorageMock.clear());
+
+    it("uses defaults when no Store Hours are persisted", () => {
+        expect(getStoredStoreHours()).toEqual(DEFAULT_STORE_HOURS);
+    });
+
+    it("persists and reloads custom Store Hours", () => {
+        const custom = cloneStoreHours(DEFAULT_STORE_HOURS);
+        custom.days = custom.days.map((day) => day.dayOfWeek === 1
+            ? { dayOfWeek: 1, isOpen: true, openTime: "09:00", closeTime: "18:00" }
+            : day.dayOfWeek === 3
+                ? { dayOfWeek: 3, isOpen: false }
+                : day);
+        setStoredStoreHours(custom);
+        expect(getStoredStoreHours()).toEqual(custom);
+    });
+
+    it("rejects malformed persisted Store Hours and returns defaults", () => {
+        localStorageMock.setItem("@pp_crew_store_hours", JSON.stringify({
+            days: [{ dayOfWeek: 1, isOpen: true, openTime: "20:00", closeTime: "09:00" }],
+        }));
+        expect(getStoredStoreHours()).toEqual(DEFAULT_STORE_HOURS);
+    });
+});
+
+describe("storageService - Soft Rules Persistence", () => {
+    beforeEach(() => localStorageMock.clear());
+
+    it("uses disabled defaults when no Soft Rules are persisted", () => {
+        expect(getStoredSoftRuleSettings()).toEqual(DEFAULT_SOFT_RULE_SETTINGS);
+    });
+
+    it("persists and reloads typed Soft Rules", () => {
+        const settings = { oneWeekendOffPerMonth: true };
+        setStoredSoftRuleSettings(settings);
+        expect(getStoredSoftRuleSettings()).toEqual(settings);
+    });
+
+    it("rejects malformed persisted Soft Rules and returns defaults", () => {
+        localStorageMock.setItem("@pp_crew_soft_rules", JSON.stringify({
+            oneWeekendOffPerMonth: "yes",
+        }));
+        expect(getStoredSoftRuleSettings()).toEqual(DEFAULT_SOFT_RULE_SETTINGS);
     });
 });

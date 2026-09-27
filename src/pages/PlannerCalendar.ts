@@ -104,6 +104,7 @@ function renderPlanningAssistant(
     const coverage = issues.filter(({ category }) => category === "coverage");
     const hours = issues.filter(({ category }) => category === "hours");
     const availability = issues.filter(({ category }) => category === "availability");
+    const softRules = issues.filter(({ category }) => category === "soft-rule");
 
     return `
         <aside class="planning-assistant-window" id="planning-assistant-window"
@@ -156,6 +157,7 @@ function renderPlanningAssistant(
                             ${renderValidationFilter("coverage", "Coverage", coverage.length)}
                             ${renderValidationFilter("hours", "Hours", hours.length)}
                             ${renderValidationFilter("availability", "Availability", availability.length)}
+                            ${renderValidationFilter("soft-rule", "Soft Rules", softRules.length)}
                         </div>
 
                         <div class="validation-results-heading">
@@ -224,6 +226,7 @@ function renderCalendarDays(
     state: PlannerState,
     editorMode: PlannerEditorMode | null,
 ): string {
+    const openDays = getOpenOperatingDays(state.storeHours);
     const daysInMonth = new Date(
         state.selectedYear,
         state.selectedMonth,
@@ -251,7 +254,7 @@ function renderCalendarDays(
         firstOpenDay,
     );
     const placeholders = Array.from(
-        { length: Math.max(firstDate.getDay() - 1, 0) },
+        { length: Math.max(openDays.indexOf(firstDate.getDay() as 0 | 1 | 2 | 3 | 4 | 5 | 6), 0) },
         () => `
             <div
                 class="calendar-day calendar-day--placeholder"

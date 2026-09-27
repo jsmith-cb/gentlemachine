@@ -1,5 +1,6 @@
 import {
     createDateKey,
+    getAdjustedMonthlyTargetMinutes,
     getAdjustedWeeklyTargetMinutes,
     getDayOfWeek,
     getPaidShiftMinutes,
@@ -17,8 +18,15 @@ import {
     getOperatingHoursForDate,
 } from "./storeHoursService";
 import {
+    DEFAULT_SOFT_RULE_SETTINGS,
+    getApplicableWeekends,
+} from "./softRulesService";
+import {
     exceedsMaximumStandardShift,
+    getEmployeePaidMinutesForDate,
+    getEffectiveMaximumPaidMinutesPerDay,
     MAXIMUM_STANDARD_SHIFT_MINUTES,
+    remainingEmployeePaidMinutesForDate,
 } from "./shiftRules";
 
 import type {
@@ -26,6 +34,7 @@ import type {
     PlannerState,
     Shift,
     StoreHours,
+    SoftRuleSettings,
     VacationPeriod,
 } from "../types/planning";
 
@@ -37,11 +46,6 @@ export type GenerationFlexibility = "hour-constrained" | "day-constrained" | "ge
 
 const MINIMUM_GENERATED_FINAL_SHIFT_PAID_MINUTES = 2 * 60;
 const GENERATION_SLOT_MINUTES = 30;
-// A gap smaller than a plausible standalone generated shift may be closed by
-// extending a bordering shift. This derives the overage bound from the existing
-// generation strategy instead of defining a separate employee constraint.
-const MAXIMUM_MODEST_COVERAGE_OVERAGE_MINUTES =
-    MINIMUM_GENERATED_FINAL_SHIFT_PAID_MINUTES;
 
 function maxTime(a: string, b: string): string {
     return timeToMinutes(a) >= timeToMinutes(b) ? a : b;
@@ -167,6 +171,18 @@ function generatedForEmployeeInWeek(
     );
 }
 
+function generatedForEmployeeInMonth(
+    shifts: readonly Shift[],
+    employeeId: string,
+    year: number,
+    month: number,
+): Shift[] {
+    const prefix = `${year}-${String(month).padStart(2, "0")}-`;
+    return shifts.filter(
+        (shift) => shift.employeeId === employeeId && shift.date.startsWith(prefix),
+    );
+}
+
 function usableDatesRemaining(
     employee: Employee,
     vacations: VacationPeriod[],
@@ -212,6 +228,29 @@ interface ShiftCandidate {
     remainingRatio: number;
     legalStart: number;
     legalEnd: number;
+    softRuleProtected?: boolean;
+}
+
+function protectedWeekendDates(
+    employees: Employee[],
+    vacations: VacationPeriod[],
+    storeHours: StoreHours,
+    year: number,
+    month: number,
+    settings: SoftRuleSettings,
+): Map<string, Set<string>> {
+    const protectedDates = new Map<string, Set<string>>();
+    if (!settings.oneWeekendOffPerMonth) return protectedDates;
+
+    [...employees].sort((left, right) => left.id.localeCompare(right.id))
+        .forEach((employee, index) => {
+            const weekends = getApplicableWeekends(
+                employee, vacations, storeHours, year, month,
+            );
+            const selected = weekends[index % Math.max(weekends.length, 1)];
+            if (selected) protectedDates.set(employee.id, new Set(selected.dates));
+        });
+    return protectedDates;
 }
 
 function bestShiftForEmployee(
@@ -303,6 +342,9 @@ function extendShiftForSmallCoverageGap(
     date: string,
     weekStart: string,
     weeklyTargets: Map<string, number>,
+    year: number,
+    month: number,
+    monthlyTargets: Map<string, number>,
     gaps: Array<{ start: string; end: string }>,
 ): boolean {
     for (const gap of gaps) {
@@ -334,7 +376,22 @@ function extendShiftForSmallCoverageGap(
             );
             const proposed = scheduled - getPaidShiftMinutes(shift) + getPaidShiftMinutes(extended);
             const target = weeklyTargets.get(employee.id) ?? 0;
-            if (proposed - target > MAXIMUM_MODEST_COVERAGE_OVERAGE_MINUTES) return [];
+            const employeeMonth = generatedForEmployeeInMonth(
+                [...existingShifts, ...generated], employee.id, year, month,
+            );
+            const scheduledMonth = employeeMonth.reduce(
+                (total, candidate) => total + getPaidShiftMinutes(candidate), 0,
+            );
+            const proposedMonth = scheduledMonth - getPaidShiftMinutes(shift) +
+                getPaidShiftMinutes(extended);
+            const monthlyTarget = monthlyTargets.get(employee.id) ?? 0;
+            const proposedDay = getEmployeePaidMinutesForDate(
+                [...existingShifts, ...generated], employee.id, date,
+            ) - getPaidShiftMinutes(shift) + getPaidShiftMinutes(extended);
+            // Generated schedules may leave coverage unresolved, but they must
+            // not create overtime above either vacation-adjusted target.
+            if (proposed > target || proposedMonth > monthlyTarget ||
+                proposedDay > getEffectiveMaximumPaidMinutesPerDay(employee)) return [];
 
             return [{
                 index,
@@ -364,6 +421,9 @@ function compareCoverageCandidates(
     gaps: Array<{ start: string; end: string }>,
     storeHours: StoreHours,
 ): number {
+    if (Boolean(left.softRuleProtected) !== Boolean(right.softRuleProtected)) {
+        return left.softRuleProtected ? 1 : -1;
+    }
     const operating = getOperatingHoursForDate(storeHours, left.shift.date);
     if (!operating) return 0;
     const focus = timeToMinutes(gaps[0]?.start ?? operating.open);
@@ -403,6 +463,7 @@ function coverageGaps(
         selectedYear: year,
         selectedMonth: month,
         storeHours,
+        softRules: DEFAULT_SOFT_RULE_SETTINGS,
         employees,
         shifts,
         vacations,
@@ -461,6 +522,7 @@ function extendGeneratedShiftTowardTarget(
     employee: Employee,
     storeHours: StoreHours,
     generated: Shift[],
+    existingShifts: readonly Shift[],
     weekStart: string,
     remainingTargetMinutes: number,
 ): boolean {
@@ -476,7 +538,12 @@ function extendGeneratedShiftTowardTarget(
         if (!legal) continue;
         const preferred = preferredWindow(employee, getDayOfWeek(shift.date), legal);
         const candidate = findContractExtensionCandidate(
-            employee, storeHours, shift, remainingTargetMinutes,
+            employee, storeHours, shift, Math.min(
+                remainingTargetMinutes,
+                remainingEmployeePaidMinutesForDate(
+                    employee, [...existingShifts, ...generated], shift.date,
+                ),
+            ),
         );
         if (!candidate) continue;
         const addedPaid = getPaidShiftMinutes(candidate) - originalPaid;
@@ -505,6 +572,10 @@ function fulfillWeeklyTargets(
     dates: string[],
     weekStart: string,
     weeklyTargets: Map<string, number>,
+    year: number,
+    month: number,
+    monthlyTargets: Map<string, number>,
+    protectedDates: Map<string, Set<string>>,
 ): void {
     const ordered = [...active].sort((left, right) => {
         const flexibility = FLEXIBILITY_RANK[classifyGenerationFlexibility(left, storeHours)] -
@@ -526,11 +597,20 @@ function fulfillWeeklyTargets(
             const scheduled = employeeWeek.reduce(
                 (total, shift) => total + getPaidShiftMinutes(shift), 0,
             );
-            const remaining = (weeklyTargets.get(employee.id) ?? 0) - scheduled;
+            const employeeMonth = generatedForEmployeeInMonth(
+                allShifts, employee.id, year, month,
+            );
+            const scheduledMonth = employeeMonth.reduce(
+                (total, shift) => total + getPaidShiftMinutes(shift), 0,
+            );
+            const remaining = Math.min(
+                (weeklyTargets.get(employee.id) ?? 0) - scheduled,
+                (monthlyTargets.get(employee.id) ?? 0) - scheduledMonth,
+            );
             if (remaining <= 0) break;
 
             if (extendGeneratedShiftTowardTarget(
-                employee, storeHours, generated, weekStart, remaining,
+                employee, storeHours, generated, existingShifts, weekStart, remaining,
             )) continue;
 
             if (remaining < MINIMUM_GENERATED_FINAL_SHIFT_PAID_MINUTES) break;
@@ -540,6 +620,7 @@ function fulfillWeeklyTargets(
             const availableDates = dates.filter((date) =>
                 employee.availability.days.includes(getDayOfWeek(date)) &&
                 !overlapsVacation(vacations, employee.id, date, date) &&
+                !protectedDates.get(employee.id)?.has(date) &&
                 !allShifts.some((shift) => shift.employeeId === employee.id && shift.date === date),
             );
             const date = availableDates[0];
@@ -551,7 +632,10 @@ function fulfillWeeklyTargets(
                 date,
                 storeHours,
                 [{ start: operating.open, end: operating.close }],
-                remaining,
+                Math.min(
+                    remaining,
+                    remainingEmployeePaidMinutesForDate(employee, allShifts, date),
+                ),
                 Math.min(availableDates.length, employee.maxDaysPerWeek - daysWorked),
             );
             if (!candidate) break;
@@ -569,11 +653,19 @@ export function generateShifts(
     year: number,
     month: number,
     existingShifts: readonly Shift[],
+    softRules: SoftRuleSettings = DEFAULT_SOFT_RULE_SETTINGS,
 ): GenerationResult {
     resetShiftIdCounter();
 
     const active = activeEmployees(employees);
     const generated: Shift[] = [];
+    const protectedDates = protectedWeekendDates(
+        active, vacations, storeHours, year, month, softRules,
+    );
+    const monthlyTargets = new Map(active.map((employee) => [
+        employee.id,
+        getAdjustedMonthlyTargetMinutes(employee, vacations, year, month),
+    ]));
 
     const openDays = getOpenOperatingDays(storeHours);
     for (const weekStart of getWeekStartsForMonth(year, month, openDays)) {
@@ -606,6 +698,9 @@ export function generateShifts(
                     date,
                     weekStart,
                     weeklyTargets,
+                    year,
+                    month,
+                    monthlyTargets,
                     gaps,
                 )) continue;
 
@@ -622,7 +717,17 @@ export function generateShifts(
                     const scheduled = employeeWeek.reduce(
                         (total, shift) => total + getPaidShiftMinutes(shift), 0,
                     );
-                    const remaining = weeklyTarget - scheduled;
+                    const employeeMonth = generatedForEmployeeInMonth(
+                        allShifts, employee.id, year, month,
+                    );
+                    const scheduledMonth = employeeMonth.reduce(
+                        (total, shift) => total + getPaidShiftMinutes(shift), 0,
+                    );
+                    const remaining = Math.min(
+                        weeklyTarget - scheduled,
+                        (monthlyTargets.get(employee.id) ?? 0) - scheduledMonth,
+                        remainingEmployeePaidMinutesForDate(employee, allShifts, date),
+                    );
                     const remainingDates = usableDatesRemaining(
                         employee, vacations, dates, date, daysWorked,
                     );
@@ -634,7 +739,10 @@ export function generateShifts(
                         remaining,
                         remainingDates,
                     );
-                    return candidate ? [candidate] : [];
+                    return candidate ? [{
+                        ...candidate,
+                        softRuleProtected: protectedDates.get(employee.id)?.has(date) ?? false,
+                    }] : [];
                 }).sort((left, right) =>
                     compareCoverageCandidates(left, right, gaps, storeHours),
                 );
@@ -657,6 +765,10 @@ export function generateShifts(
             dates,
             weekStart,
             weeklyTargets,
+            year,
+            month,
+            monthlyTargets,
+            protectedDates,
         );
     }
 

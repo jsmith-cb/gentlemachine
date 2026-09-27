@@ -1,6 +1,8 @@
 import {
     getStoredStoreHours,
+    getStoredSoftRuleSettings,
     setStoredStoreHours,
+    setStoredSoftRuleSettings,
 } from "../services/storageService";
 import {
     cloneStoreHours,
@@ -31,7 +33,9 @@ function dayConfiguration(storeHours: StoreHours, dayOfWeek: Weekday): StoreOper
 
 export function renderSettingsPage(container: HTMLElement): void {
     let storeHours = getStoredStoreHours();
-    let feedback = "";
+    let softRules = getStoredSoftRuleSettings();
+    let storeHoursFeedback = "";
+    let softRulesFeedback = "";
 
     function render(): void {
         container.innerHTML = `
@@ -44,47 +48,70 @@ export function renderSettingsPage(container: HTMLElement): void {
                 </div>
 
                 <form class="store-hours-settings" id="store-hours-form">
+                    <details class="settings-collapsible">
+                        <summary class="settings-section-heading">
+                            <span>
+                                <h3>Store Hours</h3>
+                                <p>Tell PP_Crew when the business is normally open.</p>
+                            </span>
+                        </summary>
+
+                        <div class="store-hours-days">
+                            ${DAYS.map(({ dayOfWeek, label }) => {
+                                const day = dayConfiguration(storeHours, dayOfWeek);
+                                const openTime = day.isOpen ? day.openTime : "10:30";
+                                const closeTime = day.isOpen ? day.closeTime : "20:30";
+                                return `
+                                    <fieldset class="store-hours-day" data-store-day="${dayOfWeek}">
+                                        <legend>${label}</legend>
+                                        <label class="store-day-toggle">
+                                            <input type="checkbox" name="open-${dayOfWeek}" ${day.isOpen ? "checked" : ""}>
+                                            <span>Open</span>
+                                        </label>
+                                        <div class="store-day-times">
+                                            <label>
+                                                <span>Opens</span>
+                                                <input type="time" name="start-${dayOfWeek}" value="${escapeHtml(openTime)}"
+                                                    ${day.isOpen ? "" : "disabled"} required>
+                                            </label>
+                                            <span aria-hidden="true">–</span>
+                                            <label>
+                                                <span>Closes</span>
+                                                <input type="time" name="end-${dayOfWeek}" value="${escapeHtml(closeTime)}"
+                                                    ${day.isOpen ? "" : "disabled"} required>
+                                            </label>
+                                        </div>
+                                        <span class="store-day-closed" ${day.isOpen ? "hidden" : ""}>Closed</span>
+                                    </fieldset>
+                                `;
+                            }).join("")}
+                        </div>
+
+                        <div class="settings-actions">
+                            <p class="settings-feedback" role="status">${escapeHtml(storeHoursFeedback)}</p>
+                            <button class="primary-button" type="submit">Save Store Hours</button>
+                        </div>
+                    </details>
+                </form>
+
+                <form class="store-hours-settings soft-rules-settings" id="soft-rules-form">
                     <div class="settings-section-heading">
                         <div>
-                            <h3>Store Hours</h3>
-                            <p>Tell PP_Crew when the business is normally open.</p>
+                            <h3>Soft Rules</h3>
+                            <p>Set scheduling outcomes Crew should try to achieve.</p>
                         </div>
                     </div>
-
-                    <div class="store-hours-days">
-                        ${DAYS.map(({ dayOfWeek, label }) => {
-                            const day = dayConfiguration(storeHours, dayOfWeek);
-                            const openTime = day.isOpen ? day.openTime : "10:30";
-                            const closeTime = day.isOpen ? day.closeTime : "20:30";
-                            return `
-                                <fieldset class="store-hours-day" data-store-day="${dayOfWeek}">
-                                    <legend>${label}</legend>
-                                    <label class="store-day-toggle">
-                                        <input type="checkbox" name="open-${dayOfWeek}" ${day.isOpen ? "checked" : ""}>
-                                        <span>Open</span>
-                                    </label>
-                                    <div class="store-day-times">
-                                        <label>
-                                            <span>Opens</span>
-                                            <input type="time" name="start-${dayOfWeek}" value="${escapeHtml(openTime)}"
-                                                ${day.isOpen ? "" : "disabled"} required>
-                                        </label>
-                                        <span aria-hidden="true">–</span>
-                                        <label>
-                                            <span>Closes</span>
-                                            <input type="time" name="end-${dayOfWeek}" value="${escapeHtml(closeTime)}"
-                                                ${day.isOpen ? "" : "disabled"} required>
-                                        </label>
-                                    </div>
-                                    <span class="store-day-closed" ${day.isOpen ? "hidden" : ""}>Closed</span>
-                                </fieldset>
-                            `;
-                        }).join("")}
-                    </div>
-
+                    <label class="soft-rule-option">
+                        <input type="checkbox" name="oneWeekendOffPerMonth"
+                            ${softRules.oneWeekendOffPerMonth ? "checked" : ""}>
+                        <span>
+                            <strong>One weekend off per month</strong>
+                            <small>Help give each team member at least one weekend off each month.</small>
+                        </span>
+                    </label>
                     <div class="settings-actions">
-                        <p class="settings-feedback" role="status">${escapeHtml(feedback)}</p>
-                        <button class="primary-button" type="submit">Save Store Hours</button>
+                        <p class="settings-feedback" role="status">${escapeHtml(softRulesFeedback)}</p>
+                        <button class="primary-button" type="submit">Save Soft Rules</button>
                     </div>
                 </form>
             </section>
@@ -119,17 +146,31 @@ export function renderSettingsPage(container: HTMLElement): void {
             });
             const candidate: StoreHours = { days };
             if (!isValidStoreHours(candidate)) {
-                feedback = "Check that every open day has a valid opening time before its closing time.";
+                storeHoursFeedback = "Check that every open day has a valid opening time before its closing time.";
                 render();
                 return;
             }
             setStoredStoreHours(candidate);
             storeHours = cloneStoreHours(candidate);
-            feedback = "Store Hours saved.";
+            storeHoursFeedback = "Store Hours saved.";
             render();
         });
+
+        container.querySelector<HTMLFormElement>("#soft-rules-form")?.addEventListener(
+            "submit",
+            (event) => {
+                event.preventDefault();
+                const form = event.currentTarget as HTMLFormElement;
+                softRules = {
+                    oneWeekendOffPerMonth:
+                        new FormData(form).get("oneWeekendOffPerMonth") === "on",
+                };
+                setStoredSoftRuleSettings(softRules);
+                softRulesFeedback = "Soft Rules saved.";
+                render();
+            },
+        );
     }
 
     render();
 }
-

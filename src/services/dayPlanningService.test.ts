@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { applyDayPlanningChanges, availableTeamForDay } from "./dayPlanningService";
 import { createInitialPlannerState } from "../state/plannerState";
+import { cloneStoreHours, DEFAULT_STORE_HOURS } from "./storeHoursService";
+import { validateShift } from "./validationService";
 
 describe("day planning availability", () => {
     it("uses legal default hours and excludes vacation and inactive team members", () => {
@@ -15,9 +17,48 @@ describe("day planning availability", () => {
         expect(availableTeamForDay(state, "2026-09-21").map(({ employee, start, end }) =>
             [employee.id, start, end])).toEqual([["available", "10:30", "20:30"]]);
     });
+
+    it("uses changed operating hours and excludes a closed weekday", () => {
+        const storeHours = cloneStoreHours(DEFAULT_STORE_HOURS);
+        storeHours.days = storeHours.days.map((day) => day.dayOfWeek === 1
+            ? { dayOfWeek: 1, isOpen: true, openTime: "09:00", closeTime: "18:00" }
+            : day.dayOfWeek === 3
+                ? { dayOfWeek: 3, isOpen: false }
+                : day);
+        const state = createInitialPlannerState([], undefined, [], storeHours);
+
+        expect(availableTeamForDay(state, "2026-09-21")[0]).toMatchObject({
+            start: "09:00",
+            end: "18:00",
+        });
+        expect(availableTeamForDay(state, "2026-09-23")).toEqual([]);
+    });
 });
 
 describe("saving a day plan", () => {
+    it("exposes the shared daily paid-hours error for a staged multi-shift plan", () => {
+        const state = createInitialPlannerState();
+        state.employees = [{
+            ...state.employees[0]!, maximumPaidMinutesPerDay: 6 * 60,
+        }];
+        const first = {
+            id: "first", employeeId: "a", date: "2026-09-21",
+            start: "10:30", end: "14:30",
+        };
+        const second = {
+            id: "second", employeeId: "a", date: "2026-09-21",
+            start: "15:00", end: "18:00",
+        };
+        const projected = applyDayPlanningChanges([], [first, second], []);
+
+        expect(validateShift({ ...state, shifts: projected }, second)).toContainEqual(
+            expect.objectContaining({
+                severity: "error", category: "hours",
+                message: expect.stringContaining("Maximum is 6:00"),
+            }),
+        );
+    });
+
     it("commits multiple drafts and edits together while retaining other days", () => {
         const original = { id: "one", employeeId: "a", date: "2026-09-21", start: "10:30", end: "12:30" };
         const otherDay = { ...original, id: "other-day", date: "2026-09-22" };

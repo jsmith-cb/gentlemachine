@@ -10,6 +10,7 @@ function employee(id: string, firstName: string, lastName: string): Employee {
         firstName,
         lastName,
         weeklyTargetMinutes: 0,
+        maximumPaidMinutesPerDay: 8 * 60,
         maxDaysPerWeek: 5,
         availability: { days: [1] },
     };

@@ -1,4 +1,5 @@
 import { DEFAULT_STORE_HOURS } from "../services/storeHoursService";
+import { DEFAULT_SOFT_RULE_SETTINGS } from "../services/softRulesService";
 
 import type {
     BreakRule,
@@ -6,6 +7,7 @@ import type {
     PlannerState,
     Shift,
     StoreHours,
+    SoftRuleSettings,
     VacationPeriod,
 } from "../types/planning";
 
@@ -117,6 +119,7 @@ export function createInitialPlannerState(
     providedEmployees?: Employee[],
     providedVacations?: VacationPeriod[],
     providedStoreHours: StoreHours = DEFAULT_STORE_HOURS,
+    providedSoftRules: SoftRuleSettings = DEFAULT_SOFT_RULE_SETTINGS,
 ): PlannerState {
     const now = new Date();
 
@@ -124,6 +127,7 @@ export function createInitialPlannerState(
         selectedYear: now.getFullYear(),
         selectedMonth: now.getMonth() + 1,
         storeHours: providedStoreHours,
+        softRules: providedSoftRules,
         employees: providedEmployees ?? EMPLOYEES,
         shifts: providedShifts ?? [],
         vacations: providedVacations ?? [],

@@ -1,5 +1,5 @@
 import { employeeFullName } from "../services/employeeIdentity";
-import { availableTeamForDay } from "../services/dayPlanningService";
+import { applyDayPlanningChanges, availableTeamForDay } from "../services/dayPlanningService";
 import { isValidTime } from "../services/availabilityService";
 import { timeToMinutes } from "../services/hoursService";
 import { validateShift } from "../services/validationService";
@@ -74,7 +74,14 @@ export function attachDayPlanningModal(
         if (!isValidTime(shift.start) || !isValidTime(shift.end)) return "Enter a valid start and end time.";
         if (timeToMinutes(shift.start) < opening || timeToMinutes(shift.end) > closing)
             return "Shift must stay within store hours.";
-        return validateShift(state, shift).find(({ severity }) => severity === "error")?.message ?? null;
+        const pending = new Map(drafts);
+        pending.set(shift.id, shift);
+        const projectedShifts = applyDayPlanningChanges(
+            state.shifts, [...pending.values()], [...pendingDeletes],
+        );
+        return validateShift(
+            { ...state, shifts: projectedShifts }, shift,
+        ).find(({ severity }) => severity === "error")?.message ?? null;
     }
 
     function slots(): string {

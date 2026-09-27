@@ -7,7 +7,7 @@ import {
     validatePlannerState,
 } from "../services/validationService";
 
-import { getStoredShifts, setStoredShifts, getStoredEmployees, getStoredVacations, getStoredStoreHours } from "../services/storageService";
+import { getStoredShifts, setStoredShifts, getStoredEmployees, getStoredVacations, getStoredStoreHours, getStoredSoftRuleSettings } from "../services/storageService";
 
 import {
     createInitialPlannerState,
@@ -22,6 +22,7 @@ import type {
 import { attachDayPlanningModal } from "./DayPlanningModal";
 import { applyDayPlanningChanges } from "../services/dayPlanningService";
 import { generateShifts } from "../services/generationService";
+import { evaluateSoftRules } from "../services/softRulesService";
 
 import {
     renderPlannerCalendar,
@@ -88,6 +89,7 @@ export function generateDraftForEmptyPlanningPeriod(state: PlannerState): {
         state.selectedYear,
         state.selectedMonth,
         state.shifts,
+        state.softRules,
     );
 
     if (shifts.length === 0) {
@@ -108,6 +110,7 @@ export function renderPlannerPage(
 
     let state = createInitialPlannerState(
         storedShifts, storedEmployees, getStoredVacations(), getStoredStoreHours(),
+        getStoredSoftRuleSettings(),
     );
 
     let editorMode:
@@ -132,10 +135,15 @@ export function renderPlannerPage(
                 state,
             );
 
-        const scheduleIssues =
-            validatePlannerState(
-                state,
-            );
+        const scheduleIssues: ValidationIssue[] = [
+            ...validatePlannerState(state),
+            ...evaluateSoftRules(state).map((guidance) => ({
+                severity: "warning" as const,
+                category: "soft-rule" as const,
+                employeeId: guidance.employeeId,
+                message: guidance.message,
+            })),
+        ];
 
         container.innerHTML = `
             <section class="planner">

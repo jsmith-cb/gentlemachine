@@ -11,6 +11,7 @@ import { employeeSelectOptions } from "../services/employeeIdentity";
 import { activeEmployees, createTeamMemberDraft, deactivateTeamMember } from "../services/teamService";
 import { hasValidAvailabilityHours } from "../services/availabilityService";
 import { isValidVacationPeriod, overlapsVacation } from "../services/vacationService";
+import { isValidMaximumPaidMinutesPerDayOverride } from "../services/shiftRules";
 
 import { getStoredShifts, getStoredEmployees, getStoredVacations, getStoredStoreHours, setStoredEmployees, setStoredVacations } from "../services/storageService";
 
@@ -86,12 +87,20 @@ export function renderEmployeePlanningPage(
                 ? "above target"
                 : "on target";
 
-        const dayLabels = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+        const availabilityDays = [
+            { value: 1, label: "Mon" }, { value: 2, label: "Tue" },
+            { value: 3, label: "Wed" }, { value: 4, label: "Thu" },
+            { value: 5, label: "Fri" }, { value: 6, label: "Sat" },
+            { value: 0, label: "Sun" },
+        ];
         const availability = selectedEmployee.availability;
         const hasDayHours = Object.values(availability.dayHours ?? {}).some(
             (hours) => Boolean(hours?.earliestStart || hours?.latestEnd),
         );
         const targetHours = (selectedEmployee.weeklyTargetMinutes / 60).toFixed(1);
+        const maximumHoursPerDay = selectedEmployee.maximumPaidMinutesPerDay === undefined
+            ? ""
+            : (selectedEmployee.maximumPaidMinutesPerDay / 60).toFixed(1);
         const employeeVacations = state.vacations
             .filter((period) => period.employeeId === selectedEmployee.id)
             .sort((a, b) => a.startDate.localeCompare(b.startDate));
@@ -186,6 +195,14 @@ export function renderEmployeePlanningPage(
                     </div>
 
                     <div class="form-group">
+                        <label for="emp-maximum-hours-per-day">Maximum hours per day</label>
+                        <input type="number" id="emp-maximum-hours-per-day" name="maximumHoursPerDay"
+                            value="${maximumHoursPerDay}" step="0.5" min="0.5" max="8"
+                            placeholder="8" />
+                        <small>Leave blank to use Crew's default maximum of 8 paid hours.</small>
+                    </div>
+
+                    <div class="form-group">
                         <label for="emp-max-days">Max Days Per Week</label>
                         <select id="emp-max-days" name="maxDays" required>
                             ${[1, 2, 3, 4, 5, 6, 7].map((d) =>
@@ -196,8 +213,7 @@ export function renderEmployeePlanningPage(
                     <div class="form-group">
                         <label>Available Days</label>
                         <div class="day-checkboxes">
-                            ${dayLabels.map((label, i) => {
-                                const day = i + 1;
+                            ${availabilityDays.map(({ label, value: day }) => {
                                 const checked = availability.days.includes(day);
                                 return `
                                     <label class="day-checkbox">
@@ -230,8 +246,7 @@ export function renderEmployeePlanningPage(
                         <details class="day-hours-details" ${hasDayHours ? "open" : ""}>
                             <summary>Day-specific hours</summary>
                         <div class="day-hours-list">
-                            ${dayLabels.map((label, i) => {
-                                const day = i + 1;
+                            ${availabilityDays.map(({ label, value: day }) => {
                                 const checked = availability.days.includes(day);
                                 const hours = availability.dayHours?.[day];
                                 return `
@@ -413,6 +428,7 @@ export function renderEmployeePlanningPage(
             const emailInput = container.querySelector<HTMLInputElement>('#emp-email');
             const telephoneInput = container.querySelector<HTMLInputElement>('#emp-telephone');
             const targetInput = container.querySelector<HTMLInputElement>('#emp-target-hours');
+            const maximumHoursPerDayInput = container.querySelector<HTMLInputElement>('#emp-maximum-hours-per-day');
             const maxDaysSelect = container.querySelector<HTMLSelectElement>('#emp-max-days');
             const earliestInput = container.querySelector<HTMLInputElement>('#emp-earliest');
             const latestInput = container.querySelector<HTMLInputElement>('#emp-latest');
@@ -435,7 +451,20 @@ export function renderEmployeePlanningPage(
                 return;
             }
             const targetHoursNum = parseFloat(targetInput?.value ?? "0");
+            const maximumHoursPerDayValue = maximumHoursPerDayInput?.value.trim() ?? "";
+            const maximumHoursPerDay = maximumHoursPerDayValue === ""
+                ? undefined
+                : parseFloat(maximumHoursPerDayValue);
+            const maximumPaidMinutesPerDay = maximumHoursPerDay === undefined
+                ? undefined
+                : maximumHoursPerDay * 60;
             const maxDays = parseInt(maxDaysSelect?.value ?? "5", 10);
+
+            if (maximumPaidMinutesPerDay !== undefined &&
+                !isValidMaximumPaidMinutesPerDayOverride(maximumPaidMinutesPerDay)) {
+                if (saveStatus) saveStatus.textContent = "Maximum hours per day must be between 0.5 and 8 hours in 30-minute increments, or left blank.";
+                return;
+            }
 
             const dayCheckboxes = form.querySelectorAll<HTMLInputElement>('input[name="days"]:checked');
             const days = Array.from(dayCheckboxes).map(cb => parseInt(cb.value, 10));
@@ -469,6 +498,7 @@ export function renderEmployeePlanningPage(
                 email,
                 telephoneNumber,
                 weeklyTargetMinutes: Math.round(targetHoursNum * 60),
+                maximumPaidMinutesPerDay,
                 maxDaysPerWeek: maxDays,
                 availability: updatedAvailability,
             };
