@@ -10,6 +10,11 @@ import {
 } from "../services/storeHoursService";
 
 import type { StoreHours, StoreOperatingDay, Weekday } from "../types/planning";
+import {
+    confirmDiscardUnsavedChanges,
+    formValueSignature,
+} from "../components/UnsavedChanges";
+import type { PageChangeGuard } from "../components/UnsavedChanges";
 
 const DAYS: Array<{ dayOfWeek: Weekday; label: string }> = [
     { dayOfWeek: 1, label: "Monday" },
@@ -31,11 +36,11 @@ function dayConfiguration(storeHours: StoreHours, dayOfWeek: Weekday): StoreOper
         { dayOfWeek, isOpen: false };
 }
 
-export function renderSettingsPage(container: HTMLElement): void {
+export function renderSettingsPage(container: HTMLElement): PageChangeGuard {
     let storeHours = getStoredStoreHours();
     let softRules = getStoredSoftRuleSettings();
-    let storeHoursFeedback = "";
-    let softRulesFeedback = "";
+    let storeHoursBaseline = "";
+    let softRulesBaseline = "";
 
     function render(): void {
         container.innerHTML = `
@@ -88,7 +93,7 @@ export function renderSettingsPage(container: HTMLElement): void {
                         </div>
 
                         <div class="settings-actions">
-                            <p class="settings-feedback" role="status">${escapeHtml(storeHoursFeedback)}</p>
+                            <p class="settings-feedback" role="status"></p>
                             <button class="primary-button" type="submit">Save Store Hours</button>
                         </div>
                     </details>
@@ -110,7 +115,7 @@ export function renderSettingsPage(container: HTMLElement): void {
                         </span>
                     </label>
                     <div class="settings-actions">
-                        <p class="settings-feedback" role="status">${escapeHtml(softRulesFeedback)}</p>
+                        <p class="settings-feedback" role="status"></p>
                         <button class="primary-button" type="submit">Save Soft Rules</button>
                     </div>
                 </form>
@@ -118,6 +123,9 @@ export function renderSettingsPage(container: HTMLElement): void {
         `;
 
         const form = container.querySelector<HTMLFormElement>("#store-hours-form");
+        const softRulesForm = container.querySelector<HTMLFormElement>("#soft-rules-form");
+        if (!storeHoursBaseline) storeHoursBaseline = formValueSignature(form);
+        if (!softRulesBaseline) softRulesBaseline = formValueSignature(softRulesForm);
         form?.querySelectorAll<HTMLInputElement>('input[type="checkbox"]').forEach((toggle) => {
             toggle.addEventListener("change", () => {
                 const fieldset = toggle.closest<HTMLElement>("[data-store-day]");
@@ -146,17 +154,18 @@ export function renderSettingsPage(container: HTMLElement): void {
             });
             const candidate: StoreHours = { days };
             if (!isValidStoreHours(candidate)) {
-                storeHoursFeedback = "Check that every open day has a valid opening time before its closing time.";
-                render();
+                const feedback = container.querySelector<HTMLElement>("#store-hours-form .settings-feedback");
+                if (feedback) feedback.textContent = "Check that every open day has a valid opening time before its closing time.";
                 return;
             }
             setStoredStoreHours(candidate);
             storeHours = cloneStoreHours(candidate);
-            storeHoursFeedback = "Store Hours saved.";
-            render();
+            storeHoursBaseline = formValueSignature(form);
+            const feedback = container.querySelector<HTMLElement>("#store-hours-form .settings-feedback");
+            if (feedback) feedback.textContent = "Store Hours saved.";
         });
 
-        container.querySelector<HTMLFormElement>("#soft-rules-form")?.addEventListener(
+        softRulesForm?.addEventListener(
             "submit",
             (event) => {
                 event.preventDefault();
@@ -166,11 +175,23 @@ export function renderSettingsPage(container: HTMLElement): void {
                         new FormData(form).get("oneWeekendOffPerMonth") === "on",
                 };
                 setStoredSoftRuleSettings(softRules);
-                softRulesFeedback = "Soft Rules saved.";
-                render();
+                softRulesBaseline = formValueSignature(form);
+                const feedback = container.querySelector<HTMLElement>("#soft-rules-form .settings-feedback");
+                if (feedback) feedback.textContent = "Soft Rules saved.";
             },
         );
     }
 
     render();
+
+    const hasUnsavedChanges = (): boolean =>
+        formValueSignature(container.querySelector<HTMLFormElement>("#store-hours-form")) !== storeHoursBaseline ||
+        formValueSignature(container.querySelector<HTMLFormElement>("#soft-rules-form")) !== softRulesBaseline;
+
+    return {
+        hasUnsavedChanges,
+        confirmLeave: (trigger) => hasUnsavedChanges()
+            ? confirmDiscardUnsavedChanges("Settings", trigger)
+            : Promise.resolve(true),
+    };
 }

@@ -4,6 +4,7 @@ import "./styles/employee-planning.css";
 import "./styles/day-planning.css";
 import "./styles/schedule.css";
 import "./styles/settings.css";
+import "./styles/unsaved-changes.css";
 import { renderApp } from "./app";
 
 const root = document.querySelector<HTMLDivElement>("#app");

@@ -20,6 +20,7 @@ import {
 } from "./components/Sidebar";
 
 import logoIcon from "./assets/pricepocket_logo_icon.png";
+import type { PageChangeGuard } from "./components/UnsavedChanges";
 
 export function renderApp(
     root: HTMLElement,
@@ -108,6 +109,7 @@ function attachNavigationListeners(
     pageContent: HTMLElement,
     closeSidebar: () => void,
 ): void {
+    let activeChangeGuard: PageChangeGuard | null = null;
     const sidebarPlannerButton = sidebar.querySelector<HTMLButtonElement>(
         "#sidebar-planner-button",
     );
@@ -144,41 +146,43 @@ function attachNavigationListeners(
         }
     };
 
+    const navigate = async (
+        active: HTMLButtonElement,
+        render: () => PageChangeGuard | void,
+    ): Promise<void> => {
+        if (activeChangeGuard?.hasUnsavedChanges() &&
+            !await activeChangeGuard.confirmLeave(active)) {
+            closeSidebar();
+            return;
+        }
+        setActive(active);
+        closeSidebar();
+        activeChangeGuard = render() ?? null;
+    };
+
+    window.addEventListener("beforeunload", (event) => {
+        if (!activeChangeGuard?.hasUnsavedChanges()) return;
+        event.preventDefault();
+        event.returnValue = "";
+    });
+
     sidebarScheduleButton.addEventListener(
         "click",
-        () => {
-            setActive(sidebarScheduleButton);
-            closeSidebar();
-            renderSchedulePage(pageContent);
-        },
+        () => void navigate(sidebarScheduleButton, () => renderSchedulePage(pageContent)),
     );
 
     sidebarPlannerButton.addEventListener(
         "click",
-        () => {
-            setActive(sidebarPlannerButton);
-
-            closeSidebar();
-            renderPlannerPage(pageContent);
-        },
+        () => void navigate(sidebarPlannerButton, () => renderPlannerPage(pageContent)),
     );
 
     sidebarEmployeePlanningButton.addEventListener(
         "click",
-        () => {
-            setActive(sidebarEmployeePlanningButton);
-
-            closeSidebar();
-            renderEmployeePlanningPage(pageContent);
-        },
+        () => void navigate(sidebarEmployeePlanningButton, () => renderEmployeePlanningPage(pageContent)),
     );
 
     sidebarSettingsButton.addEventListener(
         "click",
-        () => {
-            setActive(sidebarSettingsButton);
-            closeSidebar();
-            renderSettingsPage(pageContent);
-        },
+        () => void navigate(sidebarSettingsButton, () => renderSettingsPage(pageContent)),
     );
 }

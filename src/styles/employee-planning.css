@@ -7,8 +7,92 @@
     align-items: center;
     justify-content: space-between;
     gap: 16px;
-    max-width: 1700px;
     margin-bottom: 28px;
+}
+
+.employee-summary {
+    display: grid;
+    grid-template-columns: minmax(260px, 1.1fr) minmax(0, 1.9fr);
+    align-items: center;
+    gap: 32px;
+    margin-bottom: 24px;
+    padding: 22px 24px;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border-subtle);
+    border-radius: 14px;
+    box-shadow: var(--shadow-card);
+}
+
+.employee-summary-identity {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 18px;
+}
+
+.employee-summary-identity .section-label,
+.employee-summary-identity h3,
+.employee-summary-identity p {
+    margin: 0;
+}
+
+.employee-summary-identity h3 {
+    margin-top: 5px;
+    color: var(--color-text-strong);
+    font-size: clamp(1.25rem, 2vw, 1.6rem);
+}
+
+.employee-summary-identity p:last-child {
+    margin-top: 6px;
+    color: var(--color-text-secondary);
+    font-size: .82rem;
+}
+
+.employee-status {
+    padding: 5px 9px;
+    color: var(--color-success);
+    background: color-mix(in srgb, var(--color-success) 12%, transparent);
+    border-radius: 999px;
+    font-size: .7rem;
+    font-weight: 750;
+}
+
+.employee-status--draft {
+    color: var(--color-text-secondary);
+    background: var(--color-surface-subtle);
+}
+
+.employee-summary-metrics {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0;
+}
+
+.employee-summary-metrics > div {
+    display: grid;
+    gap: 5px;
+    min-width: 0;
+    padding: 4px 20px;
+    border-left: 1px solid var(--color-border-subtle);
+}
+
+.employee-summary-metrics strong {
+    overflow-wrap: anywhere;
+    color: var(--color-text-strong);
+    font-size: 1.05rem;
+}
+
+.employee-summary-metrics span {
+    color: var(--color-text-muted);
+    font-size: .7rem;
+    font-weight: 650;
+}
+
+.employee-planning-layout {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: start;
+    gap: 24px;
 }
 
 .employee-planning-toolbar > #add-employee,
@@ -96,12 +180,38 @@
 }
 
 .employee-settings-form {
+    display: contents;
+}
+
+.employee-details {
+    grid-column: 1;
+    grid-row: 1;
+}
+
+.employee-availability {
+    grid-column: 1 / -1;
+    grid-row: 2;
+}
+
+.scheduling-group + .scheduling-group {
+    margin-top: 22px;
+    padding-top: 20px;
+    border-top: 1px solid var(--color-border-subtle);
+}
+
+.scheduling-group h4,
+.day-hours-section h4 {
+    margin: 0 0 12px;
+    color: var(--color-text-strong);
+    font-size: .8rem;
+    letter-spacing: .04em;
+    text-transform: uppercase;
+}
+
+.scheduling-limits {
     display: grid;
-    grid-column: span 2;
-    grid-template-columns: minmax(0, .9fr) minmax(0, 1.15fr);
-    align-items: start;
-    gap: 24px;
-    min-width: 0;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 12px;
 }
 
 .employee-planning-analytics {
@@ -165,65 +275,74 @@
 }
 
 .employee-vacation {
-    margin-top: 20px;
-    padding: 20px;
+    grid-column: 2;
+    grid-row: 1;
+    margin-top: 0;
+    padding: 24px;
     background: var(--color-surface);
     border: 1px solid var(--color-border-subtle);
     border-radius: 14px;
     box-shadow: var(--shadow-card);
 }
 
-.employee-vacation h3 {
-    margin: 0 0 7px;
-    color: var(--color-text-strong);
-    font-size: 1rem;
-}
-
-.employee-vacation > p {
-    margin: 0 0 18px;
-    color: var(--color-text-secondary);
-    font-size: .8rem;
-    line-height: 1.5;
+.vacation-description {
+    margin: 0 0 20px;
 }
 
 .vacation-form {
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+    align-items: end;
     gap: 12px;
 }
 
 .vacation-form label {
     display: grid;
-    gap: 7px;
+    gap: 6px;
     min-width: 0;
     color: var(--color-text-secondary);
     font-size: .75rem;
     font-weight: 700;
 }
 
-.vacation-form input {
+.vacation-form input[type="date"] {
     width: 100%;
     min-width: 0;
-    min-height: 44px;
-    padding: 0 10px;
+    height: 44px;
+    padding: 0 12px;
     color: var(--color-text);
     background: var(--color-surface);
     border: 1px solid var(--color-border-control);
     border-radius: 9px;
+    font: inherit;
 }
 
-.vacation-form button {
-    grid-column: 1 / -1;
-    justify-self: start;
+.vacation-form input[type="date"]:focus {
+    outline: 2px solid var(--color-focus);
+    outline-offset: 2px;
 }
 
-.employee-vacation .vacation-status {
-    margin: 10px 0 0;
-    color: var(--color-danger);
+.vacation-form .primary-button {
+    min-height: 44px;
+    white-space: nowrap;
+}
+
+.vacation-status {
+    margin: 12px 0 0;
+}
+
+.vacation-scheduled {
+    margin-top: 20px;
+    padding-top: 16px;
+    border-top: 1px solid var(--color-border-subtle);
+}
+
+.vacation-scheduled h4 {
+    margin: 0 0 8px;
 }
 
 .vacation-periods {
-    margin: 18px 0 0;
+    margin: 0;
     padding: 0;
     list-style: none;
 }
@@ -232,23 +351,66 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 12px;
+    gap: 24px;
+    min-height: 44px;
     padding: 10px 0;
+}
+
+.vacation-periods li + li {
     border-top: 1px solid var(--color-border-subtle);
-    font-size: .8rem;
 }
 
-.vacation-periods button {
-    color: var(--color-danger);
-    background: transparent;
-    border: 0;
-    font-weight: 700;
+.vacation-period-dates {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
 }
 
-.employee-vacation .vacation-empty {
-    margin: 18px 0 0;
+.vacation-date {
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
 }
 
+.vacation-date-separator {
+    color: var(--color-text-muted);
+    font-size: 0.875rem;
+}
+
+.vacation-periods {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.vacation-periods li {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: center;
+    gap: 16px;
+    padding: 10px 12px;
+    border-radius: 8px;
+}
+
+.vacation-periods li + li {
+    border-top: 1px solid var(--color-border-subtle);
+}
+
+.vacation-period-dates {
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+}
+
+.vacation-remove-button {
+    padding: 6px 10px;
+    font-size: 1 rem;
+    white-space: nowrap;
+}
+.vacation-empty {
+    margin: 20px 0 0;
+    padding-top: 16px;
+    border-top: 1px solid var(--color-border-subtle);
+}
 .employee-selector {
     display: grid;
     gap: 8px;
@@ -280,7 +442,8 @@
     box-shadow: var(--shadow-card);
 }
 
-.employee-form h3 {
+.employee-form h3,
+.employee-vacation > h3 {
     margin: 0 0 20px;
     font-size: 1rem;
     font-weight: 700;
@@ -298,21 +461,49 @@
         grid-template-columns: 1fr;
     }
 
-    .employee-settings-form {
-        grid-column: 1;
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
-
     .employee-planning-summary {
         grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 }
 
 @media (max-width: 850px) {
-    .employee-settings-form,
+    .employee-planning-layout,
     .employee-planning-summary {
         grid-template-columns: 1fr;
     }
+
+    .employee-details,
+    .employee-vacation,
+    .employee-availability {
+        grid-column: 1;
+    }
+
+    .employee-details {
+        grid-row: 1;
+    }
+
+    .employee-vacation {
+        grid-row: 2;
+    }
+
+    .employee-availability {
+        grid-row: 3;
+    }
+
+    .employee-summary {
+        grid-template-columns: 1fr;
+        gap: 18px;
+    }
+
+    .employee-summary-metrics > div:first-child {
+        border-left: 0;
+        padding-left: 0;
+    }
+
+    .scheduling-limits {
+        grid-template-columns: 1fr;
+    }
+
 }
 
 @media (max-width: 600px) {
@@ -335,6 +526,24 @@
     .employee-planning-summary,
     .employee-identity-fields {
         grid-template-columns: 1fr;
+    }
+
+    .employee-summary-metrics {
+        grid-template-columns: 1fr;
+    }
+
+    .employee-summary-metrics > div {
+        padding: 10px 0;
+        border-top: 1px solid var(--color-border-subtle);
+        border-left: 0;
+    }
+
+    .vacation-form {
+        grid-template-columns: 1fr;
+    }
+
+    .vacation-form .primary-button {
+        width: 100%;
     }
 }
 
@@ -456,7 +665,28 @@
 
 .day-hours-list {
     display: grid;
+    gap: 0;
+}
+
+.day-hours-section {
+    margin-top: 18px;
+}
+
+.day-hours-header,
+.day-hours-row {
+    display: grid;
+    grid-template-columns: 54px minmax(105px, 1fr) 18px minmax(105px, 1fr);
+    align-items: center;
     gap: 8px;
+}
+
+.day-hours-header {
+    padding: 0 10px 7px;
+    color: var(--color-text-muted);
+    font-size: .66rem;
+    font-weight: 750;
+    letter-spacing: .04em;
+    text-transform: uppercase;
 }
 
 .day-hours-details {
@@ -484,14 +714,8 @@
 }
 
 .day-hours-row {
-    display: grid;
-    grid-template-columns: 36px repeat(2, minmax(0, 1fr));
-    align-items: end;
-    gap: 10px;
-    padding: 10px;
-    background: var(--color-surface-subtle);
-    border: 1px solid var(--color-border-subtle);
-    border-radius: 9px;
+    padding: 8px 10px;
+    border-top: 1px solid var(--color-border-subtle);
 }
 
 .day-hours-row[hidden] {
@@ -505,12 +729,7 @@
 }
 
 .day-hours-row label {
-    display: grid;
-    gap: 5px;
     min-width: 0;
-    color: var(--color-text-secondary);
-    font-size: .7rem;
-    font-weight: 700;
 }
 
 .day-hours-row input {
@@ -524,13 +743,19 @@
     border-radius: 8px;
 }
 
+.day-hours-separator {
+    color: var(--color-text-muted);
+    text-align: center;
+}
+
 @media (max-width: 420px) {
-    .day-hours-row {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
+    .day-hours-header {
+        display: none;
     }
 
-    .day-hours-row strong {
-        grid-column: 1 / -1;
+    .day-hours-row {
+        grid-template-columns: 40px minmax(0, 1fr) 14px minmax(0, 1fr);
+        padding-inline: 0;
     }
 }
 

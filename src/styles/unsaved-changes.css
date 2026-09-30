@@ -1,0 +1,32 @@
+.unsaved-changes-dialog {
+    width: min(440px, calc(100% - 32px));
+    padding: 24px;
+    color: var(--color-text);
+    background: var(--color-surface);
+    border: 1px solid var(--color-border-subtle);
+    border-radius: 14px;
+    box-shadow: var(--shadow-elevated);
+}
+
+.unsaved-changes-dialog::backdrop {
+    background: var(--color-backdrop);
+}
+
+.unsaved-changes-dialog h2 {
+    margin: 0 0 12px;
+    color: var(--color-text-strong);
+    font-size: 1.2rem;
+}
+
+.unsaved-changes-dialog p {
+    margin: 0 0 24px;
+    color: var(--color-text-secondary);
+    line-height: 1.5;
+}
+
+.unsaved-changes-actions {
+    display: flex;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+    gap: 10px;
+}

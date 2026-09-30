@@ -16,6 +16,11 @@ import { isValidMaximumPaidMinutesPerDayOverride } from "../services/shiftRules"
 import { getStoredShifts, getStoredEmployees, getStoredVacations, getStoredStoreHours, setStoredEmployees, setStoredVacations } from "../services/storageService";
 
 import type { Employee, PlannerState } from "../types/planning";
+import {
+    confirmDiscardUnsavedChanges,
+    formValueSignature,
+} from "../components/UnsavedChanges";
+import type { PageChangeGuard } from "../components/UnsavedChanges";
 
 let state: PlannerState;
 let selectedEmployeeId: string | null = null;
@@ -25,9 +30,28 @@ function escapeHtml(text: string): string {
     return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
 
+const SHORT_MONTHS = [
+    "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+    "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+];
+
+function formatVacationDate(date: string): string {
+    const [year, month, day] = date.split("-").map(Number);
+    const monthLabel = SHORT_MONTHS[month - 1];
+    if (!year || !monthLabel || !day) return date;
+    return `${day} ${monthLabel} ${year}`;
+}
+
+function formatVacationPeriod(startDate: string, endDate: string): string {
+    const start = formatVacationDate(startDate);
+    return startDate === endDate
+        ? start
+        : `${start} – ${formatVacationDate(endDate)}`;
+}
+
 export function renderEmployeePlanningPage(
     container: HTMLElement,
-): void {
+): PageChangeGuard {
     const storedShifts = getStoredShifts();
     const storedEmployees = getStoredEmployees();
     const storedVacations = getStoredVacations();
@@ -38,8 +62,19 @@ export function renderEmployeePlanningPage(
 
     newEmployeeDraft = null;
     selectedEmployeeId = employeeSelectOptions(activeEmployees(state.employees))[0]?.employee.id ?? null;
+    let employeeBaseline = "";
 
-    function startAdd(): void {
+    const hasUnsavedChanges = (): boolean =>
+        newEmployeeDraft !== null ||
+        formValueSignature(container.querySelector<HTMLFormElement>("#employee-form")) !== employeeBaseline;
+
+    const confirmLeave = (trigger?: HTMLElement | null): Promise<boolean> =>
+        hasUnsavedChanges()
+            ? confirmDiscardUnsavedChanges("Team", trigger)
+            : Promise.resolve(true);
+
+    async function startAdd(trigger?: HTMLElement | null): Promise<void> {
+        if (!await confirmLeave(trigger)) return;
         newEmployeeDraft = createTeamMemberDraft();
         selectedEmployeeId = newEmployeeDraft.id;
         render();
@@ -64,7 +99,10 @@ export function renderEmployeePlanningPage(
                     </div>
                 </section>
             `;
-            container.querySelector("#add-employee")?.addEventListener("click", startAdd);
+            container.querySelector("#add-employee")?.addEventListener("click", (event) => {
+                void startAdd(event.currentTarget as HTMLElement);
+            });
+            employeeBaseline = "";
             return;
         }
 
@@ -94,9 +132,6 @@ export function renderEmployeePlanningPage(
             { value: 0, label: "Sun" },
         ];
         const availability = selectedEmployee.availability;
-        const hasDayHours = Object.values(availability.dayHours ?? {}).some(
-            (hours) => Boolean(hours?.earliestStart || hours?.latestEnd),
-        );
         const targetHours = (selectedEmployee.weeklyTargetMinutes / 60).toFixed(1);
         const maximumHoursPerDay = selectedEmployee.maximumPaidMinutesPerDay === undefined
             ? ""
@@ -153,7 +188,25 @@ export function renderEmployeePlanningPage(
 					</div>
                 </div>
 
-                <div class="employee-planning-columns">
+                <section class="employee-summary" aria-labelledby="employee-summary-name">
+                    <div class="employee-summary-identity">
+                        <div>
+                            <p class="section-label">Employee summary</p>
+                            <h3 id="employee-summary-name">${escapeHtml(
+                                isNew ? "New team member" : `${selectedEmployee.firstName} ${selectedEmployee.lastName}`,
+                            )}</h3>
+                            <p>${escapeHtml(selectedEmployee.employeeNumber || "Employee ID not set")} · ${escapeHtml(targetHours)} hrs/week</p>
+                        </div>
+                        <span class="employee-status${isNew ? " employee-status--draft" : ""}">${isNew ? "Draft" : "Active"}</span>
+                    </div>
+                    <div class="employee-summary-metrics">
+                        <div><strong>${isNew ? "—" : formatMinutes(summary?.scheduledMinutes ?? 0)}</strong><span>Scheduled this month</span></div>
+                        <div><strong>${isNew ? "—" : `${formatMinutes(Math.abs(hoursFromTarget))} ${targetDirection}`}</strong><span>Monthly target after vacation</span></div>
+                        <div><strong>${isNew ? "—" : employeeVacations.length ? `${employeeVacations.length} planned` : "None planned"}</strong><span>Vacation</span></div>
+                    </div>
+                </section>
+
+                <div class="employee-planning-layout">
                 <form class="employee-settings-form" id="employee-form">
                     <section class="employee-form employee-details" aria-labelledby="employee-details-heading">
                     <h3 id="employee-details-heading">Employee details</h3>
@@ -188,7 +241,10 @@ export function renderEmployeePlanningPage(
                     </section>
 
                     <section class="employee-form employee-availability" aria-labelledby="employee-availability-heading">
-                    <h3 id="employee-availability-heading">Availability</h3>
+                    <h3 id="employee-availability-heading">Scheduling</h3>
+                    <div class="scheduling-group">
+                    <h4>Targets and limits</h4>
+                    <div class="scheduling-limits">
                     <div class="form-group">
                         <label for="emp-target-hours">Weekly Target Hours</label>
                         <input type="number" id="emp-target-hours" name="targetHours" value="${targetHours}" step="0.5" min="0" max="60" required />
@@ -210,8 +266,12 @@ export function renderEmployeePlanningPage(
                             ).join("")}
                         </select>
                     </div>
+                    </div>
+                    </div>
+
+                    <div class="scheduling-group">
+                    <h4>Available days</h4>
                     <div class="form-group">
-                        <label>Available Days</label>
                         <div class="day-checkboxes">
                             ${availabilityDays.map(({ label, value: day }) => {
                                 const checked = availability.days.includes(day);
@@ -223,11 +283,11 @@ export function renderEmployeePlanningPage(
                                 `;
                             }).join("")}
                         </div>
-                        <small class="availability-key">Green: can work · Red: cannot work</small>
+                    </div>
                     </div>
 
-                    <div class="availability-hours">
-                        <h4>Available hours</h4>
+                    <div class="availability-hours scheduling-group">
+                        <h4>Default availability hours</h4>
                         <p>Set default hours, then override them for individual available days. Blank day fields use the defaults.</p>
                         <div class="employee-identity-fields">
                             <div class="form-group">
@@ -243,76 +303,61 @@ export function renderEmployeePlanningPage(
                             Apply default hours to all available days
                         </button>
                         <p class="apply-hours-status" id="apply-hours-status" role="status"></p>
-                        <details class="day-hours-details" ${hasDayHours ? "open" : ""}>
-                            <summary>Day-specific hours</summary>
-                        <div class="day-hours-list">
+                        <div class="day-hours-section">
+                            <h4>Day-specific hours</h4>
+                            <div class="day-hours-header" aria-hidden="true">
+                                <span>Day</span><span>Earliest</span><span></span><span>Latest</span>
+                            </div>
+                            <div class="day-hours-list">
                             ${availabilityDays.map(({ label, value: day }) => {
                                 const checked = availability.days.includes(day);
                                 const hours = availability.dayHours?.[day];
                                 return `
                                     <div class="day-hours-row" data-day-hours-row="${day}" ${checked ? "" : "hidden"}>
                                         <strong>${label}</strong>
-                                        <label for="day-earliest-${day}">
-                                            <span>Earliest start</span>
+                                        <label for="day-earliest-${day}" aria-label="${label} earliest start">
                                             <input type="time" id="day-earliest-${day}" name="dayEarliest-${day}" value="${hours?.earliestStart ?? ""}" ${checked ? "" : "disabled"} />
                                         </label>
-                                        <label for="day-latest-${day}">
-                                            <span>Latest end</span>
+                                        <span class="day-hours-separator" aria-hidden="true">—</span>
+                                        <label for="day-latest-${day}" aria-label="${label} latest end">
                                             <input type="time" id="day-latest-${day}" name="dayLatest-${day}" value="${hours?.latestEnd ?? ""}" ${checked ? "" : "disabled"} />
                                         </label>
                                     </div>
                                 `;
                             }).join("")}
+                            </div>
                         </div>
-                        </details>
                     </div>
                     </section>
                 </form>
-                <section class="employee-planning-analytics" aria-labelledby="employee-metrics-heading">
-                    <h3 id="employee-metrics-heading">Metrics and Time off</h3>
-                    ${isNew ? '<p>Save this team member before planning time off or viewing metrics.</p>' : `
-                    <p class="section-label">${state.selectedYear}-${String(state.selectedMonth).padStart(2, "0")} Overview</p>
-                    <div class="employee-planning-summary">
-                        <div class="employee-planning-summary-item">
-                            <span class="summary-label">Hours from monthly target after vacation</span>
-                            <span>
-                                <span class="summary-value">${formatMinutes(Math.abs(hoursFromTarget))}</span>
-                                <span class="employee-planning-summary-context">${targetDirection}</span>
-                            </span>
-                        </div>
-                        <div class="employee-planning-summary-item">
-                            <span class="summary-label">Total scheduled paid hours</span>
-                            <span class="summary-value">${formatMinutes(summary?.scheduledMinutes ?? 0)}</span>
-                        </div>
-                    </div>
-                    <section class="employee-vacation" aria-labelledby="vacation-heading">
-                        <h3 id="vacation-heading">Vacation planning</h3>
-                        <p>Saved days appear on the calendar. Existing shifts are not changed.</p>
+                <section class="employee-vacation" aria-labelledby="vacation-heading">
+                    <h3 id="vacation-heading">Vacation planning</h3>
+                    ${isNew ? '<p>Save this team member before planning time off.</p>' : `
+                        <p class="vacation-description">Saved days appear on the calendar. Existing shifts are not changed.</p>
                         <form id="vacation-form" class="vacation-form">
-                            <label>
-                                <span>First day</span>
-                                <input type="date" name="startDate" required />
-                            </label>
-                            <label>
-                                <span>Last day</span>
-                                <input type="date" name="endDate" required />
-                            </label>
+                            <label><span>First day</span><input type="date" name="startDate" required /></label>
+                            <label><span>Last day</span><input type="date" name="endDate" required /></label>
                             <button type="submit" class="primary-button">Add vacation</button>
                         </form>
                         <p id="vacation-status" class="vacation-status" role="status"></p>
                         ${employeeVacations.length ? `
-                            <ul class="vacation-periods">
-                                ${employeeVacations.map((period) => `
-                                    <li>
-                                        <span>${period.startDate} – ${period.endDate}</span>
-                                        <button type="button" data-remove-vacation="${escapeHtml(period.id)}" aria-label="Remove vacation ${period.startDate} to ${period.endDate}">Remove</button>
-                                    </li>
-                                `).join("")}
-                            </ul>
+                            <div class="vacation-scheduled">
+                                <h4>Scheduled vacation</h4>
+                                <ul class="vacation-periods">
+                                    ${employeeVacations.map((period) => `
+                                        <li>
+                                            <span class="vacation-period-dates">${escapeHtml(formatVacationPeriod(period.startDate, period.endDate))}</span>
+                                            <button type="button" class="danger-button vacation-remove-button"
+                                                data-remove-vacation="${escapeHtml(period.id)}"
+                                                aria-label="Remove vacation ${period.startDate} to ${period.endDate}">Remove</button>
+                                        </li>
+                                    `).join("")}
+                                </ul>
+                            </div>
                         ` : '<p class="vacation-empty">No vacation days planned.</p>'}
-                    </section>
                     `}
                 </section>
+
                 </div>
             </section>
             ${isNew ? "" : `
@@ -328,13 +373,22 @@ export function renderEmployeePlanningPage(
         `;
 
         const selector = container.querySelector<HTMLSelectElement>("#employee-select");
-        selector?.addEventListener("change", () => {
-            selectedEmployeeId = selector.value || null;
+        employeeBaseline = formValueSignature(container.querySelector<HTMLFormElement>("#employee-form"));
+        selector?.addEventListener("change", async () => {
+            const nextEmployeeId = selector.value || null;
+            if (!await confirmLeave(selector)) {
+                selector.value = selectedEmployeeId ?? "";
+                return;
+            }
+            selectedEmployeeId = nextEmployeeId;
             render();
         });
 
-        container.querySelector("#add-employee")?.addEventListener("click", startAdd);
-        container.querySelector("#cancel-add-employee")?.addEventListener("click", () => {
+        container.querySelector("#add-employee")?.addEventListener("click", (event) => {
+            void startAdd(event.currentTarget as HTMLElement);
+        });
+        container.querySelector("#cancel-add-employee")?.addEventListener("click", async (event) => {
+            if (!await confirmLeave(event.currentTarget as HTMLElement)) return;
             newEmployeeDraft = null;
             selectedEmployeeId = employeeSelectOptions(activeEmployees(state.employees))[0]?.employee.id ?? null;
             render();
@@ -405,8 +459,6 @@ export function renderEmployeePlanningPage(
                 if (dayEarliest) dayEarliest.value = earliest;
                 if (dayLatest) dayLatest.value = latest;
             });
-            const dayHoursDetails = form.querySelector<HTMLDetailsElement>(".day-hours-details");
-            if (dayHoursDetails) dayHoursDetails.open = true;
             if (status) status.textContent = "Default hours copied to available days. Save to keep them.";
         });
         form?.querySelectorAll<HTMLInputElement>('input[name="days"]').forEach((checkbox) => {
@@ -525,4 +577,9 @@ export function renderEmployeePlanningPage(
     }
 
     render();
+
+    return {
+        hasUnsavedChanges,
+        confirmLeave,
+    };
 }
