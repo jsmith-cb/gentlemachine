@@ -5,6 +5,18 @@
     margin: 0 auto;
 }
 
+.schedule-heading-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+    gap: 12px;
+}
+
+.schedule-export-button {
+    min-height: 44px;
+}
+
 .schedule-toolbar {
     display: grid;
     grid-template-columns: minmax(0, 360px);
@@ -242,6 +254,11 @@
         grid-template-columns: minmax(0, 1fr);
     }
 
+    .schedule-heading-actions {
+        width: 100%;
+        justify-content: space-between;
+    }
+
     .schedule-matrix {
         min-width: 800px;
     }
@@ -255,4 +272,3 @@
         padding-inline: 16px;
     }
 }
-
