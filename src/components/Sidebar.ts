@@ -1,4 +1,9 @@
 import logoIcon from "../assets/pricepocket_logo_icon.png";
+import {
+    getThemePreference,
+    setThemePreference,
+    type ThemePreference,
+} from "../theme/Theme";
 
 export interface SidebarElements {
     readonly sidebar: HTMLElement;
@@ -71,6 +76,19 @@ export function createSidebar(): SidebarElements {
                 Settings
             </button>
         </nav>
+
+        <footer class="sidebar-footer">
+            <label class="theme-selector">
+                <span>Theme</span>
+                <select aria-label="Application theme">
+                    ${themeOption("system", "System")}
+                    ${themeOption("light", "Light")}
+                    ${themeOption("dark", "Dark")}
+                </select>
+            </label>
+
+            <span class="sidebar-version">v0.1.0</span>
+        </footer>
     `;
 
     const overlay = document.createElement("button");
@@ -82,6 +100,14 @@ export function createSidebar(): SidebarElements {
         sidebar,
         overlay,
     };
+}
+
+function themeOption(value: ThemePreference, label: string): string {
+    return `
+        <option value="${value}" ${getThemePreference() === value ? "selected" : ""}>
+            ${label}
+        </option>
+    `;
 }
 
 export function bindSidebar({
@@ -135,6 +161,13 @@ export function bindSidebar({
     window.addEventListener("resize", () => {
         if (window.innerWidth > 1290) close();
     });
+
+    sidebar.querySelector<HTMLSelectElement>(".theme-selector select")
+        ?.addEventListener("change", (event) => {
+            setThemePreference(
+                (event.currentTarget as HTMLSelectElement).value as ThemePreference,
+            );
+        });
 
     return { close };
 }

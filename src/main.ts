@@ -6,6 +6,9 @@ import "./styles/schedule.css";
 import "./styles/settings.css";
 import "./styles/unsaved-changes.css";
 import { renderApp } from "./app";
+import { initializeTheme } from "./theme/Theme";
+
+initializeTheme();
 
 const root = document.querySelector<HTMLDivElement>("#app");
 
