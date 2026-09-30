@@ -39,6 +39,29 @@ export interface ScheduleExportDocument {
     weeks: ScheduleExportWeek[];
 }
 
+export type WeekPaginationDecision = "current-page" | "next-page" | "split";
+
+const PDF_LAYOUT = {
+    documentHeaderEndY: 35,
+    weekHeadingHeight: 4,
+    tableHeaderHeight: 10,
+    minimumRowHeight: 13,
+    rowBaseHeight: 6,
+    rowLineHeight: 4,
+    weekBottomSpacing: 8,
+} as const;
+
+export function decideWeekPagination(
+    currentY: number,
+    bottomLimit: number,
+    freshPageY: number,
+    weekHeight: number,
+): WeekPaginationDecision {
+    if (weekHeight <= bottomLimit - currentY) return "current-page";
+    if (weekHeight <= bottomLimit - freshPageY) return "next-page";
+    return "split";
+}
+
 function dateParts(date: string): { month: number; day: number } {
     const [, month, day] = date.split("-").map(Number);
     return { month, day };
@@ -112,7 +135,7 @@ export async function createSchedulePdf(model: ScheduleExportDocument): Promise<
         pdf.text(model.periodLabel, pageWidth - margin, 22, { align: "right" });
         pdf.setDrawColor(213, 221, 232);
         pdf.line(margin, 28, pageWidth - margin, 28);
-        y = 35;
+        y = PDF_LAYOUT.documentHeaderEndY;
     };
 
     const addPage = (): void => {
@@ -125,44 +148,70 @@ export async function createSchedulePdf(model: ScheduleExportDocument): Promise<
         pdf.setFontSize(9);
         pdf.setTextColor(37, 99, 235);
         pdf.text(`${week.label}${continued ? " (continued)" : ""}`, margin, y);
-        y += 4;
+        y += PDF_LAYOUT.weekHeadingHeight;
 
         const dayWidth = (contentWidth - employeeWidth) / week.columns.length;
         pdf.setFillColor(238, 242, 247);
         pdf.setDrawColor(213, 221, 232);
-        pdf.rect(margin, y, contentWidth, 10, "FD");
+        pdf.rect(margin, y, contentWidth, PDF_LAYOUT.tableHeaderHeight, "FD");
         pdf.setTextColor(51, 65, 85);
         pdf.setFontSize(8);
         pdf.text("TEAM MEMBER", margin + 3, y + 6.5);
         week.columns.forEach((column, index) => {
             const x = margin + employeeWidth + dayWidth * index;
-            pdf.line(x, y, x, y + 10);
+            pdf.line(x, y, x, y + PDF_LAYOUT.tableHeaderHeight);
             if (!column.inSelectedMonth) {
                 pdf.setFillColor(229, 234, 240);
-                pdf.rect(x, y, dayWidth, 10, "F");
+                pdf.rect(x, y, dayWidth, PDF_LAYOUT.tableHeaderHeight, "F");
             }
             pdf.text(column.label, x + dayWidth / 2, y + 6.5, { align: "center" });
         });
-        y += 10;
+        y += PDF_LAYOUT.tableHeaderHeight;
     };
 
+    const rowHeight = (row: ScheduleExportRow): number => {
+        const nameLines = pdf.splitTextToSize(row.employeeName, employeeWidth - 6) as string[];
+        const lineCount = Math.max(1, nameLines.length, ...row.cells.map((cell) => cell.length));
+        return Math.max(
+            PDF_LAYOUT.minimumRowHeight,
+            PDF_LAYOUT.rowBaseHeight + lineCount * PDF_LAYOUT.rowLineHeight,
+        );
+    };
+
+    const weekHeight = (week: ScheduleExportWeek): number =>
+        PDF_LAYOUT.weekHeadingHeight +
+        PDF_LAYOUT.tableHeaderHeight +
+        week.rows.reduce((total, row) => total + rowHeight(row), 0) +
+        PDF_LAYOUT.weekBottomSpacing;
+
     const drawWeek = (week: ScheduleExportWeek): void => {
-        if (y + 24 > bottomLimit) addPage();
+        const pagination = decideWeekPagination(
+            y,
+            bottomLimit,
+            PDF_LAYOUT.documentHeaderEndY,
+            weekHeight(week),
+        );
+        if (pagination === "next-page" || (
+            pagination === "split" &&
+            y + PDF_LAYOUT.weekHeadingHeight + PDF_LAYOUT.tableHeaderHeight +
+                PDF_LAYOUT.minimumRowHeight > bottomLimit
+        )) {
+            addPage();
+        }
         drawWeekHeader(week);
         const dayWidth = (contentWidth - employeeWidth) / week.columns.length;
 
         for (const row of week.rows) {
             const nameLines = pdf.splitTextToSize(row.employeeName, employeeWidth - 6) as string[];
-            const lineCount = Math.max(1, nameLines.length, ...row.cells.map((cell) => cell.length));
-            const rowHeight = Math.max(13, 6 + lineCount * 4);
-            if (y + rowHeight > bottomLimit) {
+            const renderedRowHeight = rowHeight(row);
+            if (y + renderedRowHeight > bottomLimit) {
                 addPage();
                 drawWeekHeader(week, true);
             }
 
             pdf.setDrawColor(226, 232, 240);
             pdf.setFillColor(255, 255, 255);
-            pdf.rect(margin, y, contentWidth, rowHeight, "FD");
+            pdf.rect(margin, y, contentWidth, renderedRowHeight, "FD");
             pdf.setTextColor(15, 23, 42);
             pdf.setFont("helvetica", "bold");
             pdf.setFontSize(8.5);
@@ -170,10 +219,10 @@ export async function createSchedulePdf(model: ScheduleExportDocument): Promise<
 
             row.cells.forEach((cell, index) => {
                 const x = margin + employeeWidth + dayWidth * index;
-                pdf.line(x, y, x, y + rowHeight);
+                pdf.line(x, y, x, y + renderedRowHeight);
                 if (!week.columns[index]!.inSelectedMonth) {
                     pdf.setFillColor(245, 247, 250);
-                    pdf.rect(x, y, dayWidth, rowHeight, "F");
+                    pdf.rect(x, y, dayWidth, renderedRowHeight, "F");
                     return;
                 }
                 pdf.setFont("helvetica", "normal");
@@ -183,9 +232,9 @@ export async function createSchedulePdf(model: ScheduleExportDocument): Promise<
                     align: "center",
                 });
             });
-            y += rowHeight;
+            y += renderedRowHeight;
         }
-        y += 8;
+        y += PDF_LAYOUT.weekBottomSpacing;
     };
 
     drawDocumentHeader();

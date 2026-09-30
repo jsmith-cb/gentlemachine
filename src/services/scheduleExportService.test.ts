@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
     buildScheduleExportDocument,
+    decideWeekPagination,
     scheduleExportFilename,
 } from "./scheduleExportService";
 import { cloneStoreHours, DEFAULT_STORE_HOURS } from "./storeHoursService";
@@ -91,5 +92,17 @@ describe("Schedule PDF export model", () => {
 
     it("formats zero-padded monthly filenames", () => {
         expect(scheduleExportFilename(2027, 2)).toBe("pp-crew-schedule-2027-02.pdf");
+    });
+
+    it("keeps a complete week on the current page when it fits", () => {
+        expect(decideWeekPagination(100, 194, 35, 80)).toBe("current-page");
+    });
+
+    it("moves a complete week to a fresh page when only the fresh page fits it", () => {
+        expect(decideWeekPagination(150, 194, 35, 80)).toBe("next-page");
+    });
+
+    it("allows an oversized week to use the continuation path", () => {
+        expect(decideWeekPagination(100, 194, 35, 170)).toBe("split");
     });
 });
