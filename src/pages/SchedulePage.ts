@@ -45,12 +45,14 @@ export function scheduleFilterEmployees(
     shifts: readonly Shift[],
     year: number,
     month: number,
+    additionalScheduledEmployeeIds: readonly string[] = [],
 ): Employee[] {
     const scheduledIds = new Set(
         shifts
             .filter((shift) => isDateInMonth(shift.date, year, month))
             .map(({ employeeId }) => employeeId),
     );
+    additionalScheduledEmployeeIds.forEach((id) => scheduledIds.add(id));
 
     return employees
         .filter((employee) => employee.status === "active" || scheduledIds.has(employee.id))
@@ -77,7 +79,7 @@ function formatWeekRange(start: string, end: string): string {
 }
 
 function renderShiftCell(cell: ScheduleCell, selectedMonth: number): string {
-    if (!cell.inSelectedMonth) {
+    if (!cell.inScheduleScope) {
         return `
             <span class="schedule-cell-outside">
                 <span class="schedule-visually-hidden">
@@ -121,7 +123,7 @@ function renderWeek(week: ScheduleWeek, selectedMonth: number): string {
                                 const { day } = dateParts(column.date);
                                 return `
                                     <th
-                                        class="${column.inSelectedMonth ? "" : "schedule-column-outside"}"
+                                        class="${column.inScheduleScope ? "" : "schedule-column-outside"}"
                                         scope="col"
                                     >
                                         <span>${DAY_NAMES[getDayOfWeek(column.date)]}</span>
@@ -136,7 +138,7 @@ function renderWeek(week: ScheduleWeek, selectedMonth: number): string {
                             <tr>
                                 <th scope="row">${escapeHtml(row.employeeName)}</th>
                                 ${row.cells.map((cell) => `
-                                    <td class="${cell.inSelectedMonth ? "" : "schedule-cell--outside"}">
+                                    <td class="${cell.inScheduleScope ? "" : "schedule-cell--outside"}">
                                         ${renderShiftCell(cell, selectedMonth)}
                                     </td>
                                 `).join("")}
@@ -164,8 +166,19 @@ export function renderSchedulePage(container: HTMLElement): void {
     let selectedEmployeeId: string | null = null;
 
     function render(): void {
+        const teamWeeks = buildScheduleWeeks(
+            shifts,
+            employees,
+            selectedYear,
+            selectedMonth,
+            null,
+            storeHours,
+            { includeBoundaryWeekShifts: true },
+        );
+        const scheduledEmployeeIds = teamWeeks.flatMap(({ rows }) =>
+            rows.map(({ employeeId }) => employeeId));
         const filterEmployees = scheduleFilterEmployees(
-            employees, shifts, selectedYear, selectedMonth,
+            employees, shifts, selectedYear, selectedMonth, scheduledEmployeeIds,
         );
         if (selectedEmployeeId && !employees.some(({ id }) => id === selectedEmployeeId)) {
             selectedEmployeeId = null;
@@ -173,6 +186,17 @@ export function renderSchedulePage(container: HTMLElement): void {
         const selectedEmployee = selectedEmployeeId
             ? employees.find(({ id }) => id === selectedEmployeeId)
             : undefined;
+        const weeks = selectedEmployeeId
+            ? buildScheduleWeeks(
+                shifts,
+                employees,
+                selectedYear,
+                selectedMonth,
+                selectedEmployeeId,
+                storeHours,
+                { includeBoundaryWeekShifts: true },
+            )
+            : teamWeeks;
         const displayedFilterEmployees = selectedEmployee &&
             !filterEmployees.some(({ id }) => id === selectedEmployee.id)
             ? [...filterEmployees, selectedEmployee].sort((left, right) =>
@@ -181,15 +205,6 @@ export function renderSchedulePage(container: HTMLElement): void {
                 }) || left.id.localeCompare(right.id),
             )
             : filterEmployees;
-        const weeks = buildScheduleWeeks(
-            shifts,
-            employees,
-            selectedYear,
-            selectedMonth,
-            selectedEmployeeId,
-            storeHours,
-        );
-
         container.innerHTML = `
             <section class="schedule-page">
                 <div class="planner-intro schedule-intro">
@@ -269,6 +284,9 @@ export function renderSchedulePage(container: HTMLElement): void {
                     storeHours,
                     selectedYear,
                     selectedMonth,
+                    selectedEmployeeId
+                        ? { scope: "employee", employeeId: selectedEmployeeId }
+                        : { scope: "team" },
                 ));
             });
         container.querySelector<HTMLSelectElement>("#schedule-employee-filter")

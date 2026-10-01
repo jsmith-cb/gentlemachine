@@ -12,6 +12,7 @@ import type { Employee, Shift, StoreHours } from "../types/planning";
 export interface ScheduleColumn {
     date: string;
     inSelectedMonth: boolean;
+    inScheduleScope: boolean;
 }
 
 export interface ScheduleCell extends ScheduleColumn {
@@ -30,6 +31,10 @@ export interface ScheduleWeek {
     displayEnd: string;
     columns: ScheduleColumn[];
     rows: ScheduleRow[];
+}
+
+export interface ScheduleBuildOptions {
+    includeBoundaryWeekShifts?: boolean;
 }
 
 function addDays(date: string, amount: number): string {
@@ -77,16 +82,32 @@ export function buildScheduleWeeks(
     month: number,
     employeeId: string | null,
     storeHours: StoreHours,
+    options: ScheduleBuildOptions = {},
 ): ScheduleWeek[] {
     const operatingDays = orderedOpenDays(getOpenOperatingDays(storeHours));
     if (operatingDays.length === 0) return [];
 
-    const monthShifts = shifts.filter((shift) =>
-        isDateInMonth(shift.date, year, month) &&
+    const monthStart = `${year}-${String(month).padStart(2, "0")}-01`;
+    const monthEndValue = new Date(Date.UTC(year, month, 0));
+    const monthEnd = [
+        monthEndValue.getUTCFullYear(),
+        String(monthEndValue.getUTCMonth() + 1).padStart(2, "0"),
+        String(monthEndValue.getUTCDate()).padStart(2, "0"),
+    ].join("-");
+    const firstWeekStart = getWeekStartDate(monthStart);
+    const finalWeekStart = getWeekStartDate(monthEnd);
+    const isBoundaryWeekDate = (date: string): boolean =>
+        options.includeBoundaryWeekShifts === true && (
+            (date < monthStart && getWeekStartDate(date) === firstWeekStart) ||
+            (date > monthEnd && getWeekStartDate(date) === finalWeekStart)
+        );
+
+    const scopedShifts = shifts.filter((shift) =>
+        (isDateInMonth(shift.date, year, month) || isBoundaryWeekDate(shift.date)) &&
         operatingDays.includes(getDayOfWeek(shift.date)) &&
         (employeeId === null || shift.employeeId === employeeId),
     );
-    const weekStarts = [...new Set(monthShifts.map(({ date }) => getWeekStartDate(date)))].sort();
+    const weekStarts = [...new Set(scopedShifts.map(({ date }) => getWeekStartDate(date)))].sort();
 
     return weekStarts.map((weekStart) => {
         const columns = operatingDays.map((day) => {
@@ -94,9 +115,10 @@ export function buildScheduleWeeks(
             return {
                 date,
                 inSelectedMonth: isDateInMonth(date, year, month),
+                inScheduleScope: isDateInMonth(date, year, month) || isBoundaryWeekDate(date),
             };
         });
-        const weekShifts = monthShifts.filter(
+        const weekShifts = scopedShifts.filter(
             ({ date }) => getWeekStartDate(date) === weekStart,
         );
         const employeeIds = [...new Set(weekShifts.map(({ employeeId: id }) => id))]
@@ -112,7 +134,7 @@ export function buildScheduleWeeks(
                 employeeName: employeeName(id, employees),
                 cells: columns.map((column) => ({
                     ...column,
-                    shifts: column.inSelectedMonth
+                    shifts: column.inScheduleScope
                         ? weekShifts
                             .filter((shift) => shift.employeeId === id && shift.date === column.date)
                             .sort(compareShifts)

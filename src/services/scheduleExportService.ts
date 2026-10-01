@@ -18,7 +18,7 @@ const DAY_NAMES = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"] as const;
 export interface ScheduleExportColumn {
     date: string;
     label: string;
-    inSelectedMonth: boolean;
+    inScheduleScope: boolean;
 }
 
 export interface ScheduleExportRow {
@@ -34,10 +34,18 @@ export interface ScheduleExportWeek {
 
 export interface ScheduleExportDocument {
     productName: "PricePocket Crew";
+    scope: "team" | "employee";
+    documentTitle: "Team Schedule" | "Employee Schedule";
+    employeeName?: string;
     periodLabel: string;
     filename: string;
+    emptyMessage: "No shifts scheduled for this month.";
     weeks: ScheduleExportWeek[];
 }
+
+export type ScheduleExportRequest =
+    | { scope: "team" }
+    | { scope: "employee"; employeeId: string };
 
 export type WeekPaginationDecision = "current-page" | "next-page" | "split";
 
@@ -81,25 +89,63 @@ export function scheduleExportFilename(year: number, month: number): string {
     return `pp-crew-schedule-${year}-${String(month).padStart(2, "0")}.pdf`;
 }
 
+export function employeeScheduleExportFilename(
+    employeeName: string,
+    year: number,
+    month: number,
+): string {
+    const slug = employeeName
+        .normalize("NFKD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .toLocaleLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-+|-+$/g, "") || "employee";
+    return `pp-crew-schedule-${slug}-${year}-${String(month).padStart(2, "0")}.pdf`;
+}
+
 export function buildScheduleExportDocument(
     shifts: readonly Shift[],
     employees: readonly Employee[],
     storeHours: StoreHours,
     year: number,
     month: number,
+    request: ScheduleExportRequest,
 ): ScheduleExportDocument {
-    const weeks = buildScheduleWeeks(shifts, employees, year, month, null, storeHours);
+    const employee = request.scope === "employee"
+        ? employees.find(({ id }) => id === request.employeeId)
+        : undefined;
+    if (request.scope === "employee" && !employee) {
+        throw new Error(`Unknown employee: ${request.employeeId}`);
+    }
+    const employeeName = employee
+        ? `${employee.firstName} ${employee.lastName}`
+        : undefined;
+    const weeks = buildScheduleWeeks(
+        shifts,
+        employees,
+        year,
+        month,
+        request.scope === "employee" ? request.employeeId : null,
+        storeHours,
+        { includeBoundaryWeekShifts: true },
+    );
 
     return {
         productName: "PricePocket Crew",
+        scope: request.scope,
+        documentTitle: request.scope === "employee" ? "Employee Schedule" : "Team Schedule",
+        employeeName,
         periodLabel: `${MONTH_NAMES[month - 1]} ${year}`,
-        filename: scheduleExportFilename(year, month),
+        filename: employeeName
+            ? employeeScheduleExportFilename(employeeName, year, month)
+            : scheduleExportFilename(year, month),
+        emptyMessage: "No shifts scheduled for this month.",
         weeks: weeks.map((week) => ({
             label: formatWeekRange(week.displayStart, week.displayEnd),
             columns: week.columns.map((column) => ({
                 date: column.date,
                 label: `${DAY_NAMES[getDayOfWeek(column.date)]} ${dateParts(column.date).day}`,
-                inSelectedMonth: column.inSelectedMonth,
+                inScheduleScope: column.inScheduleScope,
             })),
             rows: week.rows.map((row) => ({
                 employeeName: row.employeeName,
@@ -119,6 +165,7 @@ export async function createSchedulePdf(model: ScheduleExportDocument): Promise<
     const contentWidth = pageWidth - margin * 2;
     const bottomLimit = pageHeight - 16;
     const employeeWidth = 48;
+    const documentHeaderEndY = model.scope === "employee" ? 41 : PDF_LAYOUT.documentHeaderEndY;
     let y = 0;
 
     const drawDocumentHeader = (): void => {
@@ -128,14 +175,21 @@ export async function createSchedulePdf(model: ScheduleExportDocument): Promise<
         pdf.text(model.productName.toUpperCase(), margin, 14);
         pdf.setTextColor(15, 23, 42);
         pdf.setFontSize(20);
-        pdf.text("Team Schedule", margin, 23);
+        pdf.text(model.documentTitle, margin, 23);
+        if (model.employeeName) {
+            pdf.setFont("helvetica", "bold");
+            pdf.setFontSize(10);
+            pdf.setTextColor(51, 65, 85);
+            pdf.text(model.employeeName, margin, 29);
+        }
         pdf.setFont("helvetica", "normal");
         pdf.setFontSize(10);
         pdf.setTextColor(71, 85, 105);
         pdf.text(model.periodLabel, pageWidth - margin, 22, { align: "right" });
         pdf.setDrawColor(213, 221, 232);
-        pdf.line(margin, 28, pageWidth - margin, 28);
-        y = PDF_LAYOUT.documentHeaderEndY;
+        const dividerY = model.scope === "employee" ? 34 : 28;
+        pdf.line(margin, dividerY, pageWidth - margin, dividerY);
+        y = documentHeaderEndY;
     };
 
     const addPage = (): void => {
@@ -160,7 +214,7 @@ export async function createSchedulePdf(model: ScheduleExportDocument): Promise<
         week.columns.forEach((column, index) => {
             const x = margin + employeeWidth + dayWidth * index;
             pdf.line(x, y, x, y + PDF_LAYOUT.tableHeaderHeight);
-            if (!column.inSelectedMonth) {
+            if (!column.inScheduleScope) {
                 pdf.setFillColor(229, 234, 240);
                 pdf.rect(x, y, dayWidth, PDF_LAYOUT.tableHeaderHeight, "F");
             }
@@ -188,7 +242,7 @@ export async function createSchedulePdf(model: ScheduleExportDocument): Promise<
         const pagination = decideWeekPagination(
             y,
             bottomLimit,
-            PDF_LAYOUT.documentHeaderEndY,
+            documentHeaderEndY,
             weekHeight(week),
         );
         if (pagination === "next-page" || (
@@ -220,7 +274,7 @@ export async function createSchedulePdf(model: ScheduleExportDocument): Promise<
             row.cells.forEach((cell, index) => {
                 const x = margin + employeeWidth + dayWidth * index;
                 pdf.line(x, y, x, y + renderedRowHeight);
-                if (!week.columns[index]!.inSelectedMonth) {
+                if (!week.columns[index]!.inScheduleScope) {
                     pdf.setFillColor(245, 247, 250);
                     pdf.rect(x, y, dayWidth, renderedRowHeight, "F");
                     return;
@@ -242,7 +296,7 @@ export async function createSchedulePdf(model: ScheduleExportDocument): Promise<
         pdf.setFont("helvetica", "bold");
         pdf.setFontSize(13);
         pdf.setTextColor(15, 23, 42);
-        pdf.text("No shifts scheduled for this month.", margin, y + 10);
+        pdf.text(model.emptyMessage, margin, y + 10);
     } else {
         model.weeks.forEach(drawWeek);
     }
@@ -253,12 +307,17 @@ export async function createSchedulePdf(model: ScheduleExportDocument): Promise<
         pdf.setFont("helvetica", "normal");
         pdf.setFontSize(7.5);
         pdf.setTextColor(100, 116, 139);
-        pdf.text(`${model.productName} | ${model.periodLabel}`, margin, pageHeight - 7);
+        const footerIdentity = model.employeeName
+            ? `${model.productName} | ${model.employeeName} | ${model.periodLabel}`
+            : `${model.productName} | ${model.periodLabel}`;
+        pdf.text(footerIdentity, margin, pageHeight - 7);
         pdf.text(`Page ${page} of ${pageCount}`, pageWidth - margin, pageHeight - 7, { align: "right" });
     }
 
     pdf.setProperties({
-        title: `${model.productName} - ${model.periodLabel}`,
+        title: model.employeeName
+            ? `${model.productName} - ${model.employeeName} - ${model.periodLabel}`
+            : `${model.productName} - ${model.periodLabel}`,
         subject: "Team schedule",
         creator: model.productName,
     });
