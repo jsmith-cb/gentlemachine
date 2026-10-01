@@ -132,6 +132,9 @@ export function renderEmployeePlanningPage(
             { value: 0, label: "Sun" },
         ];
         const availability = selectedEmployee.availability;
+        const hasDayHours = Object.values(availability.dayHours ?? {}).some(
+            (hours) => Boolean(hours?.earliestStart || hours?.latestEnd),
+        );
         const targetHours = (selectedEmployee.weeklyTargetMinutes / 60).toFixed(1);
         const maximumHoursPerDay = selectedEmployee.maximumPaidMinutesPerDay === undefined
             ? ""
@@ -303,8 +306,8 @@ export function renderEmployeePlanningPage(
                             Apply default hours to all available days
                         </button>
                         <p class="apply-hours-status" id="apply-hours-status" role="status"></p>
-                        <div class="day-hours-section">
-                            <h4>Day-specific hours</h4>
+                        <details class="day-hours-details" ${hasDayHours ? "open" : ""}>
+                            <summary>Day-specific hours</summary>
                             <div class="day-hours-header" aria-hidden="true">
                                 <span>Day</span><span>Earliest</span><span></span><span>Latest</span>
                             </div>
@@ -326,7 +329,7 @@ export function renderEmployeePlanningPage(
                                 `;
                             }).join("")}
                             </div>
-                        </div>
+                        </details>
                     </div>
                     </section>
                 </form>
@@ -371,6 +374,16 @@ export function renderEmployeePlanningPage(
             </dialog>
             `}
         `;
+
+        container.querySelector<HTMLElement>(".employee-availability")
+            ?.addEventListener("wheel", (event) => {
+                if (event.ctrlKey || event.deltaY === 0) return;
+                const scrollContainer = container.closest<HTMLElement>("#page-content");
+                if (!scrollContainer) return;
+
+                event.preventDefault();
+                scrollContainer.scrollBy({ top: event.deltaY, behavior: "auto" });
+            }, { passive: false });
 
         const selector = container.querySelector<HTMLSelectElement>("#employee-select");
         employeeBaseline = formValueSignature(container.querySelector<HTMLFormElement>("#employee-form"));
