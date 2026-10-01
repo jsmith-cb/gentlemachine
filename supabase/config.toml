@@ -1,0 +1,14 @@
+project_id = "pricepocket-crew"
+
+[db]
+major_version = 15
+
+[db.seed]
+enabled = false
+
+[auth]
+site_url = "http://127.0.0.1:5173"
+additional_redirect_urls = ["http://localhost:5173"]
+
+[experimental.pgdelta]
+enabled = true
