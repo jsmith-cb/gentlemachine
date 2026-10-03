@@ -23,11 +23,13 @@ import logoIcon from "./assets/pricepocket_logo_icon.png";
 import type { PageChangeGuard } from "./components/UnsavedChanges";
 import type { AuthenticatedManager } from "./auth/ManagerAuthController";
 import type { CrewApplicationStore } from "./state/CrewApplicationStore";
+import type { EmployeeAccessRepository } from "./repositories/EmployeeAccessRepository";
 
 export interface AppOptions {
     readonly manager: AuthenticatedManager;
     readonly onSignOut: () => Promise<void>;
     readonly store: CrewApplicationStore;
+    readonly employeeAccessRepository: EmployeeAccessRepository;
 }
 
 export function renderApp(
@@ -190,7 +192,9 @@ function attachNavigationListeners(
 
     sidebarEmployeePlanningButton.addEventListener(
         "click",
-        () => void navigate(sidebarEmployeePlanningButton, () => renderEmployeePlanningPage(pageContent, store)),
+        () => void navigate(sidebarEmployeePlanningButton, () => renderEmployeePlanningPage(
+            pageContent, store, options.employeeAccessRepository,
+        )),
     );
 
     sidebarSettingsButton.addEventListener(

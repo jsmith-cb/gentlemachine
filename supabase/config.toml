@@ -8,7 +8,14 @@ enabled = false
 
 [auth]
 site_url = "http://127.0.0.1:5173/pricepocket_crew/"
-additional_redirect_urls = ["http://localhost:5173/pricepocket_crew/"]
+additional_redirect_urls = [
+    "http://localhost:5173/pricepocket_crew/",
+    "http://127.0.0.1:5173/pricepocket_crew/my-schedule",
+    "http://localhost:5173/pricepocket_crew/my-schedule"
+]
+
+[functions.enable-employee-access]
+verify_jwt = true
 
 [experimental.pgdelta]
 enabled = true

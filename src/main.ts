@@ -23,6 +23,7 @@ import {
     renderWorkspaceLoadErrorPage,
     renderWorkspaceLoadingPage,
 } from "./pages/WorkspaceLoadPage";
+import { SupabaseEmployeeAccessRepository } from "./infrastructure/SupabaseEmployeeAccessRepository";
 
 initializeTheme();
 
@@ -87,6 +88,10 @@ function startAuthenticatedApplication(applicationRoot: HTMLElement): void {
                             manager: state.manager,
                             onSignOut: () => controller.signOut(),
                             store,
+                            employeeAccessRepository: new SupabaseEmployeeAccessRepository(
+                                client,
+                                state.manager.businessId,
+                            ),
                         });
                     }
                 });

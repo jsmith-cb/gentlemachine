@@ -22,12 +22,15 @@ export type ManagerAuthState =
     | { readonly status: "missing-membership"; readonly email: string }
     | { readonly status: "authenticated"; readonly manager: AuthenticatedManager };
 
-export interface ManagerAuthGateway {
+export interface AuthenticationSessionGateway {
     getSessionUser(): Promise<AuthenticatedUser | null>;
     onSessionChange(listener: (user: AuthenticatedUser | null) => void): () => void;
     requestMagicLink(email: string, redirectUrl: string): Promise<void>;
-    findManagerMembership(userId: string): Promise<readonly ManagerMembership[]>;
     signOut(): Promise<void>;
+}
+
+export interface ManagerAuthGateway extends AuthenticationSessionGateway {
+    findManagerMembership(userId: string): Promise<readonly ManagerMembership[]>;
 }
 
 type AuthStateListener = (state: ManagerAuthState) => void;

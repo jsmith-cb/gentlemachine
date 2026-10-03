@@ -20,6 +20,10 @@ import {
 } from "../components/UnsavedChanges";
 import type { PageChangeGuard } from "../components/UnsavedChanges";
 import type { CrewApplicationStore } from "../state/CrewApplicationStore";
+import type {
+    EmployeeAccessRecord,
+    EmployeeAccessRepository,
+} from "../repositories/EmployeeAccessRepository";
 
 let state: PlannerState;
 let selectedEmployeeId: string | null = null;
@@ -51,6 +55,7 @@ function formatVacationPeriod(startDate: string, endDate: string): string {
 export function renderEmployeePlanningPage(
     container: HTMLElement,
     applicationStore: CrewApplicationStore,
+    employeeAccessRepository: EmployeeAccessRepository,
 ): PageChangeGuard {
     const canonical = applicationStore.getReadyData();
 
@@ -62,6 +67,8 @@ export function renderEmployeePlanningPage(
     newEmployeeDraft = null;
     selectedEmployeeId = employeeSelectOptions(activeEmployees(state.employees))[0]?.employee.id ?? null;
     let employeeBaseline = "";
+    let employeeAccess = new Map<string, EmployeeAccessRecord>();
+    let accessLoadError: string | null = null;
 
     const hasUnsavedChanges = (): boolean =>
         newEmployeeDraft !== null ||
@@ -106,6 +113,8 @@ export function renderEmployeePlanningPage(
         }
 
         const isNew = newEmployeeDraft !== null;
+        const access = employeeAccess.get(selectedEmployee.id);
+        const portalEnabled = access?.accessEnabled === true;
 
         const summary = monthSummaries.find(
             ({ employeeId }) => employeeId === selectedEmployee.id,
@@ -232,13 +241,26 @@ export function renderEmployeePlanningPage(
                     <div class="employee-identity-fields">
                         <div class="form-group">
                             <label for="emp-email">Email</label>
-                            <input type="email" id="emp-email" name="email" value="${escapeHtml(selectedEmployee.email ?? "")}" autocomplete="email" />
+                            <input type="email" id="emp-email" name="email" value="${escapeHtml(selectedEmployee.email ?? "")}" autocomplete="email" ${portalEnabled ? "readonly" : ""} />
+                            ${portalEnabled ? '<small>Disable employee portal access before changing this email.</small>' : ""}
                         </div>
                         <div class="form-group">
                             <label for="emp-telephone">Telephone number</label>
                             <input type="tel" id="emp-telephone" name="telephoneNumber" value="${escapeHtml(selectedEmployee.telephoneNumber ?? "")}" autocomplete="tel" />
                         </div>
                     </div>
+                    ${isNew ? "" : `
+                        <div class="employee-portal-access">
+                            <div>
+                                <strong>Employee portal</strong>
+                                <span>${portalStatus(selectedEmployee, access, accessLoadError)}</span>
+                            </div>
+                            ${selectedEmployee.status === "active" && selectedEmployee.email?.trim() && !accessLoadError
+                                ? `<button type="button" class="secondary-button" id="${portalEnabled ? "disable-employee-access" : "enable-employee-access"}">${portalEnabled ? "Disable access" : "Enable access"}</button>`
+                                : ""}
+                        </div>
+                        <p class="employee-portal-status" id="employee-portal-status" role="status"></p>
+                    `}
                     ${isNew ? "" : `<div class="employee-details-actions"><button type="button" class="secondary-button employee-inactivate-button" id="inactivate-employee">Make inactive</button></div>`}
                     </section>
 
@@ -424,9 +446,49 @@ export function renderEmployeePlanningPage(
                 return;
             }
             state.employees = deactivateTeamMember(state.employees, selectedEmployee.id);
+            if (access) employeeAccess.set(selectedEmployee.id, { ...access, accessEnabled: false });
             selectedEmployeeId = employeeSelectOptions(activeEmployees(state.employees))[0]?.employee.id ?? null;
             render();
         });
+
+        container.querySelector<HTMLButtonElement>("#enable-employee-access")
+            ?.addEventListener("click", async (event) => {
+                const button = event.currentTarget as HTMLButtonElement;
+                const status = container.querySelector<HTMLElement>("#employee-portal-status");
+                button.disabled = true;
+                if (status) status.textContent = "Enabling employee portal access…";
+                try {
+                    const result = await employeeAccessRepository.enable(selectedEmployee.id);
+                    employeeAccess = new Map((await employeeAccessRepository.list())
+                        .map((record) => [record.employeeId, record]));
+                    render();
+                    const updatedStatus = container.querySelector<HTMLElement>("#employee-portal-status");
+                    if (updatedStatus) updatedStatus.textContent = result.invitationSent
+                        ? "Access enabled. A secure sign-in invitation was sent."
+                        : "Access enabled for the existing sign-in identity.";
+                } catch (error) {
+                    if (status) status.textContent = persistenceMessage(error, "Employee portal access could not be enabled.");
+                    button.disabled = false;
+                }
+            });
+
+        container.querySelector<HTMLButtonElement>("#disable-employee-access")
+            ?.addEventListener("click", async (event) => {
+                const button = event.currentTarget as HTMLButtonElement;
+                const status = container.querySelector<HTMLElement>("#employee-portal-status");
+                button.disabled = true;
+                if (status) status.textContent = "Disabling employee portal access…";
+                try {
+                    await employeeAccessRepository.disable(selectedEmployee.id);
+                    if (access) employeeAccess.set(selectedEmployee.id, { ...access, accessEnabled: false });
+                    render();
+                    const updatedStatus = container.querySelector<HTMLElement>("#employee-portal-status");
+                    if (updatedStatus) updatedStatus.textContent = "Employee portal access disabled.";
+                } catch (error) {
+                    if (status) status.textContent = persistenceMessage(error, "Employee portal access could not be disabled.");
+                    button.disabled = false;
+                }
+            });
 
         const vacationForm = container.querySelector<HTMLFormElement>("#vacation-form");
         vacationForm?.addEventListener("submit", async (event) => {
@@ -621,12 +683,36 @@ export function renderEmployeePlanningPage(
         });
     }
 
-    render();
+    container.innerHTML = `
+        <section class="planner">
+            <div class="planner-intro employee-planning-intro">
+                <div><p class="section-label">Workforce</p><h2>Team</h2></div>
+            </div>
+            <p role="status">Loading employee portal access…</p>
+        </section>
+    `;
+    void employeeAccessRepository.list().then((records) => {
+        employeeAccess = new Map(records.map((record) => [record.employeeId, record]));
+    }).catch((error) => {
+        accessLoadError = persistenceMessage(error, "Employee portal access could not be loaded.");
+    }).finally(render);
 
     return {
         hasUnsavedChanges,
         confirmLeave,
     };
+}
+
+function portalStatus(
+    employee: Employee,
+    access: EmployeeAccessRecord | undefined,
+    loadError: string | null,
+): string {
+    if (loadError) return escapeHtml(loadError);
+    if (employee.status !== "active") return "Unavailable while this team member is inactive.";
+    if (!employee.email?.trim()) return "Save an email address to enable access.";
+    if (access?.accessEnabled) return "Enabled · Email is locked while access is active.";
+    return "Not enabled.";
 }
 
 function persistenceMessage(error: unknown, fallback: string): string {
