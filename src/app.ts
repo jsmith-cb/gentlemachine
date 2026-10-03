@@ -109,6 +109,7 @@ export function renderApp(
         pageContent,
         () => sidebarController.close(),
         options.store,
+        options.employeeAccessRepository,
     );
 
     renderSchedulePage(
@@ -122,6 +123,7 @@ function attachNavigationListeners(
     pageContent: HTMLElement,
     closeSidebar: () => void,
     store: CrewApplicationStore,
+    employeeAccessRepository: EmployeeAccessRepository,
 ): void {
     let activeChangeGuard: PageChangeGuard | null = null;
     const sidebarPlannerButton = sidebar.querySelector<HTMLButtonElement>(
@@ -193,7 +195,7 @@ function attachNavigationListeners(
     sidebarEmployeePlanningButton.addEventListener(
         "click",
         () => void navigate(sidebarEmployeePlanningButton, () => renderEmployeePlanningPage(
-            pageContent, store, options.employeeAccessRepository,
+            pageContent, store, employeeAccessRepository,
         )),
     );
 

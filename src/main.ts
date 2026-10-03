@@ -6,6 +6,7 @@ import "./styles/schedule.css";
 import "./styles/settings.css";
 import "./styles/unsaved-changes.css";
 import "./styles/auth.css";
+import "./styles/employee-portal.css";
 import { renderApp } from "./app";
 import { initializeTheme } from "./theme/Theme";
 import { ManagerAuthController } from "./auth/ManagerAuthController";
@@ -24,6 +25,9 @@ import {
     renderWorkspaceLoadingPage,
 } from "./pages/WorkspaceLoadPage";
 import { SupabaseEmployeeAccessRepository } from "./infrastructure/SupabaseEmployeeAccessRepository";
+import { SupabaseEmployeeScheduleRepository } from "./infrastructure/SupabaseEmployeeScheduleRepository";
+import { EmployeePortalController } from "./auth/EmployeePortalController";
+import { renderEmployeeSchedulePage } from "./pages/EmployeeSchedulePage";
 
 initializeTheme();
 
@@ -33,9 +37,13 @@ if (!root) {
     throw new Error("App root element not found.");
 }
 
-startAuthenticatedApplication(root);
+if (isEmployeePortalRoute(window.location.pathname)) {
+    startEmployeePortal(root);
+} else {
+    startManagerApplication(root);
+}
 
-function startAuthenticatedApplication(applicationRoot: HTMLElement): void {
+function startManagerApplication(applicationRoot: HTMLElement): void {
     try {
         const client = createSupabaseBrowserClient(readSupabaseBrowserConfig());
         const redirectUrl = new URL(import.meta.env.BASE_URL, window.location.origin).toString();
@@ -48,6 +56,7 @@ function startAuthenticatedApplication(applicationRoot: HTMLElement): void {
         let activeManagerKey: string | null = null;
         let activeStore: CrewApplicationStore | null = null;
         let unsubscribeStore: (() => void) | null = null;
+        let employeeRedirectRevision = 0;
 
         const clearWorkspace = (): void => {
             unsubscribeStore?.();
@@ -58,6 +67,7 @@ function startAuthenticatedApplication(applicationRoot: HTMLElement): void {
         };
 
         controller.subscribe((state) => {
+            const redirectRevision = ++employeeRedirectRevision;
             if (state.status === "authenticated") {
                 const managerKey = `${state.manager.userId}:${state.manager.businessId}`;
                 if (activeManagerKey === managerKey) return;
@@ -99,6 +109,33 @@ function startAuthenticatedApplication(applicationRoot: HTMLElement): void {
                 return;
             }
 
+            if (state.status === "missing-membership") {
+                clearWorkspace();
+                renderManagerSignInPage(applicationRoot, {
+                    status: "loading",
+                    message: "Checking employee schedule access…",
+                }, {
+                    requestMagicLink: (email) => controller.requestMagicLink(email),
+                    signOut: () => controller.signOut(),
+                });
+                const now = new Date();
+                void new SupabaseEmployeeScheduleRepository(client)
+                    .getMySchedule(now.getFullYear(), now.getMonth() + 1)
+                    .then(() => {
+                        if (redirectRevision === employeeRedirectRevision) {
+                            window.location.replace(employeePortalUrl());
+                        }
+                    })
+                    .catch(() => {
+                        if (redirectRevision !== employeeRedirectRevision) return;
+                        renderManagerSignInPage(applicationRoot, state, {
+                            requestMagicLink: (email) => controller.requestMagicLink(email),
+                            signOut: () => controller.signOut(),
+                        });
+                    });
+                return;
+            }
+
             clearWorkspace();
             renderManagerSignInPage(applicationRoot, state, {
                 requestMagicLink: (email) => controller.requestMagicLink(email),
@@ -118,4 +155,43 @@ function startAuthenticatedApplication(applicationRoot: HTMLElement): void {
             signOut: async () => undefined,
         });
     }
+}
+
+function startEmployeePortal(applicationRoot: HTMLElement): void {
+    try {
+        const client = createSupabaseBrowserClient(readSupabaseBrowserConfig());
+        const callbackError = readAuthenticationCallbackError(window.location.href);
+        clearAuthenticationCallbackError(window.location.href);
+        const controller = new EmployeePortalController(
+            new SupabaseManagerAuthGateway(client),
+            new SupabaseEmployeeScheduleRepository(client),
+            employeePortalUrl(),
+        );
+        controller.subscribe((state) => {
+            renderEmployeeSchedulePage(applicationRoot, state, {
+                requestMagicLink: (email) => controller.requestMagicLink(email),
+                loadMonth: (year, month) => controller.loadMonth(year, month),
+                signOut: () => controller.signOut(),
+            });
+        });
+        void controller.initialize(callbackError);
+    } catch (error) {
+        renderEmployeeSchedulePage(applicationRoot, {
+            status: "error",
+            message: error instanceof Error ? error.message : "My Schedule could not be initialized.",
+        }, {
+            requestMagicLink: async () => undefined,
+            loadMonth: async () => undefined,
+            signOut: async () => undefined,
+        });
+    }
+}
+
+function employeePortalUrl(): string {
+    return new URL(`${import.meta.env.BASE_URL}my-schedule`, window.location.origin).toString();
+}
+
+function isEmployeePortalRoute(pathname: string): boolean {
+    const expected = new URL(`${import.meta.env.BASE_URL}my-schedule`, window.location.origin).pathname;
+    return pathname.replace(/\/$/, "") === expected.replace(/\/$/, "");
 }

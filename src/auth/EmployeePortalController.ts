@@ -74,7 +74,12 @@ export class EmployeePortalController {
             const schedule = await this.schedules.getMySchedule(year, month);
             if (revision === this.revision) this.emit({ status: "authenticated", user, schedule });
         } catch (error) {
-            if (revision === this.revision) this.emitError(error);
+            if (revision !== this.revision) return;
+            if (isAccessUnavailable(error)) {
+                this.emit({ status: "unavailable", email: user.email });
+            } else {
+                this.emitError(error);
+            }
         }
     }
 
@@ -97,8 +102,13 @@ export class EmployeePortalController {
         try {
             const schedule = await this.schedules.getMySchedule(now.getFullYear(), now.getMonth() + 1);
             if (revision === this.revision) this.emit({ status: "authenticated", user, schedule });
-        } catch {
-            if (revision === this.revision) this.emit({ status: "unavailable", email: user.email });
+        } catch (error) {
+            if (revision !== this.revision) return;
+            if (isAccessUnavailable(error)) {
+                this.emit({ status: "unavailable", email: user.email });
+            } else {
+                this.emitError(error);
+            }
         }
     }
 
@@ -115,4 +125,8 @@ export class EmployeePortalController {
         this.state = state;
         for (const listener of this.listeners) listener(state);
     }
+}
+
+function isAccessUnavailable(error: unknown): boolean {
+    return error instanceof Error && /access is unavailable|permission denied|not authorized/i.test(error.message);
 }

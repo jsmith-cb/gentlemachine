@@ -40,8 +40,8 @@ function validateSchedule(value: unknown): EmployeeScheduleDocument {
             firstName: value.employee.firstName,
             lastName: value.employee.lastName,
         },
-        year: value.year,
-        month: value.month,
+        year: Number(value.year),
+        month: Number(value.month),
         shifts,
     };
 }
