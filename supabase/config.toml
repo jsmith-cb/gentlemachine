@@ -7,8 +7,8 @@ major_version = 15
 enabled = false
 
 [auth]
-site_url = "http://127.0.0.1:5173"
-additional_redirect_urls = ["http://localhost:5173"]
+site_url = "http://127.0.0.1:5173/pricepocket_crew/"
+additional_redirect_urls = ["http://localhost:5173/pricepocket_crew/"]
 
 [experimental.pgdelta]
 enabled = true

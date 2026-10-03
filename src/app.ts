@@ -21,9 +21,16 @@ import {
 
 import logoIcon from "./assets/pricepocket_logo_icon.png";
 import type { PageChangeGuard } from "./components/UnsavedChanges";
+import type { AuthenticatedManager } from "./auth/ManagerAuthController";
+
+export interface AppOptions {
+    readonly manager: AuthenticatedManager;
+    readonly onSignOut: () => Promise<void>;
+}
 
 export function renderApp(
     root: HTMLElement,
+    options: AppOptions,
 ): void {
     root.innerHTML = "";
 
@@ -33,7 +40,7 @@ export function renderApp(
     const {
         sidebar,
         overlay: sidebarOverlay,
-    } = createSidebar();
+    } = createSidebar(options);
 
     const header = document.createElement("header");
     header.className = "app-header";
