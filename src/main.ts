@@ -17,6 +17,12 @@ import {
     readSupabaseBrowserConfig,
 } from "./infrastructure/supabaseClient";
 import { SupabaseManagerAuthGateway } from "./infrastructure/SupabaseManagerAuthGateway";
+import { SupabaseCrewRepository } from "./infrastructure/SupabaseCrewRepository";
+import { CrewApplicationStore } from "./state/CrewApplicationStore";
+import {
+    renderWorkspaceLoadErrorPage,
+    renderWorkspaceLoadingPage,
+} from "./pages/WorkspaceLoadPage";
 
 initializeTheme();
 
@@ -39,20 +45,55 @@ function startAuthenticatedApplication(applicationRoot: HTMLElement): void {
             redirectUrl,
         );
         let activeManagerKey: string | null = null;
+        let activeStore: CrewApplicationStore | null = null;
+        let unsubscribeStore: (() => void) | null = null;
+
+        const clearWorkspace = (): void => {
+            unsubscribeStore?.();
+            unsubscribeStore = null;
+            activeStore?.invalidate();
+            activeStore = null;
+            activeManagerKey = null;
+        };
 
         controller.subscribe((state) => {
             if (state.status === "authenticated") {
                 const managerKey = `${state.manager.userId}:${state.manager.businessId}`;
                 if (activeManagerKey === managerKey) return;
+                clearWorkspace();
                 activeManagerKey = managerKey;
-                renderApp(applicationRoot, {
-                    manager: state.manager,
-                    onSignOut: () => controller.signOut(),
+                const store = new CrewApplicationStore(
+                    new SupabaseCrewRepository(client, state.manager.businessId),
+                );
+                activeStore = store;
+                let applicationRendered = false;
+
+                unsubscribeStore = store.subscribe((workspaceState) => {
+                    if (activeStore !== store || activeManagerKey !== managerKey) return;
+                    if (workspaceState.status === "loading") {
+                        renderWorkspaceLoadingPage(applicationRoot);
+                    } else if (workspaceState.status === "error") {
+                        renderWorkspaceLoadErrorPage(
+                            applicationRoot,
+                            workspaceState.error.message,
+                            {
+                                retry: () => void store.load(),
+                                signOut: () => controller.signOut(),
+                            },
+                        );
+                    } else if (workspaceState.status === "ready" && !applicationRendered) {
+                        applicationRendered = true;
+                        renderApp(applicationRoot, {
+                            manager: state.manager,
+                            onSignOut: () => controller.signOut(),
+                        });
+                    }
                 });
+                void store.load();
                 return;
             }
 
-            activeManagerKey = null;
+            clearWorkspace();
             renderManagerSignInPage(applicationRoot, state, {
                 requestMagicLink: (email) => controller.requestMagicLink(email),
                 signOut: () => controller.signOut(),

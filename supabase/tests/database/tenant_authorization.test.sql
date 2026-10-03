@@ -3,7 +3,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set local search_path = public, extensions;
 
-select plan(25);
+select plan(29);
 
 select has_table('public', 'businesses', 'businesses exists');
 select has_table('public', 'business_memberships', 'business_memberships exists');
@@ -228,6 +228,58 @@ select throws_ok(
     '23503',
     null,
     'a shift cannot reference an employee from another business'
+);
+
+select lives_ok(
+    $$
+        select public.replace_business_shifts(
+            '20000000-0000-0000-0000-000000000001',
+            '[{
+                "id":"replacement-a",
+                "employee_id":"30000000-0000-0000-0000-000000000001",
+                "shift_date":"2026-10-03",
+                "start_time":"10:00",
+                "end_time":"16:00"
+            }]'::jsonb
+        )
+    $$,
+    'manager A can atomically replace Business A shifts'
+);
+
+select is(
+    (select count(*) from public.shifts where id = 'replacement-a'),
+    1::bigint,
+    'atomic replacement commits the planned Business A shift'
+);
+
+select throws_ok(
+    $$
+        select public.replace_business_shifts(
+            '20000000-0000-0000-0000-000000000002',
+            '[]'::jsonb
+        )
+    $$,
+    '42501',
+    null,
+    'manager A cannot replace Business B shifts even with an empty collection'
+);
+
+select throws_ok(
+    $$
+        select public.replace_business_shifts(
+            '20000000-0000-0000-0000-000000000001',
+            '[{
+                "id":"invalid-cross-business",
+                "employee_id":"30000000-0000-0000-0000-000000000002",
+                "shift_date":"2026-10-03",
+                "start_time":"10:00",
+                "end_time":"16:00"
+            }]'::jsonb
+        )
+    $$,
+    '23503',
+    null,
+    'atomic replacement preserves cross-business employee integrity'
 );
 
 select set_config(
