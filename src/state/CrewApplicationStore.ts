@@ -30,6 +30,10 @@ export class CrewApplicationStore {
         return this.state;
     }
 
+    getReadyData(): CrewWorkspaceData {
+        return cloneWorkspaceData(this.requireReady());
+    }
+
     async load(): Promise<void> {
         const revision = ++this.revision;
         this.emit({ status: "loading" });

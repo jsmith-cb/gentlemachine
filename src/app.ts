@@ -22,10 +22,12 @@ import {
 import logoIcon from "./assets/pricepocket_logo_icon.png";
 import type { PageChangeGuard } from "./components/UnsavedChanges";
 import type { AuthenticatedManager } from "./auth/ManagerAuthController";
+import type { CrewApplicationStore } from "./state/CrewApplicationStore";
 
 export interface AppOptions {
     readonly manager: AuthenticatedManager;
     readonly onSignOut: () => Promise<void>;
+    readonly store: CrewApplicationStore;
 }
 
 export function renderApp(
@@ -104,10 +106,12 @@ export function renderApp(
         sidebar,
         pageContent,
         () => sidebarController.close(),
+        options.store,
     );
 
     renderSchedulePage(
         pageContent,
+        options.store,
     );
 }
 
@@ -115,6 +119,7 @@ function attachNavigationListeners(
     sidebar: HTMLElement,
     pageContent: HTMLElement,
     closeSidebar: () => void,
+    store: CrewApplicationStore,
 ): void {
     let activeChangeGuard: PageChangeGuard | null = null;
     const sidebarPlannerButton = sidebar.querySelector<HTMLButtonElement>(
@@ -175,21 +180,21 @@ function attachNavigationListeners(
 
     sidebarScheduleButton.addEventListener(
         "click",
-        () => void navigate(sidebarScheduleButton, () => renderSchedulePage(pageContent)),
+        () => void navigate(sidebarScheduleButton, () => renderSchedulePage(pageContent, store)),
     );
 
     sidebarPlannerButton.addEventListener(
         "click",
-        () => void navigate(sidebarPlannerButton, () => renderPlannerPage(pageContent)),
+        () => void navigate(sidebarPlannerButton, () => renderPlannerPage(pageContent, store)),
     );
 
     sidebarEmployeePlanningButton.addEventListener(
         "click",
-        () => void navigate(sidebarEmployeePlanningButton, () => renderEmployeePlanningPage(pageContent)),
+        () => void navigate(sidebarEmployeePlanningButton, () => renderEmployeePlanningPage(pageContent, store)),
     );
 
     sidebarSettingsButton.addEventListener(
         "click",
-        () => void navigate(sidebarSettingsButton, () => renderSettingsPage(pageContent)),
+        () => void navigate(sidebarSettingsButton, () => renderSettingsPage(pageContent, store)),
     );
 }

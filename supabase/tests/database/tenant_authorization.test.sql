@@ -3,7 +3,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set local search_path = public, extensions;
 
-select plan(29);
+select plan(31);
 
 select has_table('public', 'businesses', 'businesses exists');
 select has_table('public', 'business_memberships', 'business_memberships exists');
@@ -11,6 +11,12 @@ select has_table('public', 'employees', 'employees exists');
 select has_table('public', 'shifts', 'shifts exists');
 select has_table('public', 'vacations', 'vacations exists');
 select has_table('public', 'business_settings', 'business_settings exists');
+select has_index(
+    'public',
+    'employees',
+    'employees_business_employee_number_ci_uidx',
+    'employees has case-insensitive business employee-number identity protection'
+);
 
 select ok(
     (select relrowsecurity from pg_class where oid = 'public.businesses'::regclass),
@@ -205,6 +211,31 @@ select lives_ok(
         )
     $$,
     'manager A can insert an employee into Business A'
+);
+
+select throws_ok(
+    $$
+        insert into public.employees (
+            business_id,
+            employee_number,
+            first_name,
+            last_name,
+            weekly_target_minutes,
+            max_days_per_week,
+            availability
+        ) values (
+            '20000000-0000-0000-0000-000000000001',
+            'a-2',
+            'Duplicate',
+            'Employee',
+            0,
+            1,
+            '{"days":[]}'
+        )
+    $$,
+    '23505',
+    null,
+    'employee numbers are unique within a business without regard to case'
 );
 
 select throws_ok(

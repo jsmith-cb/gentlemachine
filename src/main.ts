@@ -86,6 +86,7 @@ function startAuthenticatedApplication(applicationRoot: HTMLElement): void {
                         renderApp(applicationRoot, {
                             manager: state.manager,
                             onSignOut: () => controller.signOut(),
+                            store,
                         });
                     }
                 });

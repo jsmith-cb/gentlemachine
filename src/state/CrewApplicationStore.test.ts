@@ -24,20 +24,36 @@ class FakeRepository implements CrewRepository {
     readonly businessId = "business-1";
     workspace = structuredClone(WORKSPACE);
     employeeFailure: Error | null = null;
+    shiftFailure: Error | null = null;
     pendingLoad: Promise<CrewWorkspaceData> | null = null;
+    savedEmployee: Employee | null = null;
+    savedVacation: VacationPeriod | null = null;
+    deletedVacationId: string | null = null;
+    replacedShifts: readonly Shift[] | null = null;
+    savedSettings: CrewBusinessSettings | null = null;
 
     async loadWorkspace(): Promise<CrewWorkspaceData> {
         return this.pendingLoad ?? structuredClone(this.workspace);
     }
 
-    async saveEmployee(): Promise<void> {
+    async saveEmployee(employee: Employee): Promise<void> {
         if (this.employeeFailure) throw this.employeeFailure;
+        this.savedEmployee = structuredClone(employee);
     }
 
-    async saveVacation(_vacation: VacationPeriod): Promise<void> {}
-    async deleteVacation(_vacationId: string): Promise<void> {}
-    async replaceShifts(_shifts: readonly Shift[]): Promise<void> {}
-    async saveBusinessSettings(_settings: CrewBusinessSettings): Promise<void> {}
+    async saveVacation(vacation: VacationPeriod): Promise<void> {
+        this.savedVacation = structuredClone(vacation);
+    }
+    async deleteVacation(vacationId: string): Promise<void> {
+        this.deletedVacationId = vacationId;
+    }
+    async replaceShifts(shifts: readonly Shift[]): Promise<void> {
+        if (this.shiftFailure) throw this.shiftFailure;
+        this.replacedShifts = structuredClone(shifts);
+    }
+    async saveBusinessSettings(settings: CrewBusinessSettings): Promise<void> {
+        this.savedSettings = structuredClone(settings);
+    }
 }
 
 describe("CrewApplicationStore", () => {
@@ -67,6 +83,74 @@ describe("CrewApplicationStore", () => {
 
         await expect(store.saveEmployee(employee)).rejects.toThrow("write failed");
         expect(store.getState()).toEqual(before);
+    });
+
+    it("persists canonical domain mutations before updating application state", async () => {
+        const repository = new FakeRepository();
+        const store = new CrewApplicationStore(repository);
+        await store.load();
+        const employee: Employee = {
+            id: "10000000-0000-4000-8000-000000000001",
+            employeeNumber: "A-1",
+            status: "active",
+            firstName: "Alex",
+            lastName: "Example",
+            weeklyTargetMinutes: 1200,
+            maxDaysPerWeek: 5,
+            availability: { days: [1, 2, 3, 4, 5] },
+        };
+        const vacation: VacationPeriod = {
+            id: "20000000-0000-4000-8000-000000000001",
+            employeeId: employee.id,
+            startDate: "2026-10-12",
+            endDate: "2026-10-16",
+        };
+        const shift: Shift = {
+            id: "shift-1",
+            employeeId: employee.id,
+            date: "2026-10-19",
+            start: "10:30",
+            end: "16:30",
+        };
+        const settings: CrewBusinessSettings = {
+            storeHours: DEFAULT_STORE_HOURS,
+            softRules: { oneWeekendOffPerMonth: true },
+        };
+
+        await store.saveEmployee(employee);
+        await store.saveVacation(vacation);
+        await store.replaceShifts([shift]);
+        await store.saveBusinessSettings(settings);
+
+        expect(repository.savedEmployee).toEqual(employee);
+        expect(repository.savedVacation).toEqual(vacation);
+        expect(repository.replacedShifts).toEqual([shift]);
+        expect(repository.savedSettings).toEqual(settings);
+        expect(store.getReadyData()).toMatchObject({
+            employees: [employee], vacations: [vacation], shifts: [shift], settings,
+        });
+
+        await store.deleteVacation(vacation.id);
+        expect(repository.deletedVacationId).toBe(vacation.id);
+        expect(store.getReadyData().vacations).toEqual([]);
+    });
+
+    it("does not accept proposed shift state when atomic persistence fails", async () => {
+        const repository = new FakeRepository();
+        repository.shiftFailure = new Error("atomic replacement failed");
+        const store = new CrewApplicationStore(repository);
+        await store.load();
+        const before = store.getReadyData();
+
+        await expect(store.replaceShifts([{
+            id: "shift-1",
+            employeeId: "10000000-0000-4000-8000-000000000001",
+            date: "2026-10-19",
+            start: "10:30",
+            end: "16:30",
+        }])).rejects.toThrow("atomic replacement failed");
+
+        expect(store.getReadyData()).toEqual(before);
     });
 
     it("ignores a late load after the authenticated workspace is invalidated", async () => {

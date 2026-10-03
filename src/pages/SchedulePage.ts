@@ -3,11 +3,6 @@ import {
     getDayOfWeek,
     isDateInMonth,
 } from "../services/hoursService";
-import {
-    getStoredEmployees,
-    getStoredStoreHours,
-    getStoredShifts,
-} from "../services/storageService";
 import { buildScheduleWeeks } from "../services/scheduleService";
 import type { ScheduleCell, ScheduleWeek } from "../services/scheduleService";
 import {
@@ -16,6 +11,7 @@ import {
 } from "../services/scheduleExportService";
 
 import type { Employee, Shift } from "../types/planning";
+import type { CrewApplicationStore } from "../state/CrewApplicationStore";
 
 export { buildScheduleWeeks } from "../services/scheduleService";
 
@@ -156,10 +152,14 @@ function adjacentMonth(year: number, month: number, amount: number): { year: num
     return { year: value.getUTCFullYear(), month: value.getUTCMonth() + 1 };
 }
 
-export function renderSchedulePage(container: HTMLElement): void {
-    const shifts = getStoredShifts();
-    const employees = getStoredEmployees() ?? [];
-    const storeHours = getStoredStoreHours();
+export function renderSchedulePage(
+    container: HTMLElement,
+    applicationStore: CrewApplicationStore,
+): void {
+    const canonical = applicationStore.getReadyData();
+    const shifts = [...canonical.shifts];
+    const employees = [...canonical.employees];
+    const storeHours = canonical.settings.storeHours;
     const today = new Date();
     let selectedYear = today.getFullYear();
     let selectedMonth = today.getMonth() + 1;

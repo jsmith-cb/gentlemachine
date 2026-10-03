@@ -10,7 +10,7 @@ describe("team-member lifecycle", () => {
     it("generates a separate immutable reference for a new member", () => {
         const first = createTeamMemberDraft();
         const second = createTeamMemberDraft();
-        expect(first.id).toMatch(/^employee-/);
+        expect(first.id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i);
         expect(first.id).not.toBe(second.id);
         expect(first.employeeNumber).toBe("");
         expect(first.status).toBe("active");

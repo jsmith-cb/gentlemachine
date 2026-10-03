@@ -43,7 +43,7 @@ export function attachDayPlanningModal(
     state: PlannerState,
     date: string,
     initialShiftId: string | null,
-    onSave: (upserts: Shift[], deletions: string[]) => void,
+    onSave: (upserts: Shift[], deletions: string[]) => Promise<void>,
     onClose: () => void,
 ): void {
     const operating = getOperatingHoursForDate(state.storeHours, date);
@@ -61,6 +61,8 @@ export function attachDayPlanningModal(
     let activeDraftId: string | null = initialShift?.id ?? null;
     let selectedEmployeeId: string | null = initialShift?.employeeId ?? null;
     let resize: { pointerId: number; edge: "start" | "end" } | null = null;
+    let saving = false;
+    let saveError: string | null = null;
 
     const activeDraft = (): Shift | null => drafts.get(activeDraftId ?? "") ??
         dayShifts.find(({ id }) => id === activeDraftId) ?? null;
@@ -163,7 +165,8 @@ export function attachDayPlanningModal(
         const invalid = [...drafts.values()].some((shift) => draftError(shift) !== null);
         return `<div class="day-planner-batch-actions">
             <span>${drafts.size} pending shift change${drafts.size === 1 ? "" : "s"}${pendingDeletes.size ? ` · ${pendingDeletes.size} removal${pendingDeletes.size === 1 ? "" : "s"}` : ""}</span>
-            <button type="button" class="primary-button" data-save-all ${invalid ? "disabled" : ""}>Save all changes</button>
+            ${saveError ? `<span class="day-planner-save-error" role="alert">${escapeHtml(saveError)}</span>` : ""}
+            <button type="button" class="primary-button" data-save-all ${invalid || saving ? "disabled" : ""}>${saving ? "Saving…" : "Save all changes"}</button>
         </div>`;
     }
 
@@ -212,7 +215,8 @@ export function attachDayPlanningModal(
             candidate.start !== current.start || candidate.end !== current.end) stageDraft(candidate);
     }
 
-    function saveAll(): void {
+    async function saveAll(): Promise<void> {
+        if (saving) return;
         stageActiveForm();
         const invalid = [...drafts.values()].find((shift) => draftError(shift) !== null);
         if (invalid) {
@@ -220,7 +224,17 @@ export function attachDayPlanningModal(
             refresh();
             return;
         }
-        if (drafts.size || pendingDeletes.size) onSave([...drafts.values()], [...pendingDeletes]);
+        if (!drafts.size && !pendingDeletes.size) return;
+        saving = true;
+        saveError = null;
+        refresh();
+        try {
+            await onSave([...drafts.values()], [...pendingDeletes]);
+        } catch (error) {
+            saving = false;
+            saveError = error instanceof Error ? error.message : "The shift changes could not be saved.";
+            refresh();
+        }
     }
 
     refresh();
@@ -258,7 +272,7 @@ export function attachDayPlanningModal(
             return;
         }
         if (target.closest("[data-save-all]")) {
-            saveAll();
+            void saveAll();
             return;
         }
         const slot = target.closest<HTMLElement>("[data-slot]");
@@ -313,7 +327,7 @@ export function attachDayPlanningModal(
     dialog.addEventListener("submit", (event) => {
         if (!(event.target as HTMLElement).matches("#day-planner-editor")) return;
         event.preventDefault();
-        saveAll();
+        void saveAll();
     });
     dialog.addEventListener("pointerdown", (event) => {
         const handle = (event.target as HTMLElement).closest<HTMLElement>("[data-resize]");

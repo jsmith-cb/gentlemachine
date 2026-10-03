@@ -1,10 +1,4 @@
 import {
-    getStoredStoreHours,
-    getStoredSoftRuleSettings,
-    setStoredStoreHours,
-    setStoredSoftRuleSettings,
-} from "../services/storageService";
-import {
     cloneStoreHours,
     isValidStoreHours,
 } from "../services/storeHoursService";
@@ -15,6 +9,7 @@ import {
     formValueSignature,
 } from "../components/UnsavedChanges";
 import type { PageChangeGuard } from "../components/UnsavedChanges";
+import type { CrewApplicationStore } from "../state/CrewApplicationStore";
 
 const DAYS: Array<{ dayOfWeek: Weekday; label: string }> = [
     { dayOfWeek: 1, label: "Monday" },
@@ -36,9 +31,13 @@ function dayConfiguration(storeHours: StoreHours, dayOfWeek: Weekday): StoreOper
         { dayOfWeek, isOpen: false };
 }
 
-export function renderSettingsPage(container: HTMLElement): PageChangeGuard {
-    let storeHours = getStoredStoreHours();
-    let softRules = getStoredSoftRuleSettings();
+export function renderSettingsPage(
+    container: HTMLElement,
+    applicationStore: CrewApplicationStore,
+): PageChangeGuard {
+    const canonical = applicationStore.getReadyData();
+    let storeHours = cloneStoreHours(canonical.settings.storeHours);
+    let softRules = structuredClone(canonical.settings.softRules);
     let storeHoursBaseline = "";
     let softRulesBaseline = "";
 
@@ -138,7 +137,7 @@ export function renderSettingsPage(container: HTMLElement): PageChangeGuard {
             });
         });
 
-        form?.addEventListener("submit", (event) => {
+        form?.addEventListener("submit", async (event) => {
             event.preventDefault();
             const data = new FormData(form);
             const days: StoreOperatingDay[] = DAYS.map(({ dayOfWeek }) => {
@@ -158,26 +157,51 @@ export function renderSettingsPage(container: HTMLElement): PageChangeGuard {
                 if (feedback) feedback.textContent = "Check that every open day has a valid opening time before its closing time.";
                 return;
             }
-            setStoredStoreHours(candidate);
-            storeHours = cloneStoreHours(candidate);
-            storeHoursBaseline = formValueSignature(form);
             const feedback = container.querySelector<HTMLElement>("#store-hours-form .settings-feedback");
-            if (feedback) feedback.textContent = "Store Hours saved.";
+            const submit = form.querySelector<HTMLButtonElement>('button[type="submit"]');
+            if (submit) submit.disabled = true;
+            if (feedback) feedback.textContent = "Saving Store Hours…";
+            try {
+                await applicationStore.saveBusinessSettings({
+                    storeHours: candidate,
+                    softRules,
+                });
+                storeHours = cloneStoreHours(candidate);
+                storeHoursBaseline = formValueSignature(form);
+                if (feedback) feedback.textContent = "Store Hours saved.";
+            } catch (error) {
+                if (feedback) feedback.textContent = persistenceMessage(error, "Store Hours could not be saved.");
+            } finally {
+                if (submit) submit.disabled = false;
+            }
         });
 
         softRulesForm?.addEventListener(
             "submit",
-            (event) => {
+            async (event) => {
                 event.preventDefault();
                 const form = event.currentTarget as HTMLFormElement;
-                softRules = {
+                const candidate = {
                     oneWeekendOffPerMonth:
                         new FormData(form).get("oneWeekendOffPerMonth") === "on",
                 };
-                setStoredSoftRuleSettings(softRules);
-                softRulesBaseline = formValueSignature(form);
                 const feedback = container.querySelector<HTMLElement>("#soft-rules-form .settings-feedback");
-                if (feedback) feedback.textContent = "Soft Rules saved.";
+                const submit = form.querySelector<HTMLButtonElement>('button[type="submit"]');
+                if (submit) submit.disabled = true;
+                if (feedback) feedback.textContent = "Saving Soft Rules…";
+                try {
+                    await applicationStore.saveBusinessSettings({
+                        storeHours,
+                        softRules: candidate,
+                    });
+                    softRules = structuredClone(candidate);
+                    softRulesBaseline = formValueSignature(form);
+                    if (feedback) feedback.textContent = "Soft Rules saved.";
+                } catch (error) {
+                    if (feedback) feedback.textContent = persistenceMessage(error, "Soft Rules could not be saved.");
+                } finally {
+                    if (submit) submit.disabled = false;
+                }
             },
         );
     }
@@ -194,4 +218,8 @@ export function renderSettingsPage(container: HTMLElement): PageChangeGuard {
             ? confirmDiscardUnsavedChanges("Settings", trigger)
             : Promise.resolve(true),
     };
+}
+
+function persistenceMessage(error: unknown, fallback: string): string {
+    return error instanceof Error ? error.message : fallback;
 }

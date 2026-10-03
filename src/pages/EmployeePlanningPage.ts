@@ -13,14 +13,13 @@ import { hasValidAvailabilityHours } from "../services/availabilityService";
 import { isValidVacationPeriod, overlapsVacation } from "../services/vacationService";
 import { isValidMaximumPaidMinutesPerDayOverride } from "../services/shiftRules";
 
-import { getStoredShifts, getStoredEmployees, getStoredVacations, getStoredStoreHours, setStoredEmployees, setStoredVacations } from "../services/storageService";
-
 import type { Employee, PlannerState } from "../types/planning";
 import {
     confirmDiscardUnsavedChanges,
     formValueSignature,
 } from "../components/UnsavedChanges";
 import type { PageChangeGuard } from "../components/UnsavedChanges";
+import type { CrewApplicationStore } from "../state/CrewApplicationStore";
 
 let state: PlannerState;
 let selectedEmployeeId: string | null = null;
@@ -51,13 +50,13 @@ function formatVacationPeriod(startDate: string, endDate: string): string {
 
 export function renderEmployeePlanningPage(
     container: HTMLElement,
+    applicationStore: CrewApplicationStore,
 ): PageChangeGuard {
-    const storedShifts = getStoredShifts();
-    const storedEmployees = getStoredEmployees();
-    const storedVacations = getStoredVacations();
+    const canonical = applicationStore.getReadyData();
 
     state = createInitialPlannerState(
-        storedShifts, storedEmployees, storedVacations, getStoredStoreHours(),
+        [...canonical.shifts], [...canonical.employees], [...canonical.vacations],
+        canonical.settings.storeHours, canonical.settings.softRules,
     );
 
     newEmployeeDraft = null;
@@ -412,16 +411,25 @@ export function renderEmployeePlanningPage(
             inactivateDialog.returnValue = "";
             inactivateDialog.showModal();
         });
-        inactivateDialog?.addEventListener("close", () => {
+        inactivateDialog?.addEventListener("close", async () => {
             if (inactivateDialog.returnValue !== "confirm") return;
+            const candidate = deactivateTeamMember(state.employees, selectedEmployee.id)
+                .find(({ id }) => id === selectedEmployee.id);
+            if (!candidate) return;
+            try {
+                await applicationStore.saveEmployee(candidate);
+            } catch (error) {
+                const saveStatus = container.querySelector("#save-status");
+                if (saveStatus) saveStatus.textContent = persistenceMessage(error, "The team member could not be made inactive.");
+                return;
+            }
             state.employees = deactivateTeamMember(state.employees, selectedEmployee.id);
-            setStoredEmployees(state.employees);
             selectedEmployeeId = employeeSelectOptions(activeEmployees(state.employees))[0]?.employee.id ?? null;
             render();
         });
 
         const vacationForm = container.querySelector<HTMLFormElement>("#vacation-form");
-        vacationForm?.addEventListener("submit", (event) => {
+        vacationForm?.addEventListener("submit", async (event) => {
             event.preventDefault();
             const formData = new FormData(vacationForm);
             const startDate = String(formData.get("startDate") ?? "");
@@ -441,17 +449,33 @@ export function renderEmployeePlanningPage(
                 if (status) status.textContent = "These dates overlap an existing vacation.";
                 return;
             }
+            const submit = vacationForm.querySelector<HTMLButtonElement>('button[type="submit"]');
+            if (submit) submit.disabled = true;
+            try {
+                await applicationStore.saveVacation(period);
+            } catch (error) {
+                if (status) status.textContent = persistenceMessage(error, "Vacation could not be saved.");
+                if (submit) submit.disabled = false;
+                return;
+            }
             state.vacations = [...state.vacations, period];
-            setStoredVacations(state.vacations);
             render();
         });
 
         container.querySelectorAll<HTMLButtonElement>("[data-remove-vacation]").forEach((button) => {
-            button.addEventListener("click", () => {
-                state.vacations = state.vacations.filter((period) =>
-                    period.id !== button.dataset.removeVacation,
-                );
-                setStoredVacations(state.vacations);
+            button.addEventListener("click", async () => {
+                const vacationId = button.dataset.removeVacation;
+                if (!vacationId) return;
+                button.disabled = true;
+                try {
+                    await applicationStore.deleteVacation(vacationId);
+                } catch (error) {
+                    const status = container.querySelector("#vacation-status");
+                    if (status) status.textContent = persistenceMessage(error, "Vacation could not be removed.");
+                    button.disabled = false;
+                    return;
+                }
+                state.vacations = state.vacations.filter((period) => period.id !== vacationId);
                 render();
             });
         });
@@ -484,7 +508,7 @@ export function renderEmployeePlanningPage(
                 });
             });
         });
-        form?.addEventListener("submit", (event) => {
+        form?.addEventListener("submit", async (event) => {
             event.preventDefault();
 
             const firstNameInput = container.querySelector<HTMLInputElement>('#emp-first-name');
@@ -568,14 +592,22 @@ export function renderEmployeePlanningPage(
                 availability: updatedAvailability,
             };
 
+            const submit = form.querySelector<HTMLButtonElement>('button[type="submit"]');
+            if (submit) submit.disabled = true;
+            if (saveStatus) saveStatus.textContent = "Saving…";
+            try {
+                await applicationStore.saveEmployee(updatedEmployee);
+            } catch (error) {
+                if (saveStatus) saveStatus.textContent = persistenceMessage(error, "The team member could not be saved.");
+                if (submit) submit.disabled = false;
+                return;
+            }
+
             state.employees = isNew
                 ? [...state.employees, updatedEmployee]
                 : state.employees.map((emp) => emp.id === selectedEmployee.id ? updatedEmployee : emp);
-
             newEmployeeDraft = null;
             selectedEmployeeId = selectedEmployee.id;
-
-            setStoredEmployees(state.employees);
 
             render();
 
@@ -595,4 +627,8 @@ export function renderEmployeePlanningPage(
         hasUnsavedChanges,
         confirmLeave,
     };
+}
+
+function persistenceMessage(error: unknown, fallback: string): string {
+    return error instanceof Error ? error.message : fallback;
 }
