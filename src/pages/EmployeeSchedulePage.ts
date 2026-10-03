@@ -4,6 +4,7 @@ import type { EmployeePortalState } from "../auth/EmployeePortalController";
 export interface EmployeeScheduleActions {
     requestMagicLink(email: string): Promise<void>;
     loadMonth(year: number, month: number): Promise<void>;
+    submitTimeOff(startDate: string, endDate: string, note?: string): Promise<void>;
     signOut(): Promise<void>;
 }
 
@@ -32,6 +33,12 @@ export function renderEmployeeSchedulePage(
             const [year, month] = String(button.dataset.employeeMonth).split("-").map(Number);
             if (year && month) void actions.loadMonth(year, month);
         });
+    });
+    root.querySelector<HTMLFormElement>("#time-off-request-form")?.addEventListener("submit", (event) => {
+        event.preventDefault();
+        const data = new FormData(event.currentTarget as HTMLFormElement);
+        void actions.submitTimeOff(String(data.get("startDate") ?? ""),
+            String(data.get("endDate") ?? ""), String(data.get("note") ?? ""));
     });
 }
 
@@ -65,7 +72,7 @@ function content(state: EmployeePortalState): string {
             </div>
         `);
     }
-    if (state.status === "authenticated") return scheduleContent(state.schedule);
+    if (state.status === "authenticated") return scheduleContent(state);
 
     const error = state.status === "error"
         ? `<div class="auth-error" role="alert">${escapeHtml(state.message)}</div>`
@@ -85,7 +92,8 @@ function content(state: EmployeePortalState): string {
     `);
 }
 
-function scheduleContent(schedule: Extract<EmployeePortalState, { status: "authenticated" }>["schedule"]): string {
+function scheduleContent(state: Extract<EmployeePortalState, { status: "authenticated" }>): string {
+    const schedule = state.schedule;
     const previous = adjacentMonth(schedule.year, schedule.month, -1);
     const next = adjacentMonth(schedule.year, schedule.month, 1);
     const grouped = new Map<string, typeof schedule.shifts>();
@@ -121,8 +129,34 @@ function scheduleContent(schedule: Extract<EmployeePortalState, { status: "authe
                     </div>
                 `}
             </div>
+            <section class="employee-time-off" aria-labelledby="time-off-heading">
+                <div><p class="section-label">Time off</p><h2 id="time-off-heading">Request Time Off</h2></div>
+                <form id="time-off-request-form" class="employee-time-off-form">
+                    <label>Start date<input type="date" name="startDate" required></label>
+                    <label>End date<input type="date" name="endDate" required></label>
+                    <label class="employee-time-off-note">Note (optional)<textarea name="note" maxlength="500" rows="2"></textarea></label>
+                    <button type="submit">Submit request</button>
+                </form>
+                ${scheduleStateMessage(state)}
+                <div class="employee-time-off-list">
+                    ${state.requests.length ? state.requests.map((request) => `
+                        <article><div><strong>${formatDate(request.startDate)}${request.startDate === request.endDate ? "" : ` – ${formatDate(request.endDate)}`}</strong>
+                        <span class="time-off-status time-off-status--${request.status}">${statusLabel(request.status)}</span></div>
+                        ${request.employeeNote ? `<p>${escapeHtml(request.employeeNote)}</p>` : ""}
+                        ${request.managerNote ? `<p><strong>Manager note:</strong> ${escapeHtml(request.managerNote)}</p>` : ""}
+                        </article>`).join("") : "<p>No time-off requests yet.</p>"}
+                </div>
+            </section>
         </section>
     `;
+}
+
+function scheduleStateMessage(schedule: Extract<EmployeePortalState, { status: "authenticated" }>): string {
+    return schedule.requestMessage ? `<p class="employee-time-off-message" role="status">${escapeHtml(schedule.requestMessage)}</p>` : "";
+}
+
+function statusLabel(status: "pending" | "approved" | "declined" | "superseded"): string {
+    return status[0].toUpperCase() + status.slice(1);
 }
 
 function portalCard(body: string): string {

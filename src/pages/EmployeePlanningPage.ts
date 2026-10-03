@@ -24,6 +24,7 @@ import type {
     EmployeeAccessRecord,
     EmployeeAccessRepository,
 } from "../repositories/EmployeeAccessRepository";
+import type { ManagerTimeOffRequest, ManagerTimeOffRequestRepository } from "../repositories/TimeOffRequestRepository";
 
 let state: PlannerState;
 let selectedEmployeeId: string | null = null;
@@ -56,6 +57,7 @@ export function renderEmployeePlanningPage(
     container: HTMLElement,
     applicationStore: CrewApplicationStore,
     employeeAccessRepository: EmployeeAccessRepository,
+    timeOffRequestRepository: ManagerTimeOffRequestRepository,
 ): PageChangeGuard {
     const canonical = applicationStore.getReadyData();
 
@@ -69,6 +71,8 @@ export function renderEmployeePlanningPage(
     let employeeBaseline = "";
     let employeeAccess = new Map<string, EmployeeAccessRecord>();
     let accessLoadError: string | null = null;
+    let timeOffRequests: readonly ManagerTimeOffRequest[] = [];
+    let requestLoadError: string | null = null;
 
     const hasUnsavedChanges = (): boolean =>
         newEmployeeDraft !== null ||
@@ -150,6 +154,7 @@ export function renderEmployeePlanningPage(
         const employeeVacations = state.vacations
             .filter((period) => period.employeeId === selectedEmployee.id)
             .sort((a, b) => a.startDate.localeCompare(b.startDate));
+        const employeeRequests = timeOffRequests.filter((request) => request.employeeId === selectedEmployee.id);
 
         container.innerHTML = `
             <section class="planner">
@@ -379,6 +384,22 @@ export function renderEmployeePlanningPage(
                                 </ul>
                             </div>
                         ` : '<p class="vacation-empty">No vacation days planned.</p>'}
+                        <div class="time-off-review">
+                            <h4>Employee requests</h4>
+                            ${requestLoadError ? `<p class="vacation-status">${escapeHtml(requestLoadError)}</p>` :
+                                employeeRequests.length ? employeeRequests.map((request) => `
+                                    <article class="time-off-review-card">
+                                        <div><strong>${escapeHtml(formatVacationPeriod(request.startDate, request.endDate))}</strong>
+                                        <span class="time-off-status time-off-status--${request.status}">${request.status}</span></div>
+                                        ${request.employeeNote ? `<p>${escapeHtml(request.employeeNote)}</p>` : ""}
+                                        ${request.managerNote ? `<p><strong>Manager note:</strong> ${escapeHtml(request.managerNote)}</p>` : ""}
+                                        ${request.status === "pending" ? `<div class="time-off-review-actions">
+                                            <button type="button" class="primary-button" data-time-off-decision="approved" data-request-id="${request.id}">Approve</button>
+                                            <button type="button" class="secondary-button" data-time-off-decision="declined" data-request-id="${request.id}">Decline</button>
+                                        </div>` : ""}
+                                    </article>`).join("") : '<p class="vacation-empty">No employee requests.</p>'}
+                            <p id="time-off-review-status" class="vacation-status" role="status"></p>
+                        </div>
                     `}
                 </section>
 
@@ -542,6 +563,30 @@ export function renderEmployeePlanningPage(
             });
         });
 
+        container.querySelectorAll<HTMLButtonElement>("[data-time-off-decision]").forEach((button) => {
+            button.addEventListener("click", async () => {
+                const requestId = button.dataset.requestId;
+                const decision = button.dataset.timeOffDecision;
+                if (!requestId || (decision !== "approved" && decision !== "declined")) return;
+                const request = timeOffRequests.find(({ id }) => id === requestId);
+                if (!request) return;
+                button.disabled = true;
+                const status = container.querySelector("#time-off-review-status");
+                try {
+                    const result = await timeOffRequestRepository.decide(requestId, decision);
+                    if (decision === "approved" && result.vacationId) {
+                        await applicationStore.refreshVacations();
+                        state.vacations = [...applicationStore.getReadyData().vacations];
+                    }
+                    timeOffRequests = await timeOffRequestRepository.list();
+                    render();
+                } catch (error) {
+                    if (status) status.textContent = persistenceMessage(error, "The request could not be decided.");
+                    button.disabled = false;
+                }
+            });
+        });
+
         const form = container.querySelector<HTMLFormElement>("#employee-form");
         form?.querySelector<HTMLButtonElement>("#apply-default-hours")?.addEventListener("click", () => {
             const earliest = form.querySelector<HTMLInputElement>("#emp-earliest")?.value ?? "";
@@ -691,11 +736,15 @@ export function renderEmployeePlanningPage(
             <p role="status">Loading employee portal access…</p>
         </section>
     `;
-    void employeeAccessRepository.list().then((records) => {
-        employeeAccess = new Map(records.map((record) => [record.employeeId, record]));
-    }).catch((error) => {
-        accessLoadError = persistenceMessage(error, "Employee portal access could not be loaded.");
-    }).finally(render);
+    void Promise.all([
+        employeeAccessRepository.list().then((records) => {
+            employeeAccess = new Map(records.map((record) => [record.employeeId, record]));
+        }).catch((error) => {
+            accessLoadError = persistenceMessage(error, "Employee portal access could not be loaded.");
+        }),
+        timeOffRequestRepository.list().then((requests) => { timeOffRequests = requests; })
+            .catch((error) => { requestLoadError = persistenceMessage(error, "Time-off requests could not be loaded."); }),
+    ]).finally(render);
 
     return {
         hasUnsavedChanges,

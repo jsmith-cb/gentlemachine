@@ -6,6 +6,7 @@ import type {
     EmployeeScheduleDocument,
     EmployeeScheduleRepository,
 } from "../repositories/EmployeeScheduleRepository";
+import type { EmployeeTimeOffRequest, EmployeeTimeOffRequestRepository } from "../repositories/TimeOffRequestRepository";
 
 export type EmployeePortalState =
     | { readonly status: "loading"; readonly message: string }
@@ -17,6 +18,8 @@ export type EmployeePortalState =
         readonly status: "authenticated";
         readonly user: AuthenticatedUser;
         readonly schedule: EmployeeScheduleDocument;
+        readonly requests: readonly EmployeeTimeOffRequest[];
+        readonly requestMessage?: string;
       };
 
 type Listener = (state: EmployeePortalState) => void;
@@ -30,6 +33,7 @@ export class EmployeePortalController {
     constructor(
         private readonly session: AuthenticationSessionGateway,
         private readonly schedules: EmployeeScheduleRepository,
+        private readonly timeOffRequests: EmployeeTimeOffRequestRepository,
         private readonly redirectUrl: string,
     ) {}
 
@@ -71,8 +75,10 @@ export class EmployeePortalController {
         const revision = ++this.revision;
         this.emit({ status: "loading", message: "Loading your schedule…" });
         try {
-            const schedule = await this.schedules.getMySchedule(year, month);
-            if (revision === this.revision) this.emit({ status: "authenticated", user, schedule });
+            const [schedule, requests] = await Promise.all([
+                this.schedules.getMySchedule(year, month), this.timeOffRequests.listMine(),
+            ]);
+            if (revision === this.revision) this.emit({ status: "authenticated", user, schedule, requests });
         } catch (error) {
             if (revision !== this.revision) return;
             if (isAccessUnavailable(error)) {
@@ -80,6 +86,21 @@ export class EmployeePortalController {
             } else {
                 this.emitError(error);
             }
+        }
+    }
+
+    async submitTimeOff(startDate: string, endDate: string, note?: string): Promise<void> {
+        if (this.state.status !== "authenticated") return;
+        const current = this.state;
+        if (!startDate || !endDate || startDate > endDate) {
+            return this.emit({ ...current, requestMessage: "Choose a valid start and end date." });
+        }
+        try {
+            await this.timeOffRequests.submit(startDate, endDate, note);
+            const requests = await this.timeOffRequests.listMine();
+            this.emit({ ...current, requests, requestMessage: "Time-off request submitted." });
+        } catch (error) {
+            this.emit({ ...current, requestMessage: error instanceof Error ? error.message : "The request could not be submitted." });
         }
     }
 
@@ -100,8 +121,11 @@ export class EmployeePortalController {
         this.emit({ status: "loading", message: "Opening your schedule…" });
         const now = new Date();
         try {
-            const schedule = await this.schedules.getMySchedule(now.getFullYear(), now.getMonth() + 1);
-            if (revision === this.revision) this.emit({ status: "authenticated", user, schedule });
+            const [schedule, requests] = await Promise.all([
+                this.schedules.getMySchedule(now.getFullYear(), now.getMonth() + 1),
+                this.timeOffRequests.listMine(),
+            ]);
+            if (revision === this.revision) this.emit({ status: "authenticated", user, schedule, requests });
         } catch (error) {
             if (revision !== this.revision) return;
             if (isAccessUnavailable(error)) {

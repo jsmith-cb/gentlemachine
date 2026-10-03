@@ -24,12 +24,14 @@ import type { PageChangeGuard } from "./components/UnsavedChanges";
 import type { AuthenticatedManager } from "./auth/ManagerAuthController";
 import type { CrewApplicationStore } from "./state/CrewApplicationStore";
 import type { EmployeeAccessRepository } from "./repositories/EmployeeAccessRepository";
+import type { ManagerTimeOffRequestRepository } from "./repositories/TimeOffRequestRepository";
 
 export interface AppOptions {
     readonly manager: AuthenticatedManager;
     readonly onSignOut: () => Promise<void>;
     readonly store: CrewApplicationStore;
     readonly employeeAccessRepository: EmployeeAccessRepository;
+    readonly timeOffRequestRepository: ManagerTimeOffRequestRepository;
 }
 
 export function renderApp(
@@ -110,6 +112,7 @@ export function renderApp(
         () => sidebarController.close(),
         options.store,
         options.employeeAccessRepository,
+        options.timeOffRequestRepository,
     );
 
     renderSchedulePage(
@@ -124,6 +127,7 @@ function attachNavigationListeners(
     closeSidebar: () => void,
     store: CrewApplicationStore,
     employeeAccessRepository: EmployeeAccessRepository,
+    timeOffRequestRepository: ManagerTimeOffRequestRepository,
 ): void {
     let activeChangeGuard: PageChangeGuard | null = null;
     const sidebarPlannerButton = sidebar.querySelector<HTMLButtonElement>(
@@ -195,7 +199,7 @@ function attachNavigationListeners(
     sidebarEmployeePlanningButton.addEventListener(
         "click",
         () => void navigate(sidebarEmployeePlanningButton, () => renderEmployeePlanningPage(
-            pageContent, store, employeeAccessRepository,
+            pageContent, store, employeeAccessRepository, timeOffRequestRepository,
         )),
     );
 

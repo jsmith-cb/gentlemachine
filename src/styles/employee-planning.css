@@ -411,6 +411,11 @@
     padding-top: 16px;
     border-top: 1px solid var(--color-border-subtle);
 }
+
+.time-off-review { margin-top: 1.5rem; padding-top: 1.25rem; border-top: 1px solid var(--border-color); }
+.time-off-review-card { display: grid; gap: .6rem; margin-top: .75rem; padding: .9rem; border: 1px solid var(--border-color); border-radius: 12px; }
+.time-off-review-card > div:first-child { display: flex; justify-content: space-between; gap: 1rem; }
+.time-off-review-actions { display: flex; gap: .6rem; }
 .employee-selector {
     display: grid;
     gap: 8px;

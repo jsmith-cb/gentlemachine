@@ -72,6 +72,25 @@
     border-radius: 14px;
     text-align: center;
 }
+
+.employee-time-off { margin-top: 2rem; padding-top: 1.5rem; border-top: 1px solid var(--border-color); }
+.employee-time-off-form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)) auto; gap: .75rem; align-items: end; }
+.employee-time-off-form label { display: grid; gap: .4rem; color: var(--text-muted); font-weight: 700; }
+.employee-time-off-form input, .employee-time-off-form textarea { width: 100%; }
+.employee-time-off-note { grid-column: 1 / 3; }
+.employee-time-off-form button { grid-column: 3; grid-row: 1 / 3; align-self: stretch; }
+.employee-time-off-message { color: var(--accent-color); font-weight: 700; }
+.employee-time-off-list { display: grid; gap: .75rem; margin-top: 1rem; }
+.employee-time-off-list article { padding: 1rem; border: 1px solid var(--border-color); border-radius: 14px; background: var(--surface-muted); }
+.employee-time-off-list article > div { display: flex; justify-content: space-between; gap: 1rem; }
+.time-off-status { font-size: .75rem; font-weight: 800; text-transform: uppercase; letter-spacing: .08em; }
+.time-off-status--approved { color: var(--success-color, #3f9d68); }
+.time-off-status--declined { color: var(--danger-color, #d96872); }
+
+@media (max-width: 700px) {
+    .employee-time-off-form { grid-template-columns: 1fr; }
+    .employee-time-off-note, .employee-time-off-form button { grid-column: 1; grid-row: auto; }
+}
 .employee-schedule-empty h3 { margin: 0 0 8px; }
 .employee-schedule-empty p { margin: 0; color: var(--color-text-secondary); }
 

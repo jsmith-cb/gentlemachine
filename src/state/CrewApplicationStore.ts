@@ -72,6 +72,18 @@ export class CrewApplicationStore {
         });
     }
 
+    async refreshVacations(): Promise<void> {
+        const current = this.requireReady();
+        const revision = this.revision;
+        const authoritative = await this.repository.loadWorkspace();
+        if (revision !== this.revision || this.state.status !== "ready") return;
+        const latest = this.state.data === current ? current : this.state.data;
+        this.emit({ status: "ready", data: cloneWorkspaceData({
+            ...latest,
+            vacations: authoritative.vacations,
+        }) });
+    }
+
     async deleteVacation(vacationId: string): Promise<void> {
         await this.persist(async () => {
             await this.repository.deleteVacation(vacationId);

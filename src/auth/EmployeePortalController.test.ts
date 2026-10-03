@@ -8,6 +8,7 @@ import type {
     EmployeeScheduleRepository,
 } from "../repositories/EmployeeScheduleRepository";
 import { EmployeePortalController, type EmployeePortalState } from "./EmployeePortalController";
+import type { EmployeeTimeOffRequest, EmployeeTimeOffRequestRepository } from "../repositories/TimeOffRequestRepository";
 
 const USER: AuthenticatedUser = { id: "auth-employee", email: "employee@example.invalid" };
 const SCHEDULE: EmployeeScheduleDocument = {
@@ -43,6 +44,17 @@ class FakeSchedules implements EmployeeScheduleRepository {
     }
 }
 
+class FakeRequests implements EmployeeTimeOffRequestRepository {
+    requests: EmployeeTimeOffRequest[] = [];
+    submitted: { startDate: string; endDate: string; note?: string } | null = null;
+    async listMine() { return this.requests; }
+    async submit(startDate: string, endDate: string, note?: string) {
+        this.submitted = { startDate, endDate, note };
+        this.requests = [{ id: "request-1", startDate, endDate, status: "pending",
+            ...(note ? { employeeNote: note } : {}), createdAt: "2026-10-04T10:00:00Z" }];
+    }
+}
+
 function observe(controller: EmployeePortalController): EmployeePortalState[] {
     const states: EmployeePortalState[] = [];
     controller.subscribe((state) => states.push(state));
@@ -54,7 +66,7 @@ describe("EmployeePortalController", () => {
         const session = new FakeSession();
         session.user = USER;
         const schedules = new FakeSchedules();
-        const controller = new EmployeePortalController(session, schedules, "http://localhost/my-schedule");
+        const controller = new EmployeePortalController(session, schedules, new FakeRequests(), "http://localhost/my-schedule");
         const states = observe(controller);
 
         await controller.initialize();
@@ -72,7 +84,7 @@ describe("EmployeePortalController", () => {
         session.user = USER;
         const schedules = new FakeSchedules();
         schedules.failure = new Error("Employee schedule access is unavailable.");
-        const controller = new EmployeePortalController(session, schedules, "http://localhost/my-schedule");
+        const controller = new EmployeePortalController(session, schedules, new FakeRequests(), "http://localhost/my-schedule");
         const states = observe(controller);
 
         await controller.initialize();
@@ -85,7 +97,7 @@ describe("EmployeePortalController", () => {
         session.user = USER;
         const schedules = new FakeSchedules();
         schedules.failure = new Error("The schedule service could not be reached.");
-        const controller = new EmployeePortalController(session, schedules, "http://localhost/my-schedule");
+        const controller = new EmployeePortalController(session, schedules, new FakeRequests(), "http://localhost/my-schedule");
         const states = observe(controller);
 
         await controller.initialize();
@@ -99,7 +111,7 @@ describe("EmployeePortalController", () => {
     it("uses passwordless sign-in with the employee portal callback", async () => {
         const session = new FakeSession();
         const controller = new EmployeePortalController(
-            session, new FakeSchedules(), "http://localhost/my-schedule",
+            session, new FakeSchedules(), new FakeRequests(), "http://localhost/my-schedule",
         );
         const states = observe(controller);
 
@@ -116,7 +128,7 @@ describe("EmployeePortalController", () => {
         const session = new FakeSession();
         session.user = USER;
         const schedules = new FakeSchedules();
-        const controller = new EmployeePortalController(session, schedules, "http://localhost/my-schedule");
+        const controller = new EmployeePortalController(session, schedules, new FakeRequests(), "http://localhost/my-schedule");
         const states = observe(controller);
         await controller.initialize();
 
@@ -130,7 +142,7 @@ describe("EmployeePortalController", () => {
         const session = new FakeSession();
         session.user = USER;
         const schedules = new FakeSchedules();
-        const controller = new EmployeePortalController(session, schedules, "http://localhost/my-schedule");
+        const controller = new EmployeePortalController(session, schedules, new FakeRequests(), "http://localhost/my-schedule");
         const states = observe(controller);
         await controller.initialize();
         schedules.failure = new Error("Employee schedule access is unavailable.");
@@ -138,5 +150,27 @@ describe("EmployeePortalController", () => {
         await controller.loadMonth(2026, 11);
 
         expect(states.at(-1)).toEqual({ status: "unavailable", email: USER.email });
+    });
+
+    it("persists and then displays an employee time-off request", async () => {
+        const session = new FakeSession();
+        session.user = USER;
+        const requests = new FakeRequests();
+        const controller = new EmployeePortalController(
+            session, new FakeSchedules(), requests, "http://localhost/my-schedule",
+        );
+        const states = observe(controller);
+        await controller.initialize();
+
+        await controller.submitTimeOff("2026-11-02", "2026-11-03", "Family event");
+
+        expect(requests.submitted).toEqual({
+            startDate: "2026-11-02", endDate: "2026-11-03", note: "Family event",
+        });
+        expect(states.at(-1)).toMatchObject({
+            status: "authenticated",
+            requests: [{ id: "request-1", status: "pending" }],
+            requestMessage: "Time-off request submitted.",
+        });
     });
 });

@@ -153,6 +153,47 @@ describe("CrewApplicationStore", () => {
         expect(store.getReadyData()).toEqual(before);
     });
 
+    it("reconciles superseded vacations from canonical repository state", async () => {
+        const repository = new FakeRepository();
+        const oldVacation: VacationPeriod = {
+            id: "20000000-0000-4000-8000-000000000001",
+            employeeId: "10000000-0000-4000-8000-000000000001",
+            startDate: "2026-10-05",
+            endDate: "2026-10-05",
+        };
+        const replacement: VacationPeriod = {
+            id: "20000000-0000-4000-8000-000000000002",
+            employeeId: oldVacation.employeeId,
+            startDate: "2026-10-02",
+            endDate: "2026-10-07",
+        };
+        repository.workspace = { ...repository.workspace, vacations: [oldVacation] };
+        const store = new CrewApplicationStore(repository);
+        await store.load();
+        repository.workspace = { ...repository.workspace, vacations: [replacement] };
+
+        await store.refreshVacations();
+
+        expect(store.getReadyData().vacations).toEqual([replacement]);
+    });
+
+    it("reconciles an ordinary approval from canonical repository state", async () => {
+        const repository = new FakeRepository();
+        const vacation: VacationPeriod = {
+            id: "20000000-0000-4000-8000-000000000003",
+            employeeId: "10000000-0000-4000-8000-000000000001",
+            startDate: "2026-11-02",
+            endDate: "2026-11-03",
+        };
+        const store = new CrewApplicationStore(repository);
+        await store.load();
+        repository.workspace = { ...repository.workspace, vacations: [vacation] };
+
+        await store.refreshVacations();
+
+        expect(store.getReadyData().vacations).toEqual([vacation]);
+    });
+
     it("ignores a late load after the authenticated workspace is invalidated", async () => {
         const repository = new FakeRepository();
         let resolveLoad: ((value: CrewWorkspaceData) => void) | undefined;

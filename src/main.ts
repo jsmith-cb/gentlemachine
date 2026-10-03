@@ -28,6 +28,7 @@ import { SupabaseEmployeeAccessRepository } from "./infrastructure/SupabaseEmplo
 import { SupabaseEmployeeScheduleRepository } from "./infrastructure/SupabaseEmployeeScheduleRepository";
 import { EmployeePortalController } from "./auth/EmployeePortalController";
 import { renderEmployeeSchedulePage } from "./pages/EmployeeSchedulePage";
+import { SupabaseEmployeeTimeOffRequestRepository, SupabaseManagerTimeOffRequestRepository } from "./infrastructure/SupabaseTimeOffRequestRepository";
 
 initializeTheme();
 
@@ -102,6 +103,10 @@ function startManagerApplication(applicationRoot: HTMLElement): void {
                                 client,
                                 state.manager.businessId,
                             ),
+                            timeOffRequestRepository: new SupabaseManagerTimeOffRequestRepository(
+                                client,
+                                state.manager.businessId,
+                            ),
                         });
                     }
                 });
@@ -165,12 +170,14 @@ function startEmployeePortal(applicationRoot: HTMLElement): void {
         const controller = new EmployeePortalController(
             new SupabaseManagerAuthGateway(client),
             new SupabaseEmployeeScheduleRepository(client),
+            new SupabaseEmployeeTimeOffRequestRepository(client),
             employeePortalUrl(),
         );
         controller.subscribe((state) => {
             renderEmployeeSchedulePage(applicationRoot, state, {
                 requestMagicLink: (email) => controller.requestMagicLink(email),
                 loadMonth: (year, month) => controller.loadMonth(year, month),
+                submitTimeOff: (startDate, endDate, note) => controller.submitTimeOff(startDate, endDate, note),
                 signOut: () => controller.signOut(),
             });
         });
@@ -182,6 +189,7 @@ function startEmployeePortal(applicationRoot: HTMLElement): void {
         }, {
             requestMagicLink: async () => undefined,
             loadMonth: async () => undefined,
+            submitTimeOff: async () => undefined,
             signOut: async () => undefined,
         });
     }
