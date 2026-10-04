@@ -6,6 +6,7 @@ import type {
     Employee,
     EmployeeAvailability,
     Shift,
+    SicknessPeriod,
     VacationPeriod,
 } from "../types/planning";
 import type { CrewWorkspaceData } from "./CrewRepository";
@@ -16,6 +17,7 @@ export interface CanonicalWorkspaceRows {
     readonly employees: unknown;
     readonly shifts: unknown;
     readonly vacations: unknown;
+    readonly sicknesses: unknown;
     readonly settings: unknown;
 }
 
@@ -38,6 +40,10 @@ export function mapCanonicalWorkspaceRows(
         .map((row, index) => mapVacation(businessId, row, index));
     ensureUnique(vacations.map(({ id }) => id), "vacations");
     ensureEmployeeReferences(vacations, employeeIds, "vacations");
+    const sicknesses = requireArray(rows.sicknesses, "sicknesses")
+        .map((row, index) => mapSickness(businessId, row, index));
+    ensureUnique(sicknesses.map(({ id }) => id), "sicknesses");
+    ensureEmployeeReferences(sicknesses, employeeIds, "sicknesses");
 
     const settings = requireRecord(rows.settings, "business_settings");
     requireBusinessScope(businessId, settings, "business_settings");
@@ -53,6 +59,7 @@ export function mapCanonicalWorkspaceRows(
         employees,
         shifts,
         vacations,
+        sicknesses,
         settings: {
             storeHours: structuredClone(settings.store_hours),
             softRules: structuredClone(settings.soft_rules),
@@ -146,6 +153,17 @@ function mapVacation(businessId: string, value: unknown, index: number): Vacatio
         startDate: row.start_date,
         endDate: row.end_date,
     };
+}
+
+function mapSickness(businessId: string, value: unknown, index: number): SicknessPeriod {
+    const path = `sicknesses[${index}]`;
+    const row = requireRecord(value, path);
+    requireBusinessScope(businessId, row, path);
+    if (!isNonEmptyString(row.id) || !isNonEmptyString(row.employee_id) ||
+        !isDateKey(row.start_date) || !isDateKey(row.end_date) || row.start_date > row.end_date) {
+        fail(`${path} is invalid`);
+    }
+    return { id: row.id, employeeId: row.employee_id, startDate: row.start_date, endDate: row.end_date };
 }
 
 function mapDatabaseTime(value: unknown, path: string): string {

@@ -89,6 +89,7 @@ export function generateDraftForEmptyPlanningPeriod(state: PlannerState): {
         state.selectedMonth,
         state.shifts,
         state.softRules,
+        state.sicknesses,
     );
 
     if (shifts.length === 0) {
@@ -110,6 +111,7 @@ export function renderPlannerPage(
     let state = createInitialPlannerState(
         [...canonical.shifts], [...canonical.employees], [...canonical.vacations],
         canonical.settings.storeHours, canonical.settings.softRules,
+        [...canonical.sicknesses],
     );
 
     let editorMode:

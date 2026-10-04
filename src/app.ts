@@ -25,6 +25,7 @@ import type { AuthenticatedManager } from "./auth/ManagerAuthController";
 import type { CrewApplicationStore } from "./state/CrewApplicationStore";
 import type { EmployeeAccessRepository } from "./repositories/EmployeeAccessRepository";
 import type { ManagerTimeOffRequestRepository } from "./repositories/TimeOffRequestRepository";
+import type { ManagerSickReportRepository } from "./repositories/SickReportRepository";
 
 export interface AppOptions {
     readonly manager: AuthenticatedManager;
@@ -32,6 +33,7 @@ export interface AppOptions {
     readonly store: CrewApplicationStore;
     readonly employeeAccessRepository: EmployeeAccessRepository;
     readonly timeOffRequestRepository: ManagerTimeOffRequestRepository;
+    readonly sickReportRepository: ManagerSickReportRepository;
 }
 
 export function renderApp(
@@ -113,6 +115,7 @@ export function renderApp(
         options.store,
         options.employeeAccessRepository,
         options.timeOffRequestRepository,
+        options.sickReportRepository,
     );
 
     renderSchedulePage(
@@ -128,6 +131,7 @@ function attachNavigationListeners(
     store: CrewApplicationStore,
     employeeAccessRepository: EmployeeAccessRepository,
     timeOffRequestRepository: ManagerTimeOffRequestRepository,
+    sickReportRepository: ManagerSickReportRepository,
 ): void {
     let activeChangeGuard: PageChangeGuard | null = null;
     const sidebarPlannerButton = sidebar.querySelector<HTMLButtonElement>(
@@ -199,7 +203,7 @@ function attachNavigationListeners(
     sidebarEmployeePlanningButton.addEventListener(
         "click",
         () => void navigate(sidebarEmployeePlanningButton, () => renderEmployeePlanningPage(
-            pageContent, store, employeeAccessRepository, timeOffRequestRepository,
+            pageContent, store, employeeAccessRepository, timeOffRequestRepository, sickReportRepository,
         )),
     );
 

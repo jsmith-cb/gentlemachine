@@ -5,6 +5,7 @@ export interface EmployeeScheduleActions {
     requestMagicLink(email: string): Promise<void>;
     loadMonth(year: number, month: number): Promise<void>;
     submitTimeOff(startDate: string, endDate: string, note?: string): Promise<void>;
+    reportSick(startDate:string,endDate:string,note?:string):Promise<void>;
     signOut(): Promise<void>;
 }
 
@@ -40,6 +41,7 @@ export function renderEmployeeSchedulePage(
         void actions.submitTimeOff(String(data.get("startDate") ?? ""),
             String(data.get("endDate") ?? ""), String(data.get("note") ?? ""));
     });
+    root.querySelector<HTMLFormElement>("#sick-report-form")?.addEventListener("submit",event=>{event.preventDefault();const data=new FormData(event.currentTarget as HTMLFormElement);void actions.reportSick(String(data.get("startDate")??""),String(data.get("endDate")??""),String(data.get("note")??""));});
 }
 
 function content(state: EmployeePortalState): string {
@@ -146,6 +148,16 @@ function scheduleContent(state: Extract<EmployeePortalState, { status: "authenti
                         ${request.managerNote ? `<p><strong>Manager note:</strong> ${escapeHtml(request.managerNote)}</p>` : ""}
                         </article>`).join("") : "<p>No time-off requests yet.</p>"}
                 </div>
+            </section>
+            <section class="employee-time-off" aria-labelledby="sick-heading">
+                <div><p class="section-label">Absence</p><h2 id="sick-heading">Report Sick</h2></div>
+                <form id="sick-report-form" class="employee-time-off-form">
+                    <label>Start date<input type="date" name="startDate" required></label>
+                    <label>End date<input type="date" name="endDate" required></label>
+                    <label class="employee-time-off-note">Note (optional)<textarea name="note" maxlength="500" rows="2"></textarea></label>
+                    <button type="submit">Report sick</button>
+                </form>
+                <div class="employee-time-off-list">${state.sickReports.length?state.sickReports.map(report=>`<article><div><strong>${formatDate(report.startDate)}${report.startDate===report.endDate?"":` – ${formatDate(report.endDate)}`}</strong><span class="time-off-status">${report.status==="reported"?"Reported":"Acknowledged"}</span></div>${report.employeeNote?`<p>${escapeHtml(report.employeeNote)}</p>`:""}</article>`).join(""):"<p>No sickness reports.</p>"}</div>
             </section>
         </section>
     `;

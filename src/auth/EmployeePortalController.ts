@@ -7,6 +7,7 @@ import type {
     EmployeeScheduleRepository,
 } from "../repositories/EmployeeScheduleRepository";
 import type { EmployeeTimeOffRequest, EmployeeTimeOffRequestRepository } from "../repositories/TimeOffRequestRepository";
+import type { EmployeeSickReportRepository, SickReport } from "../repositories/SickReportRepository";
 
 export type EmployeePortalState =
     | { readonly status: "loading"; readonly message: string }
@@ -19,6 +20,7 @@ export type EmployeePortalState =
         readonly user: AuthenticatedUser;
         readonly schedule: EmployeeScheduleDocument;
         readonly requests: readonly EmployeeTimeOffRequest[];
+        readonly sickReports: readonly SickReport[];
         readonly requestMessage?: string;
       };
 
@@ -34,6 +36,7 @@ export class EmployeePortalController {
         private readonly session: AuthenticationSessionGateway,
         private readonly schedules: EmployeeScheduleRepository,
         private readonly timeOffRequests: EmployeeTimeOffRequestRepository,
+        private readonly sickReports: EmployeeSickReportRepository,
         private readonly redirectUrl: string,
     ) {}
 
@@ -75,10 +78,10 @@ export class EmployeePortalController {
         const revision = ++this.revision;
         this.emit({ status: "loading", message: "Loading your schedule…" });
         try {
-            const [schedule, requests] = await Promise.all([
-                this.schedules.getMySchedule(year, month), this.timeOffRequests.listMine(),
+            const [schedule, requests, sickReports] = await Promise.all([
+                this.schedules.getMySchedule(year, month), this.timeOffRequests.listMine(), this.sickReports.listMine(),
             ]);
-            if (revision === this.revision) this.emit({ status: "authenticated", user, schedule, requests });
+            if (revision === this.revision) this.emit({ status: "authenticated", user, schedule, requests, sickReports });
         } catch (error) {
             if (revision !== this.revision) return;
             if (isAccessUnavailable(error)) {
@@ -103,6 +106,11 @@ export class EmployeePortalController {
             this.emit({ ...current, requestMessage: error instanceof Error ? error.message : "The request could not be submitted." });
         }
     }
+    async reportSick(startDate:string,endDate:string,note?:string):Promise<void>{
+        if(this.state.status!=="authenticated")return;const current=this.state;
+        try{await this.sickReports.report(startDate,endDate,note);const sickReports=await this.sickReports.listMine();this.emit({...current,sickReports,requestMessage:"Sickness reported."});}
+        catch(error){this.emit({...current,requestMessage:error instanceof Error?error.message:"Sickness could not be reported."});}
+    }
 
     async signOut(): Promise<void> {
         this.revision += 1;
@@ -121,11 +129,12 @@ export class EmployeePortalController {
         this.emit({ status: "loading", message: "Opening your schedule…" });
         const now = new Date();
         try {
-            const [schedule, requests] = await Promise.all([
+            const [schedule, requests, sickReports] = await Promise.all([
                 this.schedules.getMySchedule(now.getFullYear(), now.getMonth() + 1),
                 this.timeOffRequests.listMine(),
+                this.sickReports.listMine(),
             ]);
-            if (revision === this.revision) this.emit({ status: "authenticated", user, schedule, requests });
+            if (revision === this.revision) this.emit({ status: "authenticated", user, schedule, requests, sickReports });
         } catch (error) {
             if (revision !== this.revision) return;
             if (isAccessUnavailable(error)) {

@@ -3,6 +3,7 @@ import type {
     Shift,
     SoftRuleSettings,
     StoreHours,
+    SicknessPeriod,
     VacationPeriod,
 } from "../types/planning";
 
@@ -21,6 +22,7 @@ export interface CrewWorkspaceData {
     readonly employees: readonly Employee[];
     readonly shifts: readonly Shift[];
     readonly vacations: readonly VacationPeriod[];
+    readonly sicknesses: readonly SicknessPeriod[];
     readonly settings: CrewBusinessSettings;
 }
 

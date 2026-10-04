@@ -17,6 +17,7 @@ import {
 import { employeeFullName } from "./employeeIdentity";
 import { legalAvailabilityHours } from "./availabilityService";
 import { overlapsVacation } from "./vacationService";
+import { overlapsSickness } from "./sicknessService";
 import { activeEmployees } from "./teamService";
 import {
     exceedsEmployeeDailyPaidMaximum,
@@ -284,6 +285,11 @@ function validateEmployeeAvailability(
             employeeId: employee.id,
             date: shift.date,
         });
+    }
+    if (overlapsSickness(state.sicknesses, employee.id, shift.date, shift.date)) {
+        issues.push({ severity: "error", category: "availability",
+            message: `${employeeFullName(employee)} is reported sick on this day.`,
+            employeeId: employee.id, date: shift.date });
     }
 
     const dayOfWeek =

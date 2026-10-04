@@ -38,6 +38,7 @@ function createLoadClient(settings: unknown = {
         employees: [],
         shifts: [],
         vacations: [],
+        sick_reports: [],
         business_settings: settings,
     };
     const client = {
@@ -58,7 +59,7 @@ describe("SupabaseCrewRepository", () => {
         await expect(repository.loadWorkspace()).resolves.toMatchObject({
             workspace: { id: BUSINESS_ID, name: "Test Crew" },
         });
-        expect([...queries.values()]).toHaveLength(5);
+        expect([...queries.values()]).toHaveLength(6);
         for (const query of queries.values()) {
             expect(query.equalityFilters).toContainEqual([
                 query === queries.get("businesses") ? "id" : "business_id",

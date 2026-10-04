@@ -9,6 +9,7 @@ import type {
 } from "../repositories/EmployeeScheduleRepository";
 import { EmployeePortalController, type EmployeePortalState } from "./EmployeePortalController";
 import type { EmployeeTimeOffRequest, EmployeeTimeOffRequestRepository } from "../repositories/TimeOffRequestRepository";
+import type { EmployeeSickReportRepository } from "../repositories/SickReportRepository";
 
 const USER: AuthenticatedUser = { id: "auth-employee", email: "employee@example.invalid" };
 const SCHEDULE: EmployeeScheduleDocument = {
@@ -54,6 +55,7 @@ class FakeRequests implements EmployeeTimeOffRequestRepository {
             ...(note ? { employeeNote: note } : {}), createdAt: "2026-10-04T10:00:00Z" }];
     }
 }
+class FakeSickReports implements EmployeeSickReportRepository { async listMine(){return [];} async report(){return undefined;} }
 
 function observe(controller: EmployeePortalController): EmployeePortalState[] {
     const states: EmployeePortalState[] = [];
@@ -66,7 +68,7 @@ describe("EmployeePortalController", () => {
         const session = new FakeSession();
         session.user = USER;
         const schedules = new FakeSchedules();
-        const controller = new EmployeePortalController(session, schedules, new FakeRequests(), "http://localhost/my-schedule");
+        const controller = new EmployeePortalController(session, schedules, new FakeRequests(), new FakeSickReports(), "http://localhost/my-schedule");
         const states = observe(controller);
 
         await controller.initialize();
@@ -84,7 +86,7 @@ describe("EmployeePortalController", () => {
         session.user = USER;
         const schedules = new FakeSchedules();
         schedules.failure = new Error("Employee schedule access is unavailable.");
-        const controller = new EmployeePortalController(session, schedules, new FakeRequests(), "http://localhost/my-schedule");
+        const controller = new EmployeePortalController(session, schedules, new FakeRequests(), new FakeSickReports(), "http://localhost/my-schedule");
         const states = observe(controller);
 
         await controller.initialize();
@@ -97,7 +99,7 @@ describe("EmployeePortalController", () => {
         session.user = USER;
         const schedules = new FakeSchedules();
         schedules.failure = new Error("The schedule service could not be reached.");
-        const controller = new EmployeePortalController(session, schedules, new FakeRequests(), "http://localhost/my-schedule");
+        const controller = new EmployeePortalController(session, schedules, new FakeRequests(), new FakeSickReports(), "http://localhost/my-schedule");
         const states = observe(controller);
 
         await controller.initialize();
@@ -111,7 +113,7 @@ describe("EmployeePortalController", () => {
     it("uses passwordless sign-in with the employee portal callback", async () => {
         const session = new FakeSession();
         const controller = new EmployeePortalController(
-            session, new FakeSchedules(), new FakeRequests(), "http://localhost/my-schedule",
+            session, new FakeSchedules(), new FakeRequests(), new FakeSickReports(), "http://localhost/my-schedule",
         );
         const states = observe(controller);
 
@@ -128,7 +130,7 @@ describe("EmployeePortalController", () => {
         const session = new FakeSession();
         session.user = USER;
         const schedules = new FakeSchedules();
-        const controller = new EmployeePortalController(session, schedules, new FakeRequests(), "http://localhost/my-schedule");
+        const controller = new EmployeePortalController(session, schedules, new FakeRequests(), new FakeSickReports(), "http://localhost/my-schedule");
         const states = observe(controller);
         await controller.initialize();
 
@@ -142,7 +144,7 @@ describe("EmployeePortalController", () => {
         const session = new FakeSession();
         session.user = USER;
         const schedules = new FakeSchedules();
-        const controller = new EmployeePortalController(session, schedules, new FakeRequests(), "http://localhost/my-schedule");
+        const controller = new EmployeePortalController(session, schedules, new FakeRequests(), new FakeSickReports(), "http://localhost/my-schedule");
         const states = observe(controller);
         await controller.initialize();
         schedules.failure = new Error("Employee schedule access is unavailable.");
@@ -157,7 +159,7 @@ describe("EmployeePortalController", () => {
         session.user = USER;
         const requests = new FakeRequests();
         const controller = new EmployeePortalController(
-            session, new FakeSchedules(), requests, "http://localhost/my-schedule",
+            session, new FakeSchedules(), requests, new FakeSickReports(), "http://localhost/my-schedule",
         );
         const states = observe(controller);
         await controller.initialize();

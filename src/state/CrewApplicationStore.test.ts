@@ -14,6 +14,7 @@ const WORKSPACE: CrewWorkspaceData = {
     employees: [],
     shifts: [],
     vacations: [],
+    sicknesses: [],
     settings: {
         storeHours: DEFAULT_STORE_HOURS,
         softRules: DEFAULT_SOFT_RULE_SETTINGS,
@@ -192,6 +193,17 @@ describe("CrewApplicationStore", () => {
         await store.refreshVacations();
 
         expect(store.getReadyData().vacations).toEqual([vacation]);
+    });
+
+    it("reconciles canonical sickness without changing vacation state", async () => {
+        const repository = new FakeRepository();
+        const store = new CrewApplicationStore(repository);
+        await store.load();
+        const sickness = { id: "sick-1", employeeId: "employee-1", startDate: "2026-10-05", endDate: "2026-10-05" };
+        repository.workspace = { ...repository.workspace, sicknesses: [sickness] };
+        await store.refreshSicknesses();
+        expect(store.getReadyData().sicknesses).toEqual([sickness]);
+        expect(store.getReadyData().vacations).toEqual([]);
     });
 
     it("ignores a late load after the authenticated workspace is invalidated", async () => {

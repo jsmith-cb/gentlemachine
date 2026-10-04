@@ -29,6 +29,7 @@ import { SupabaseEmployeeScheduleRepository } from "./infrastructure/SupabaseEmp
 import { EmployeePortalController } from "./auth/EmployeePortalController";
 import { renderEmployeeSchedulePage } from "./pages/EmployeeSchedulePage";
 import { SupabaseEmployeeTimeOffRequestRepository, SupabaseManagerTimeOffRequestRepository } from "./infrastructure/SupabaseTimeOffRequestRepository";
+import { SupabaseEmployeeSickReportRepository, SupabaseManagerSickReportRepository } from "./infrastructure/SupabaseSickReportRepository";
 
 initializeTheme();
 
@@ -107,6 +108,7 @@ function startManagerApplication(applicationRoot: HTMLElement): void {
                                 client,
                                 state.manager.businessId,
                             ),
+                            sickReportRepository: new SupabaseManagerSickReportRepository(client,state.manager.businessId),
                         });
                     }
                 });
@@ -171,6 +173,7 @@ function startEmployeePortal(applicationRoot: HTMLElement): void {
             new SupabaseManagerAuthGateway(client),
             new SupabaseEmployeeScheduleRepository(client),
             new SupabaseEmployeeTimeOffRequestRepository(client),
+            new SupabaseEmployeeSickReportRepository(client),
             employeePortalUrl(),
         );
         controller.subscribe((state) => {
@@ -178,6 +181,7 @@ function startEmployeePortal(applicationRoot: HTMLElement): void {
                 requestMagicLink: (email) => controller.requestMagicLink(email),
                 loadMonth: (year, month) => controller.loadMonth(year, month),
                 submitTimeOff: (startDate, endDate, note) => controller.submitTimeOff(startDate, endDate, note),
+                reportSick: (startDate,endDate,note)=>controller.reportSick(startDate,endDate,note),
                 signOut: () => controller.signOut(),
             });
         });
@@ -190,6 +194,7 @@ function startEmployeePortal(applicationRoot: HTMLElement): void {
             requestMagicLink: async () => undefined,
             loadMonth: async () => undefined,
             submitTimeOff: async () => undefined,
+            reportSick: async()=>undefined,
             signOut: async () => undefined,
         });
     }

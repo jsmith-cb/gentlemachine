@@ -22,7 +22,7 @@ export class SupabaseCrewRepository implements CrewRepository {
 
     async loadWorkspace(): Promise<CrewWorkspaceData> {
         try {
-            const [business, employees, shifts, vacations, settings] = await Promise.all([
+            const [business, employees, shifts, vacations, sicknesses, settings] = await Promise.all([
                 this.client.from("businesses")
                     .select("id, name")
                     .eq("id", this.businessId)
@@ -42,6 +42,9 @@ export class SupabaseCrewRepository implements CrewRepository {
                     .eq("business_id", this.businessId)
                     .order("start_date")
                     .order("id"),
+                this.client.from("sick_reports")
+                    .select("id, business_id, employee_id, start_date, end_date")
+                    .eq("business_id", this.businessId).order("start_date").order("id"),
                 this.client.from("business_settings")
                     .select("business_id, store_hours, soft_rules")
                     .eq("business_id", this.businessId)
@@ -52,6 +55,7 @@ export class SupabaseCrewRepository implements CrewRepository {
             assertQuerySucceeded(employees.error, "load employees");
             assertQuerySucceeded(shifts.error, "load shifts");
             assertQuerySucceeded(vacations.error, "load vacations");
+            assertQuerySucceeded(sicknesses.error, "load sickness");
             assertQuerySucceeded(settings.error, "load business settings");
             if (!business.data) throw new CrewRepositoryError("The authorized business workspace could not be loaded.");
             if (!settings.data) {
@@ -63,6 +67,7 @@ export class SupabaseCrewRepository implements CrewRepository {
                 employees: employees.data,
                 shifts: shifts.data,
                 vacations: vacations.data,
+                sicknesses: sicknesses.data,
                 settings: settings.data,
             });
         } catch (error) {

@@ -68,6 +68,18 @@ describe("vacation shift validation", () => {
     });
 });
 
+describe("sickness shift validation", () => {
+    it("keeps an existing shift and reports a hard sickness conflict", () => {
+        const state = createInitialPlannerState();
+        const employee = state.employees[0];
+        state.shifts = [{ id: "sick-shift", employeeId: employee.id, date: "2026-10-05", start: "10:00", end: "14:00" }];
+        state.sicknesses = [{ id: "sick-1", employeeId: employee.id, startDate: "2026-10-05", endDate: "2026-10-05" }];
+        const issues = validatePlannerState(state);
+        expect(state.shifts).toHaveLength(1);
+        expect(issues.some((issue) => issue.severity === "error" && issue.message.includes("reported sick"))).toBe(true);
+    });
+});
+
 describe("standard shift duration validation", () => {
     it("allows an eight-hour shift", () => {
         const state = createInitialPlannerState();

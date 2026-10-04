@@ -35,6 +35,7 @@ import type {
     Shift,
     StoreHours,
     SoftRuleSettings,
+    SicknessPeriod,
     VacationPeriod,
 } from "../types/planning";
 
@@ -467,6 +468,7 @@ function coverageGaps(
         employees,
         shifts,
         vacations,
+        sicknesses: [],
     };
     return getCoverageGapsForDate(state, date);
 }
@@ -654,13 +656,15 @@ export function generateShifts(
     month: number,
     existingShifts: readonly Shift[],
     softRules: SoftRuleSettings = DEFAULT_SOFT_RULE_SETTINGS,
+    sicknesses: readonly SicknessPeriod[] = [],
 ): GenerationResult {
     resetShiftIdCounter();
 
     const active = activeEmployees(employees);
+    const blockedPeriods = [...vacations, ...sicknesses];
     const generated: Shift[] = [];
     const protectedDates = protectedWeekendDates(
-        active, vacations, storeHours, year, month, softRules,
+        active, blockedPeriods, storeHours, year, month, softRules,
     );
     const monthlyTargets = new Map(active.map((employee) => [
         employee.id,
@@ -687,11 +691,11 @@ export function generateShifts(
 
             while (true) {
                 const allShifts = [...existingShifts, ...generated];
-                const gaps = coverageGaps(active, vacations, storeHours, allShifts, date, year, month);
+                const gaps = coverageGaps(active, blockedPeriods, storeHours, allShifts, date, year, month);
                 if (gaps.length === 0) break;
                 if (extendShiftForSmallCoverageGap(
                     active,
-                    vacations,
+                    blockedPeriods,
                     storeHours,
                     generated,
                     existingShifts,
@@ -706,7 +710,7 @@ export function generateShifts(
 
                 const candidates = active.flatMap((employee): ShiftCandidate[] => {
                     if (!employee.availability.days.includes(dayOfWeek) ||
-                        overlapsVacation(vacations, employee.id, date, date) ||
+                        overlapsVacation(blockedPeriods, employee.id, date, date) ||
                         allShifts.some((shift) => shift.employeeId === employee.id && shift.date === date)) {
                         return [];
                     }
@@ -729,7 +733,7 @@ export function generateShifts(
                         remainingEmployeePaidMinutesForDate(employee, allShifts, date),
                     );
                     const remainingDates = usableDatesRemaining(
-                        employee, vacations, dates, date, daysWorked,
+                        employee, blockedPeriods, dates, date, daysWorked,
                     );
                     const candidate = bestShiftForEmployee(
                         employee,
@@ -758,7 +762,7 @@ export function generateShifts(
 
         fulfillWeeklyTargets(
             active,
-            vacations,
+            blockedPeriods,
             storeHours,
             generated,
             existingShifts,

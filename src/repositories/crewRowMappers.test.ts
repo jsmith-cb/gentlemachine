@@ -38,6 +38,7 @@ function canonicalRows() {
             start_date: "2026-10-12",
             end_date: "2026-10-16",
         }],
+        sicknesses: [],
         settings: {
             business_id: BUSINESS_ID,
             store_hours: DEFAULT_STORE_HOURS,

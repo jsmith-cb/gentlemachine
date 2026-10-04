@@ -8,6 +8,7 @@ import type {
     Shift,
     StoreHours,
     SoftRuleSettings,
+    SicknessPeriod,
     VacationPeriod,
 } from "../types/planning";
 
@@ -120,6 +121,7 @@ export function createInitialPlannerState(
     providedVacations?: VacationPeriod[],
     providedStoreHours: StoreHours = DEFAULT_STORE_HOURS,
     providedSoftRules: SoftRuleSettings = DEFAULT_SOFT_RULE_SETTINGS,
+    providedSicknesses: SicknessPeriod[] = [],
 ): PlannerState {
     const now = new Date();
 
@@ -131,5 +133,6 @@ export function createInitialPlannerState(
         employees: providedEmployees ?? EMPLOYEES,
         shifts: providedShifts ?? [],
         vacations: providedVacations ?? [],
+        sicknesses: providedSicknesses,
     };
 }

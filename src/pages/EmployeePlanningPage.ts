@@ -25,6 +25,7 @@ import type {
     EmployeeAccessRepository,
 } from "../repositories/EmployeeAccessRepository";
 import type { ManagerTimeOffRequest, ManagerTimeOffRequestRepository } from "../repositories/TimeOffRequestRepository";
+import type { ManagerSickReportRepository, SickReport } from "../repositories/SickReportRepository";
 
 let state: PlannerState;
 let selectedEmployeeId: string | null = null;
@@ -58,12 +59,14 @@ export function renderEmployeePlanningPage(
     applicationStore: CrewApplicationStore,
     employeeAccessRepository: EmployeeAccessRepository,
     timeOffRequestRepository: ManagerTimeOffRequestRepository,
+    sickReportRepository: ManagerSickReportRepository,
 ): PageChangeGuard {
     const canonical = applicationStore.getReadyData();
 
     state = createInitialPlannerState(
         [...canonical.shifts], [...canonical.employees], [...canonical.vacations],
         canonical.settings.storeHours, canonical.settings.softRules,
+        [...canonical.sicknesses],
     );
 
     newEmployeeDraft = null;
@@ -73,6 +76,7 @@ export function renderEmployeePlanningPage(
     let accessLoadError: string | null = null;
     let timeOffRequests: readonly ManagerTimeOffRequest[] = [];
     let requestLoadError: string | null = null;
+    let sickReports: readonly SickReport[]=[];
 
     const hasUnsavedChanges = (): boolean =>
         newEmployeeDraft !== null ||
@@ -155,6 +159,7 @@ export function renderEmployeePlanningPage(
             .filter((period) => period.employeeId === selectedEmployee.id)
             .sort((a, b) => a.startDate.localeCompare(b.startDate));
         const employeeRequests = timeOffRequests.filter((request) => request.employeeId === selectedEmployee.id);
+        const employeeSickness=sickReports.filter(report=>report.employeeId===selectedEmployee.id);
 
         container.innerHTML = `
             <section class="planner">
@@ -400,6 +405,7 @@ export function renderEmployeePlanningPage(
                                     </article>`).join("") : '<p class="vacation-empty">No employee requests.</p>'}
                             <p id="time-off-review-status" class="vacation-status" role="status"></p>
                         </div>
+                        <div class="time-off-review"><h4>Sickness</h4>${employeeSickness.length?employeeSickness.map(report=>`<article class="time-off-review-card"><div><strong>${escapeHtml(formatVacationPeriod(report.startDate,report.endDate))}</strong><span class="time-off-status">${report.status}</span></div>${report.employeeNote?`<p>${escapeHtml(report.employeeNote)}</p>`:""}${report.status==="reported"?`<button type="button" class="primary-button" data-ack-sick="${report.id}">Acknowledge</button>`:""}</article>`).join(""):"<p class=\"vacation-empty\">No sickness reports.</p>"}</div>
                     `}
                 </section>
 
@@ -586,6 +592,7 @@ export function renderEmployeePlanningPage(
                 }
             });
         });
+        container.querySelectorAll<HTMLButtonElement>("[data-ack-sick]").forEach(button=>button.addEventListener("click",async()=>{const id=button.dataset.ackSick;if(!id)return;button.disabled=true;try{await sickReportRepository.acknowledge(id);sickReports=await sickReportRepository.list();await applicationStore.refreshSicknesses();state.sicknesses=[...applicationStore.getReadyData().sicknesses];render();}catch(error){button.disabled=false;const status=container.querySelector("#vacation-status");if(status)status.textContent=persistenceMessage(error,"Sickness could not be acknowledged.");}}));
 
         const form = container.querySelector<HTMLFormElement>("#employee-form");
         form?.querySelector<HTMLButtonElement>("#apply-default-hours")?.addEventListener("click", () => {
@@ -744,6 +751,11 @@ export function renderEmployeePlanningPage(
         }),
         timeOffRequestRepository.list().then((requests) => { timeOffRequests = requests; })
             .catch((error) => { requestLoadError = persistenceMessage(error, "Time-off requests could not be loaded."); }),
+        sickReportRepository.list().then(async reports=>{
+            sickReports=reports;
+            await applicationStore.refreshSicknesses();
+            state.sicknesses=[...applicationStore.getReadyData().sicknesses];
+        }),
     ]).finally(render);
 
     return {
