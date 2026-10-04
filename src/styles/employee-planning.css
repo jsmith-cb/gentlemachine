@@ -411,6 +411,11 @@
     padding-top: 16px;
     border-top: 1px solid var(--color-border-subtle);
 }
+
+.time-off-review { margin-top: 1.5rem; padding-top: 1.25rem; border-top: 1px solid var(--border-color); }
+.time-off-review-card { display: grid; gap: .6rem; margin-top: .75rem; padding: .9rem; border: 1px solid var(--border-color); border-radius: 12px; }
+.time-off-review-card > div:first-child { display: flex; justify-content: space-between; gap: 1rem; }
+.time-off-review-actions { display: flex; gap: .6rem; }
 .employee-selector {
     display: grid;
     gap: 8px;
@@ -589,6 +594,7 @@
 }
 
 .day-checkbox {
+    position: relative;
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -608,10 +614,12 @@
 .day-checkbox input[type="checkbox"] {
     appearance: none;
     position: absolute;
-    width: 1px;
-    height: 1px;
-    overflow: hidden;
-    clip: rect(0, 0, 0, 0);
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    opacity: 0;
+    cursor: pointer;
 }
 
 .day-checkbox:has(input:checked) {
@@ -796,4 +804,32 @@
     color: var(--color-success);
     font-size: 0.8rem;
     font-weight: 650;
+}
+
+.employee-portal-access {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    margin-top: 18px;
+    padding: 14px;
+    border: 1px solid var(--color-border-subtle);
+    border-radius: 12px;
+    background: var(--color-surface-subtle);
+}
+
+.employee-portal-access > div {
+    display: grid;
+    gap: 4px;
+}
+
+.employee-portal-access span,
+.employee-portal-status {
+    color: var(--color-text-secondary);
+    font-size: .82rem;
+}
+
+.employee-portal-status {
+    min-height: 1.3em;
+    margin: 8px 0 0;
 }

@@ -33,6 +33,7 @@ pnpm-debug.log*
 # Local archives
 *.zip
 
+<<<<<<< HEAD
 # Generated review artifacts
 .review-package/
 pricepocket-review*.zip
@@ -68,9 +69,14 @@ pnpm-debug.log*
 # Local archives
 *.zip
 
+=======
+>>>>>>> feat/export_schedule
 temp_styles/
 
 # Supabase local runtime state
 supabase/.branches/
 supabase/.temp/
+<<<<<<< HEAD
 temp_styles/
+=======
+>>>>>>> feat/export_schedule

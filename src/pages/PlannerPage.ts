@@ -7,8 +7,6 @@ import {
     validatePlannerState,
 } from "../services/validationService";
 
-import { getStoredShifts, setStoredShifts, getStoredEmployees, getStoredVacations, getStoredStoreHours, getStoredSoftRuleSettings } from "../services/storageService";
-
 import {
     createInitialPlannerState,
 } from "../state/plannerState";
@@ -39,6 +37,7 @@ import {
 import {
     renderPlannerWeeklyOverview,
 } from "./PlannerWeeklyOverview";
+import type { CrewApplicationStore } from "../state/CrewApplicationStore";
 
 const MONTH_NAMES = [
     "January",
@@ -90,6 +89,7 @@ export function generateDraftForEmptyPlanningPeriod(state: PlannerState): {
         state.selectedMonth,
         state.shifts,
         state.softRules,
+        state.sicknesses,
     );
 
     if (shifts.length === 0) {
@@ -104,13 +104,14 @@ export function generateDraftForEmptyPlanningPeriod(state: PlannerState): {
 
 export function renderPlannerPage(
     container: HTMLElement,
+    applicationStore: CrewApplicationStore,
 ): void {
-    const storedShifts = getStoredShifts();
-    const storedEmployees = getStoredEmployees();
+    const canonical = applicationStore.getReadyData();
 
     let state = createInitialPlannerState(
-        storedShifts, storedEmployees, getStoredVacations(), getStoredStoreHours(),
-        getStoredSoftRuleSettings(),
+        [...canonical.shifts], [...canonical.employees], [...canonical.vacations],
+        canonical.settings.storeHours, canonical.settings.softRules,
+        [...canonical.sicknesses],
     );
 
     let editorMode:
@@ -286,7 +287,7 @@ export function renderPlannerPage(
 
         panel.querySelector<HTMLButtonElement>(
             '[data-action="generate-draft-schedule"]',
-        )?.addEventListener("click", () => {
+        )?.addEventListener("click", async () => {
             // The rendered empty-period state is not authoritative. Guard the
             // current state again before asking the integration to generate.
             if (planningPeriodHasShifts(state)) {
@@ -308,10 +309,17 @@ export function renderPlannerPage(
             }
 
             if (result.outcome === "generated") {
-                state = result.state;
-                setStoredShifts(state.shifts);
-                generationFeedback = null;
                 assistantOpen = true;
+                try {
+                    await applicationStore.replaceShifts(result.state.shifts);
+                    state = result.state;
+                    generationFeedback = null;
+                } catch (error) {
+                    generationFeedback = {
+                        period,
+                        message: persistenceMessage(error, "The generated schedule could not be saved."),
+                    };
+                }
                 render();
             }
         });
@@ -542,9 +550,10 @@ export function renderPlannerPage(
         if (!dialog || !date) return;
         attachDayPlanningModal(dialog, state, date,
             mode.type === "edit" ? mode.shiftId : null,
-            (upserts, deletions) => {
-                state = { ...state, shifts: applyDayPlanningChanges(state.shifts, upserts, deletions) };
-                setStoredShifts(state.shifts);
+            async (upserts, deletions) => {
+                const shifts = applyDayPlanningChanges(state.shifts, upserts, deletions);
+                await applicationStore.replaceShifts(shifts);
+                state = { ...state, shifts };
                 editorMode = { type: "add", date };
                 render();
             },
@@ -638,6 +647,10 @@ export function renderPlannerPage(
     }
 
     render();
+}
+
+function persistenceMessage(error: unknown, fallback: string): string {
+    return error instanceof Error ? error.message : fallback;
 }
 
 function renderActiveTab(

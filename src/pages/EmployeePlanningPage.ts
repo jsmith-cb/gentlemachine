@@ -13,14 +13,19 @@ import { hasValidAvailabilityHours } from "../services/availabilityService";
 import { isValidVacationPeriod, overlapsVacation } from "../services/vacationService";
 import { isValidMaximumPaidMinutesPerDayOverride } from "../services/shiftRules";
 
-import { getStoredShifts, getStoredEmployees, getStoredVacations, getStoredStoreHours, setStoredEmployees, setStoredVacations } from "../services/storageService";
-
 import type { Employee, PlannerState } from "../types/planning";
 import {
     confirmDiscardUnsavedChanges,
     formValueSignature,
 } from "../components/UnsavedChanges";
 import type { PageChangeGuard } from "../components/UnsavedChanges";
+import type { CrewApplicationStore } from "../state/CrewApplicationStore";
+import type {
+    EmployeeAccessRecord,
+    EmployeeAccessRepository,
+} from "../repositories/EmployeeAccessRepository";
+import type { ManagerTimeOffRequest, ManagerTimeOffRequestRepository } from "../repositories/TimeOffRequestRepository";
+import type { ManagerSickReportRepository, SickReport } from "../repositories/SickReportRepository";
 
 let state: PlannerState;
 let selectedEmployeeId: string | null = null;
@@ -51,18 +56,27 @@ function formatVacationPeriod(startDate: string, endDate: string): string {
 
 export function renderEmployeePlanningPage(
     container: HTMLElement,
+    applicationStore: CrewApplicationStore,
+    employeeAccessRepository: EmployeeAccessRepository,
+    timeOffRequestRepository: ManagerTimeOffRequestRepository,
+    sickReportRepository: ManagerSickReportRepository,
 ): PageChangeGuard {
-    const storedShifts = getStoredShifts();
-    const storedEmployees = getStoredEmployees();
-    const storedVacations = getStoredVacations();
+    const canonical = applicationStore.getReadyData();
 
     state = createInitialPlannerState(
-        storedShifts, storedEmployees, storedVacations, getStoredStoreHours(),
+        [...canonical.shifts], [...canonical.employees], [...canonical.vacations],
+        canonical.settings.storeHours, canonical.settings.softRules,
+        [...canonical.sicknesses],
     );
 
     newEmployeeDraft = null;
     selectedEmployeeId = employeeSelectOptions(activeEmployees(state.employees))[0]?.employee.id ?? null;
     let employeeBaseline = "";
+    let employeeAccess = new Map<string, EmployeeAccessRecord>();
+    let accessLoadError: string | null = null;
+    let timeOffRequests: readonly ManagerTimeOffRequest[] = [];
+    let requestLoadError: string | null = null;
+    let sickReports: readonly SickReport[]=[];
 
     const hasUnsavedChanges = (): boolean =>
         newEmployeeDraft !== null ||
@@ -107,6 +121,8 @@ export function renderEmployeePlanningPage(
         }
 
         const isNew = newEmployeeDraft !== null;
+        const access = employeeAccess.get(selectedEmployee.id);
+        const portalEnabled = access?.accessEnabled === true;
 
         const summary = monthSummaries.find(
             ({ employeeId }) => employeeId === selectedEmployee.id,
@@ -132,6 +148,9 @@ export function renderEmployeePlanningPage(
             { value: 0, label: "Sun" },
         ];
         const availability = selectedEmployee.availability;
+        const hasDayHours = Object.values(availability.dayHours ?? {}).some(
+            (hours) => Boolean(hours?.earliestStart || hours?.latestEnd),
+        );
         const targetHours = (selectedEmployee.weeklyTargetMinutes / 60).toFixed(1);
         const maximumHoursPerDay = selectedEmployee.maximumPaidMinutesPerDay === undefined
             ? ""
@@ -139,6 +158,8 @@ export function renderEmployeePlanningPage(
         const employeeVacations = state.vacations
             .filter((period) => period.employeeId === selectedEmployee.id)
             .sort((a, b) => a.startDate.localeCompare(b.startDate));
+        const employeeRequests = timeOffRequests.filter((request) => request.employeeId === selectedEmployee.id);
+        const employeeSickness=sickReports.filter(report=>report.employeeId===selectedEmployee.id);
 
         container.innerHTML = `
             <section class="planner">
@@ -230,13 +251,26 @@ export function renderEmployeePlanningPage(
                     <div class="employee-identity-fields">
                         <div class="form-group">
                             <label for="emp-email">Email</label>
-                            <input type="email" id="emp-email" name="email" value="${escapeHtml(selectedEmployee.email ?? "")}" autocomplete="email" />
+                            <input type="email" id="emp-email" name="email" value="${escapeHtml(selectedEmployee.email ?? "")}" autocomplete="email" ${portalEnabled ? "readonly" : ""} />
+                            ${portalEnabled ? '<small>Disable employee portal access before changing this email.</small>' : ""}
                         </div>
                         <div class="form-group">
                             <label for="emp-telephone">Telephone number</label>
                             <input type="tel" id="emp-telephone" name="telephoneNumber" value="${escapeHtml(selectedEmployee.telephoneNumber ?? "")}" autocomplete="tel" />
                         </div>
                     </div>
+                    ${isNew ? "" : `
+                        <div class="employee-portal-access">
+                            <div>
+                                <strong>Employee portal</strong>
+                                <span>${portalStatus(selectedEmployee, access, accessLoadError)}</span>
+                            </div>
+                            ${selectedEmployee.status === "active" && selectedEmployee.email?.trim() && !accessLoadError
+                                ? `<button type="button" class="secondary-button" id="${portalEnabled ? "disable-employee-access" : "enable-employee-access"}">${portalEnabled ? "Disable access" : "Enable access"}</button>`
+                                : ""}
+                        </div>
+                        <p class="employee-portal-status" id="employee-portal-status" role="status"></p>
+                    `}
                     ${isNew ? "" : `<div class="employee-details-actions"><button type="button" class="secondary-button employee-inactivate-button" id="inactivate-employee">Make inactive</button></div>`}
                     </section>
 
@@ -303,8 +337,8 @@ export function renderEmployeePlanningPage(
                             Apply default hours to all available days
                         </button>
                         <p class="apply-hours-status" id="apply-hours-status" role="status"></p>
-                        <div class="day-hours-section">
-                            <h4>Day-specific hours</h4>
+                        <details class="day-hours-details" ${hasDayHours ? "open" : ""}>
+                            <summary>Day-specific hours</summary>
                             <div class="day-hours-header" aria-hidden="true">
                                 <span>Day</span><span>Earliest</span><span></span><span>Latest</span>
                             </div>
@@ -326,7 +360,7 @@ export function renderEmployeePlanningPage(
                                 `;
                             }).join("")}
                             </div>
-                        </div>
+                        </details>
                     </div>
                     </section>
                 </form>
@@ -355,6 +389,23 @@ export function renderEmployeePlanningPage(
                                 </ul>
                             </div>
                         ` : '<p class="vacation-empty">No vacation days planned.</p>'}
+                        <div class="time-off-review">
+                            <h4>Employee requests</h4>
+                            ${requestLoadError ? `<p class="vacation-status">${escapeHtml(requestLoadError)}</p>` :
+                                employeeRequests.length ? employeeRequests.map((request) => `
+                                    <article class="time-off-review-card">
+                                        <div><strong>${escapeHtml(formatVacationPeriod(request.startDate, request.endDate))}</strong>
+                                        <span class="time-off-status time-off-status--${request.status}">${request.status}</span></div>
+                                        ${request.employeeNote ? `<p>${escapeHtml(request.employeeNote)}</p>` : ""}
+                                        ${request.managerNote ? `<p><strong>Manager note:</strong> ${escapeHtml(request.managerNote)}</p>` : ""}
+                                        ${request.status === "pending" ? `<div class="time-off-review-actions">
+                                            <button type="button" class="primary-button" data-time-off-decision="approved" data-request-id="${request.id}">Approve</button>
+                                            <button type="button" class="secondary-button" data-time-off-decision="declined" data-request-id="${request.id}">Decline</button>
+                                        </div>` : ""}
+                                    </article>`).join("") : '<p class="vacation-empty">No employee requests.</p>'}
+                            <p id="time-off-review-status" class="vacation-status" role="status"></p>
+                        </div>
+                        <div class="time-off-review"><h4>Sickness</h4>${employeeSickness.length?employeeSickness.map(report=>`<article class="time-off-review-card"><div><strong>${escapeHtml(formatVacationPeriod(report.startDate,report.endDate))}</strong><span class="time-off-status">${report.status}</span></div>${report.employeeNote?`<p>${escapeHtml(report.employeeNote)}</p>`:""}${report.status==="reported"?`<button type="button" class="primary-button" data-ack-sick="${report.id}">Acknowledge</button>`:""}</article>`).join(""):"<p class=\"vacation-empty\">No sickness reports.</p>"}</div>
                     `}
                 </section>
 
@@ -371,6 +422,16 @@ export function renderEmployeePlanningPage(
             </dialog>
             `}
         `;
+
+        container.querySelector<HTMLElement>(".employee-availability")
+            ?.addEventListener("wheel", (event) => {
+                if (event.ctrlKey || event.deltaY === 0) return;
+                const scrollContainer = container.closest<HTMLElement>("#page-content");
+                if (!scrollContainer) return;
+
+                event.preventDefault();
+                scrollContainer.scrollBy({ top: event.deltaY, behavior: "auto" });
+            }, { passive: false });
 
         const selector = container.querySelector<HTMLSelectElement>("#employee-select");
         employeeBaseline = formValueSignature(container.querySelector<HTMLFormElement>("#employee-form"));
@@ -399,16 +460,65 @@ export function renderEmployeePlanningPage(
             inactivateDialog.returnValue = "";
             inactivateDialog.showModal();
         });
-        inactivateDialog?.addEventListener("close", () => {
+        inactivateDialog?.addEventListener("close", async () => {
             if (inactivateDialog.returnValue !== "confirm") return;
+            const candidate = deactivateTeamMember(state.employees, selectedEmployee.id)
+                .find(({ id }) => id === selectedEmployee.id);
+            if (!candidate) return;
+            try {
+                await applicationStore.saveEmployee(candidate);
+            } catch (error) {
+                const saveStatus = container.querySelector("#save-status");
+                if (saveStatus) saveStatus.textContent = persistenceMessage(error, "The team member could not be made inactive.");
+                return;
+            }
             state.employees = deactivateTeamMember(state.employees, selectedEmployee.id);
-            setStoredEmployees(state.employees);
+            if (access) employeeAccess.set(selectedEmployee.id, { ...access, accessEnabled: false });
             selectedEmployeeId = employeeSelectOptions(activeEmployees(state.employees))[0]?.employee.id ?? null;
             render();
         });
 
+        container.querySelector<HTMLButtonElement>("#enable-employee-access")
+            ?.addEventListener("click", async (event) => {
+                const button = event.currentTarget as HTMLButtonElement;
+                const status = container.querySelector<HTMLElement>("#employee-portal-status");
+                button.disabled = true;
+                if (status) status.textContent = "Enabling employee portal access…";
+                try {
+                    const result = await employeeAccessRepository.enable(selectedEmployee.id);
+                    employeeAccess = new Map((await employeeAccessRepository.list())
+                        .map((record) => [record.employeeId, record]));
+                    render();
+                    const updatedStatus = container.querySelector<HTMLElement>("#employee-portal-status");
+                    if (updatedStatus) updatedStatus.textContent = result.invitationSent
+                        ? "Access enabled. A secure sign-in invitation was sent."
+                        : "Access enabled for the existing sign-in identity.";
+                } catch (error) {
+                    if (status) status.textContent = persistenceMessage(error, "Employee portal access could not be enabled.");
+                    button.disabled = false;
+                }
+            });
+
+        container.querySelector<HTMLButtonElement>("#disable-employee-access")
+            ?.addEventListener("click", async (event) => {
+                const button = event.currentTarget as HTMLButtonElement;
+                const status = container.querySelector<HTMLElement>("#employee-portal-status");
+                button.disabled = true;
+                if (status) status.textContent = "Disabling employee portal access…";
+                try {
+                    await employeeAccessRepository.disable(selectedEmployee.id);
+                    if (access) employeeAccess.set(selectedEmployee.id, { ...access, accessEnabled: false });
+                    render();
+                    const updatedStatus = container.querySelector<HTMLElement>("#employee-portal-status");
+                    if (updatedStatus) updatedStatus.textContent = "Employee portal access disabled.";
+                } catch (error) {
+                    if (status) status.textContent = persistenceMessage(error, "Employee portal access could not be disabled.");
+                    button.disabled = false;
+                }
+            });
+
         const vacationForm = container.querySelector<HTMLFormElement>("#vacation-form");
-        vacationForm?.addEventListener("submit", (event) => {
+        vacationForm?.addEventListener("submit", async (event) => {
             event.preventDefault();
             const formData = new FormData(vacationForm);
             const startDate = String(formData.get("startDate") ?? "");
@@ -428,20 +538,61 @@ export function renderEmployeePlanningPage(
                 if (status) status.textContent = "These dates overlap an existing vacation.";
                 return;
             }
+            const submit = vacationForm.querySelector<HTMLButtonElement>('button[type="submit"]');
+            if (submit) submit.disabled = true;
+            try {
+                await applicationStore.saveVacation(period);
+            } catch (error) {
+                if (status) status.textContent = persistenceMessage(error, "Vacation could not be saved.");
+                if (submit) submit.disabled = false;
+                return;
+            }
             state.vacations = [...state.vacations, period];
-            setStoredVacations(state.vacations);
             render();
         });
 
         container.querySelectorAll<HTMLButtonElement>("[data-remove-vacation]").forEach((button) => {
-            button.addEventListener("click", () => {
-                state.vacations = state.vacations.filter((period) =>
-                    period.id !== button.dataset.removeVacation,
-                );
-                setStoredVacations(state.vacations);
+            button.addEventListener("click", async () => {
+                const vacationId = button.dataset.removeVacation;
+                if (!vacationId) return;
+                button.disabled = true;
+                try {
+                    await applicationStore.deleteVacation(vacationId);
+                } catch (error) {
+                    const status = container.querySelector("#vacation-status");
+                    if (status) status.textContent = persistenceMessage(error, "Vacation could not be removed.");
+                    button.disabled = false;
+                    return;
+                }
+                state.vacations = state.vacations.filter((period) => period.id !== vacationId);
                 render();
             });
         });
+
+        container.querySelectorAll<HTMLButtonElement>("[data-time-off-decision]").forEach((button) => {
+            button.addEventListener("click", async () => {
+                const requestId = button.dataset.requestId;
+                const decision = button.dataset.timeOffDecision;
+                if (!requestId || (decision !== "approved" && decision !== "declined")) return;
+                const request = timeOffRequests.find(({ id }) => id === requestId);
+                if (!request) return;
+                button.disabled = true;
+                const status = container.querySelector("#time-off-review-status");
+                try {
+                    const result = await timeOffRequestRepository.decide(requestId, decision);
+                    if (decision === "approved" && result.vacationId) {
+                        await applicationStore.refreshVacations();
+                        state.vacations = [...applicationStore.getReadyData().vacations];
+                    }
+                    timeOffRequests = await timeOffRequestRepository.list();
+                    render();
+                } catch (error) {
+                    if (status) status.textContent = persistenceMessage(error, "The request could not be decided.");
+                    button.disabled = false;
+                }
+            });
+        });
+        container.querySelectorAll<HTMLButtonElement>("[data-ack-sick]").forEach(button=>button.addEventListener("click",async()=>{const id=button.dataset.ackSick;if(!id)return;button.disabled=true;try{await sickReportRepository.acknowledge(id);sickReports=await sickReportRepository.list();await applicationStore.refreshSicknesses();state.sicknesses=[...applicationStore.getReadyData().sicknesses];render();}catch(error){button.disabled=false;const status=container.querySelector("#vacation-status");if(status)status.textContent=persistenceMessage(error,"Sickness could not be acknowledged.");}}));
 
         const form = container.querySelector<HTMLFormElement>("#employee-form");
         form?.querySelector<HTMLButtonElement>("#apply-default-hours")?.addEventListener("click", () => {
@@ -471,7 +622,7 @@ export function renderEmployeePlanningPage(
                 });
             });
         });
-        form?.addEventListener("submit", (event) => {
+        form?.addEventListener("submit", async (event) => {
             event.preventDefault();
 
             const firstNameInput = container.querySelector<HTMLInputElement>('#emp-first-name');
@@ -555,14 +706,22 @@ export function renderEmployeePlanningPage(
                 availability: updatedAvailability,
             };
 
+            const submit = form.querySelector<HTMLButtonElement>('button[type="submit"]');
+            if (submit) submit.disabled = true;
+            if (saveStatus) saveStatus.textContent = "Saving…";
+            try {
+                await applicationStore.saveEmployee(updatedEmployee);
+            } catch (error) {
+                if (saveStatus) saveStatus.textContent = persistenceMessage(error, "The team member could not be saved.");
+                if (submit) submit.disabled = false;
+                return;
+            }
+
             state.employees = isNew
                 ? [...state.employees, updatedEmployee]
                 : state.employees.map((emp) => emp.id === selectedEmployee.id ? updatedEmployee : emp);
-
             newEmployeeDraft = null;
             selectedEmployeeId = selectedEmployee.id;
-
-            setStoredEmployees(state.employees);
 
             render();
 
@@ -576,10 +735,47 @@ export function renderEmployeePlanningPage(
         });
     }
 
-    render();
+    container.innerHTML = `
+        <section class="planner">
+            <div class="planner-intro employee-planning-intro">
+                <div><p class="section-label">Workforce</p><h2>Team</h2></div>
+            </div>
+            <p role="status">Loading employee portal access…</p>
+        </section>
+    `;
+    void Promise.all([
+        employeeAccessRepository.list().then((records) => {
+            employeeAccess = new Map(records.map((record) => [record.employeeId, record]));
+        }).catch((error) => {
+            accessLoadError = persistenceMessage(error, "Employee portal access could not be loaded.");
+        }),
+        timeOffRequestRepository.list().then((requests) => { timeOffRequests = requests; })
+            .catch((error) => { requestLoadError = persistenceMessage(error, "Time-off requests could not be loaded."); }),
+        sickReportRepository.list().then(async reports=>{
+            sickReports=reports;
+            await applicationStore.refreshSicknesses();
+            state.sicknesses=[...applicationStore.getReadyData().sicknesses];
+        }),
+    ]).finally(render);
 
     return {
         hasUnsavedChanges,
         confirmLeave,
     };
+}
+
+function portalStatus(
+    employee: Employee,
+    access: EmployeeAccessRecord | undefined,
+    loadError: string | null,
+): string {
+    if (loadError) return escapeHtml(loadError);
+    if (employee.status !== "active") return "Unavailable while this team member is inactive.";
+    if (!employee.email?.trim()) return "Save an email address to enable access.";
+    if (access?.accessEnabled) return "Enabled · Email is locked while access is active.";
+    return "Not enabled.";
+}
+
+function persistenceMessage(error: unknown, fallback: string): string {
+    return error instanceof Error ? error.message : fallback;
 }

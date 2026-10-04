@@ -21,9 +21,24 @@ import {
 
 import logoIcon from "./assets/pricepocket_logo_icon.png";
 import type { PageChangeGuard } from "./components/UnsavedChanges";
+import type { AuthenticatedManager } from "./auth/ManagerAuthController";
+import type { CrewApplicationStore } from "./state/CrewApplicationStore";
+import type { EmployeeAccessRepository } from "./repositories/EmployeeAccessRepository";
+import type { ManagerTimeOffRequestRepository } from "./repositories/TimeOffRequestRepository";
+import type { ManagerSickReportRepository } from "./repositories/SickReportRepository";
+
+export interface AppOptions {
+    readonly manager: AuthenticatedManager;
+    readonly onSignOut: () => Promise<void>;
+    readonly store: CrewApplicationStore;
+    readonly employeeAccessRepository: EmployeeAccessRepository;
+    readonly timeOffRequestRepository: ManagerTimeOffRequestRepository;
+    readonly sickReportRepository: ManagerSickReportRepository;
+}
 
 export function renderApp(
     root: HTMLElement,
+    options: AppOptions,
 ): void {
     root.innerHTML = "";
 
@@ -33,7 +48,7 @@ export function renderApp(
     const {
         sidebar,
         overlay: sidebarOverlay,
-    } = createSidebar();
+    } = createSidebar(options);
 
     const header = document.createElement("header");
     header.className = "app-header";
@@ -97,10 +112,15 @@ export function renderApp(
         sidebar,
         pageContent,
         () => sidebarController.close(),
+        options.store,
+        options.employeeAccessRepository,
+        options.timeOffRequestRepository,
+        options.sickReportRepository,
     );
 
     renderSchedulePage(
         pageContent,
+        options.store,
     );
 }
 
@@ -108,6 +128,10 @@ function attachNavigationListeners(
     sidebar: HTMLElement,
     pageContent: HTMLElement,
     closeSidebar: () => void,
+    store: CrewApplicationStore,
+    employeeAccessRepository: EmployeeAccessRepository,
+    timeOffRequestRepository: ManagerTimeOffRequestRepository,
+    sickReportRepository: ManagerSickReportRepository,
 ): void {
     let activeChangeGuard: PageChangeGuard | null = null;
     const sidebarPlannerButton = sidebar.querySelector<HTMLButtonElement>(
@@ -168,21 +192,23 @@ function attachNavigationListeners(
 
     sidebarScheduleButton.addEventListener(
         "click",
-        () => void navigate(sidebarScheduleButton, () => renderSchedulePage(pageContent)),
+        () => void navigate(sidebarScheduleButton, () => renderSchedulePage(pageContent, store)),
     );
 
     sidebarPlannerButton.addEventListener(
         "click",
-        () => void navigate(sidebarPlannerButton, () => renderPlannerPage(pageContent)),
+        () => void navigate(sidebarPlannerButton, () => renderPlannerPage(pageContent, store)),
     );
 
     sidebarEmployeePlanningButton.addEventListener(
         "click",
-        () => void navigate(sidebarEmployeePlanningButton, () => renderEmployeePlanningPage(pageContent)),
+        () => void navigate(sidebarEmployeePlanningButton, () => renderEmployeePlanningPage(
+            pageContent, store, employeeAccessRepository, timeOffRequestRepository, sickReportRepository,
+        )),
     );
 
     sidebarSettingsButton.addEventListener(
         "click",
-        () => void navigate(sidebarSettingsButton, () => renderSettingsPage(pageContent)),
+        () => void navigate(sidebarSettingsButton, () => renderSettingsPage(pageContent, store)),
     );
 }

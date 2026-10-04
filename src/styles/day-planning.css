@@ -281,6 +281,10 @@
     font-weight: 700;
 }
 
+.day-planner-batch-actions .day-planner-save-error {
+    color: var(--color-danger);
+}
+
 @media (max-width: 700px) {
     .day-planner-main { grid-template-columns: 1fr; }
     .day-planner-team { border-left: 0; border-top: 1px solid var(--color-border-subtle); }

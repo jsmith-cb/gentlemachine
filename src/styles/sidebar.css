@@ -267,6 +267,58 @@
     font-weight: 500;
 }
 
+.sidebar-account {
+    display: grid;
+    gap: 4px;
+    margin-bottom: 24px;
+}
+
+.sidebar-account > span {
+    color: var(--color-sidebar-muted);
+    font-size: .68rem;
+    font-weight: 750;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+}
+
+.sidebar-account strong,
+.sidebar-account small {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.sidebar-account strong {
+    color: var(--color-text-inverse);
+    font-size: .9rem;
+}
+
+.sidebar-account small {
+    color: var(--color-sidebar-muted);
+    font-size: .76rem;
+}
+
+.sidebar-account button {
+    justify-self: start;
+    margin-top: 9px;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: var(--color-primary-border);
+    font-size: .78rem;
+    font-weight: 700;
+}
+
+.sidebar-account button:hover {
+    color: var(--color-text-inverse);
+}
+
+.sidebar-account button:focus-visible {
+    border-radius: 4px;
+    outline: 2px solid var(--color-focus);
+    outline-offset: 3px;
+}
+
 .theme-selector {
     display: grid;
     gap: 8px;

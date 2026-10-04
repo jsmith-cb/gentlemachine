@@ -113,6 +113,47 @@ describe("Schedule presentation", () => {
             .flatMap(({ shifts }) => shifts).map(({ id }) => id)).toEqual(["oct-b"]);
     });
 
+    it("can include only the adjacent dates of boundary weeks", () => {
+        const shifts = [
+            ...SHIFTS,
+            { id: "oct-next", employeeId: "a", date: "2026-10-05", start: "09:00", end: "15:00" },
+        ];
+        const [week] = buildScheduleWeeks(
+            shifts,
+            EMPLOYEES,
+            2026,
+            9,
+            null,
+            DEFAULT_STORE_HOURS,
+            { includeBoundaryWeekShifts: true },
+        );
+
+        expect(week?.columns.find(({ date }) => date === "2026-10-01"))
+            .toMatchObject({ inSelectedMonth: false, inScheduleScope: true });
+        expect(week?.rows.flatMap(({ cells }) => cells)
+            .flatMap(({ shifts: cellShifts }) => cellShifts).map(({ id }) => id))
+            .toContain("oct-b");
+        expect(JSON.stringify(week)).not.toContain("oct-next");
+
+        const [octoberBoundaryWeek] = buildScheduleWeeks(
+            shifts,
+            EMPLOYEES,
+            2026,
+            10,
+            null,
+            DEFAULT_STORE_HOURS,
+            { includeBoundaryWeekShifts: true },
+        );
+        expect(octoberBoundaryWeek?.weekStart).toBe("2026-09-28");
+        expect(octoberBoundaryWeek?.columns.find(({ date }) => date === "2026-09-28"))
+            .toMatchObject({ inSelectedMonth: false, inScheduleScope: true });
+        expect(octoberBoundaryWeek?.rows.flatMap(({ cells }) => cells)
+            .flatMap(({ shifts: cellShifts }) => cellShifts).map(({ id }) => id))
+            .toEqual(expect.arrayContaining([
+                "sep-split", "sep-early-a", "sep-late", "sep-early-b", "oct-b",
+            ]));
+    });
+
     it("filters the matrix to one employee without a separate representation", () => {
         const weeks = buildScheduleWeeks(
             SHIFTS, EMPLOYEES, 2026, 9, "a", DEFAULT_STORE_HOURS,
@@ -126,6 +167,16 @@ describe("Schedule presentation", () => {
             .toEqual(["a", "b"]);
         expect(scheduleFilterEmployees(EMPLOYEES, [], 2026, 9).map(({ id }) => id))
             .toEqual(["a"]);
+    });
+
+    it("keeps employees with only a trailing-week shift available to Schedule", () => {
+        expect(scheduleFilterEmployees(
+            EMPLOYEES,
+            [],
+            2026,
+            9,
+            ["b"],
+        ).map(({ id }) => id)).toEqual(["a", "b"]);
     });
 
     it("returns an empty projection for a month without shifts", () => {

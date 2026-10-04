@@ -1,0 +1,165 @@
+import type {
+    AuthenticatedUser,
+    AuthenticationSessionGateway,
+} from "./ManagerAuthController";
+import type {
+    EmployeeScheduleDocument,
+    EmployeeScheduleRepository,
+} from "../repositories/EmployeeScheduleRepository";
+import type { EmployeeTimeOffRequest, EmployeeTimeOffRequestRepository } from "../repositories/TimeOffRequestRepository";
+import type { EmployeeSickReportRepository, SickReport } from "../repositories/SickReportRepository";
+
+export type EmployeePortalState =
+    | { readonly status: "loading"; readonly message: string }
+    | { readonly status: "signed-out" }
+    | { readonly status: "email-sent"; readonly email: string }
+    | { readonly status: "error"; readonly message: string }
+    | { readonly status: "unavailable"; readonly email: string }
+    | {
+        readonly status: "authenticated";
+        readonly user: AuthenticatedUser;
+        readonly schedule: EmployeeScheduleDocument;
+        readonly requests: readonly EmployeeTimeOffRequest[];
+        readonly sickReports: readonly SickReport[];
+        readonly requestMessage?: string;
+      };
+
+type Listener = (state: EmployeePortalState) => void;
+
+export class EmployeePortalController {
+    private state: EmployeePortalState = { status: "loading", message: "Checking your session…" };
+    private readonly listeners = new Set<Listener>();
+    private stopSessionListener: (() => void) | null = null;
+    private revision = 0;
+
+    constructor(
+        private readonly session: AuthenticationSessionGateway,
+        private readonly schedules: EmployeeScheduleRepository,
+        private readonly timeOffRequests: EmployeeTimeOffRequestRepository,
+        private readonly sickReports: EmployeeSickReportRepository,
+        private readonly redirectUrl: string,
+    ) {}
+
+    subscribe(listener: Listener): () => void {
+        this.listeners.add(listener);
+        listener(this.state);
+        return () => this.listeners.delete(listener);
+    }
+
+    async initialize(callbackError: string | null = null): Promise<void> {
+        this.stopSessionListener?.();
+        this.stopSessionListener = this.session.onSessionChange((user) => {
+            queueMicrotask(() => void this.applySession(user));
+        });
+        try {
+            const user = await this.session.getSessionUser();
+            if (!user && callbackError) return this.emit({ status: "error", message: callbackError });
+            await this.applySession(user);
+        } catch (error) {
+            this.emitError(error);
+        }
+    }
+
+    async requestMagicLink(rawEmail: string): Promise<void> {
+        const email = rawEmail.trim();
+        if (!email) return this.emit({ status: "error", message: "Enter your employee email address." });
+        this.emit({ status: "loading", message: "Sending your secure sign-in link…" });
+        try {
+            await this.session.requestMagicLink(email, this.redirectUrl);
+            this.emit({ status: "email-sent", email });
+        } catch (error) {
+            this.emitError(error);
+        }
+    }
+
+    async loadMonth(year: number, month: number): Promise<void> {
+        if (this.state.status !== "authenticated") return;
+        const user = this.state.user;
+        const revision = ++this.revision;
+        this.emit({ status: "loading", message: "Loading your schedule…" });
+        try {
+            const [schedule, requests, sickReports] = await Promise.all([
+                this.schedules.getMySchedule(year, month), this.timeOffRequests.listMine(), this.sickReports.listMine(),
+            ]);
+            if (revision === this.revision) this.emit({ status: "authenticated", user, schedule, requests, sickReports });
+        } catch (error) {
+            if (revision !== this.revision) return;
+            if (isAccessUnavailable(error)) {
+                this.emit({ status: "unavailable", email: user.email });
+            } else {
+                this.emitError(error);
+            }
+        }
+    }
+
+    async submitTimeOff(startDate: string, endDate: string, note?: string): Promise<void> {
+        if (this.state.status !== "authenticated") return;
+        const current = this.state;
+        if (!startDate || !endDate || startDate > endDate) {
+            return this.emit({ ...current, requestMessage: "Choose a valid start and end date." });
+        }
+        try {
+            await this.timeOffRequests.submit(startDate, endDate, note);
+            const requests = await this.timeOffRequests.listMine();
+            this.emit({ ...current, requests, requestMessage: "Time-off request submitted." });
+        } catch (error) {
+            this.emit({ ...current, requestMessage: error instanceof Error ? error.message : "The request could not be submitted." });
+        }
+    }
+    async reportSick(startDate:string,endDate:string,note?:string):Promise<void>{
+        if(this.state.status!=="authenticated")return;const current=this.state;
+        try{await this.sickReports.report(startDate,endDate,note);const sickReports=await this.sickReports.listMine();this.emit({...current,sickReports,requestMessage:"Sickness reported."});}
+        catch(error){this.emit({...current,requestMessage:error instanceof Error?error.message:"Sickness could not be reported."});}
+    }
+
+    async signOut(): Promise<void> {
+        this.revision += 1;
+        this.emit({ status: "loading", message: "Signing out…" });
+        try {
+            await this.session.signOut();
+            this.emit({ status: "signed-out" });
+        } catch (error) {
+            this.emitError(error);
+        }
+    }
+
+    private async applySession(user: AuthenticatedUser | null): Promise<void> {
+        const revision = ++this.revision;
+        if (!user) return this.emit({ status: "signed-out" });
+        this.emit({ status: "loading", message: "Opening your schedule…" });
+        const now = new Date();
+        try {
+            const [schedule, requests, sickReports] = await Promise.all([
+                this.schedules.getMySchedule(now.getFullYear(), now.getMonth() + 1),
+                this.timeOffRequests.listMine(),
+                this.sickReports.listMine(),
+            ]);
+            if (revision === this.revision) this.emit({ status: "authenticated", user, schedule, requests, sickReports });
+        } catch (error) {
+            if (revision !== this.revision) return;
+            if (isAccessUnavailable(error)) {
+                this.emit({ status: "unavailable", email: user.email });
+            } else {
+                this.emitError(error);
+            }
+        }
+    }
+
+    private emitError(error: unknown): void {
+        this.emit({
+            status: "error",
+            message: error instanceof Error && error.message.trim()
+                ? error.message
+                : "Your employee schedule could not be opened.",
+        });
+    }
+
+    private emit(state: EmployeePortalState): void {
+        this.state = state;
+        for (const listener of this.listeners) listener(state);
+    }
+}
+
+function isAccessUnavailable(error: unknown): boolean {
+    return error instanceof Error && /access is unavailable|permission denied|not authorized/i.test(error.message);
+}

@@ -1,18 +1,19 @@
 import { employeeFullName } from "../services/employeeIdentity";
 import {
     getDayOfWeek,
-    getWeekStartDate,
     isDateInMonth,
-    timeToMinutes,
 } from "../services/hoursService";
+import { buildScheduleWeeks } from "../services/scheduleService";
+import type { ScheduleCell, ScheduleWeek } from "../services/scheduleService";
 import {
-    getStoredEmployees,
-    getStoredStoreHours,
-    getStoredShifts,
-} from "../services/storageService";
-import { getOpenOperatingDays } from "../services/storeHoursService";
+    buildScheduleExportDocument,
+    downloadSchedulePdf,
+} from "../services/scheduleExportService";
 
-import type { Employee, Shift, StoreHours } from "../types/planning";
+import type { Employee, Shift } from "../types/planning";
+import type { CrewApplicationStore } from "../state/CrewApplicationStore";
+
+export { buildScheduleWeeks } from "../services/scheduleService";
 
 const MONTH_NAMES = [
     "January", "February", "March", "April", "May", "June",
@@ -26,29 +27,6 @@ const SHORT_MONTH_NAMES = [
 
 const DAY_NAMES = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"] as const;
 
-export interface ScheduleColumn {
-    date: string;
-    inSelectedMonth: boolean;
-}
-
-export interface ScheduleCell extends ScheduleColumn {
-    shifts: Shift[];
-}
-
-export interface ScheduleRow {
-    employeeId: string;
-    employeeName: string;
-    cells: ScheduleCell[];
-}
-
-export interface ScheduleWeek {
-    weekStart: string;
-    displayStart: string;
-    displayEnd: string;
-    columns: ScheduleColumn[];
-    rows: ScheduleRow[];
-}
-
 function escapeHtml(value: string): string {
     return value
         .replaceAll("&", "&amp;")
@@ -58,110 +36,19 @@ function escapeHtml(value: string): string {
         .replaceAll("'", "&#039;");
 }
 
-function addDays(date: string, amount: number): string {
-    const [year, month, day] = date.split("-").map(Number);
-    const value = new Date(Date.UTC(year, month - 1, day + amount));
-    return [
-        value.getUTCFullYear(),
-        String(value.getUTCMonth() + 1).padStart(2, "0"),
-        String(value.getUTCDate()).padStart(2, "0"),
-    ].join("-");
-}
-
-function orderedOpenDays(openDays: readonly number[]): number[] {
-    return [...new Set(openDays)]
-        .sort((left, right) => ((left + 6) % 7) - ((right + 6) % 7));
-}
-
-function employeeName(employeeId: string, employees: readonly Employee[]): string {
-    const employee = employees.find(({ id }) => id === employeeId);
-    return employee ? employeeFullName(employee) : "Unknown team member";
-}
-
-function compareShifts(left: Shift, right: Shift): number {
-    return timeToMinutes(left.start) - timeToMinutes(right.start) ||
-        timeToMinutes(left.end) - timeToMinutes(right.end) ||
-        left.id.localeCompare(right.id);
-}
-
-function compareEmployeeIds(
-    leftId: string,
-    rightId: string,
-    employees: readonly Employee[],
-): number {
-    return employeeName(leftId, employees).localeCompare(
-        employeeName(rightId, employees),
-        undefined,
-        { sensitivity: "base" },
-    ) || leftId.localeCompare(rightId);
-}
-
-export function buildScheduleWeeks(
-    shifts: readonly Shift[],
-    employees: readonly Employee[],
-    year: number,
-    month: number,
-    employeeId: string | null,
-    storeHours: StoreHours,
-): ScheduleWeek[] {
-    const operatingDays = orderedOpenDays(getOpenOperatingDays(storeHours));
-    if (operatingDays.length === 0) return [];
-
-    const monthShifts = shifts.filter((shift) =>
-        isDateInMonth(shift.date, year, month) &&
-        operatingDays.includes(getDayOfWeek(shift.date)) &&
-        (employeeId === null || shift.employeeId === employeeId),
-    );
-    const weekStarts = [...new Set(monthShifts.map(({ date }) => getWeekStartDate(date)))].sort();
-
-    return weekStarts.map((weekStart) => {
-        const columns = operatingDays.map((day) => {
-            const date = addDays(weekStart, (day + 6) % 7);
-            return {
-                date,
-                inSelectedMonth: isDateInMonth(date, year, month),
-            };
-        });
-        const weekShifts = monthShifts.filter(
-            ({ date }) => getWeekStartDate(date) === weekStart,
-        );
-        const employeeIds = [...new Set(weekShifts.map(({ employeeId: id }) => id))]
-            .sort((left, right) => compareEmployeeIds(left, right, employees));
-
-        return {
-            weekStart,
-            displayStart: columns[0]!.date,
-            displayEnd: columns[columns.length - 1]!.date,
-            columns,
-            rows: employeeIds.map((id) => ({
-                employeeId: id,
-                employeeName: employeeName(id, employees),
-                cells: columns.map((column) => ({
-                    ...column,
-                    shifts: column.inSelectedMonth
-                        ? weekShifts
-                            .filter((shift) =>
-                                shift.employeeId === id && shift.date === column.date,
-                            )
-                            .sort(compareShifts)
-                        : [],
-                })),
-            })),
-        };
-    });
-}
-
 export function scheduleFilterEmployees(
     employees: readonly Employee[],
     shifts: readonly Shift[],
     year: number,
     month: number,
+    additionalScheduledEmployeeIds: readonly string[] = [],
 ): Employee[] {
     const scheduledIds = new Set(
         shifts
             .filter((shift) => isDateInMonth(shift.date, year, month))
             .map(({ employeeId }) => employeeId),
     );
+    additionalScheduledEmployeeIds.forEach((id) => scheduledIds.add(id));
 
     return employees
         .filter((employee) => employee.status === "active" || scheduledIds.has(employee.id))
@@ -188,7 +75,7 @@ function formatWeekRange(start: string, end: string): string {
 }
 
 function renderShiftCell(cell: ScheduleCell, selectedMonth: number): string {
-    if (!cell.inSelectedMonth) {
+    if (!cell.inScheduleScope) {
         return `
             <span class="schedule-cell-outside">
                 <span class="schedule-visually-hidden">
@@ -232,7 +119,7 @@ function renderWeek(week: ScheduleWeek, selectedMonth: number): string {
                                 const { day } = dateParts(column.date);
                                 return `
                                     <th
-                                        class="${column.inSelectedMonth ? "" : "schedule-column-outside"}"
+                                        class="${column.inScheduleScope ? "" : "schedule-column-outside"}"
                                         scope="col"
                                     >
                                         <span>${DAY_NAMES[getDayOfWeek(column.date)]}</span>
@@ -247,7 +134,7 @@ function renderWeek(week: ScheduleWeek, selectedMonth: number): string {
                             <tr>
                                 <th scope="row">${escapeHtml(row.employeeName)}</th>
                                 ${row.cells.map((cell) => `
-                                    <td class="${cell.inSelectedMonth ? "" : "schedule-cell--outside"}">
+                                    <td class="${cell.inScheduleScope ? "" : "schedule-cell--outside"}">
                                         ${renderShiftCell(cell, selectedMonth)}
                                     </td>
                                 `).join("")}
@@ -265,18 +152,33 @@ function adjacentMonth(year: number, month: number, amount: number): { year: num
     return { year: value.getUTCFullYear(), month: value.getUTCMonth() + 1 };
 }
 
-export function renderSchedulePage(container: HTMLElement): void {
-    const shifts = getStoredShifts();
-    const employees = getStoredEmployees() ?? [];
-    const storeHours = getStoredStoreHours();
+export function renderSchedulePage(
+    container: HTMLElement,
+    applicationStore: CrewApplicationStore,
+): void {
+    const canonical = applicationStore.getReadyData();
+    const shifts = [...canonical.shifts];
+    const employees = [...canonical.employees];
+    const storeHours = canonical.settings.storeHours;
     const today = new Date();
     let selectedYear = today.getFullYear();
     let selectedMonth = today.getMonth() + 1;
     let selectedEmployeeId: string | null = null;
 
     function render(): void {
+        const teamWeeks = buildScheduleWeeks(
+            shifts,
+            employees,
+            selectedYear,
+            selectedMonth,
+            null,
+            storeHours,
+            { includeBoundaryWeekShifts: true },
+        );
+        const scheduledEmployeeIds = teamWeeks.flatMap(({ rows }) =>
+            rows.map(({ employeeId }) => employeeId));
         const filterEmployees = scheduleFilterEmployees(
-            employees, shifts, selectedYear, selectedMonth,
+            employees, shifts, selectedYear, selectedMonth, scheduledEmployeeIds,
         );
         if (selectedEmployeeId && !employees.some(({ id }) => id === selectedEmployeeId)) {
             selectedEmployeeId = null;
@@ -284,6 +186,17 @@ export function renderSchedulePage(container: HTMLElement): void {
         const selectedEmployee = selectedEmployeeId
             ? employees.find(({ id }) => id === selectedEmployeeId)
             : undefined;
+        const weeks = selectedEmployeeId
+            ? buildScheduleWeeks(
+                shifts,
+                employees,
+                selectedYear,
+                selectedMonth,
+                selectedEmployeeId,
+                storeHours,
+                { includeBoundaryWeekShifts: true },
+            )
+            : teamWeeks;
         const displayedFilterEmployees = selectedEmployee &&
             !filterEmployees.some(({ id }) => id === selectedEmployee.id)
             ? [...filterEmployees, selectedEmployee].sort((left, right) =>
@@ -292,15 +205,6 @@ export function renderSchedulePage(container: HTMLElement): void {
                 }) || left.id.localeCompare(right.id),
             )
             : filterEmployees;
-        const weeks = buildScheduleWeeks(
-            shifts,
-            employees,
-            selectedYear,
-            selectedMonth,
-            selectedEmployeeId,
-            storeHours,
-        );
-
         container.innerHTML = `
             <section class="schedule-page">
                 <div class="planner-intro schedule-intro">
@@ -308,10 +212,15 @@ export function renderSchedulePage(container: HTMLElement): void {
                         <p class="section-label">Team schedule</p>
                         <h2>${MONTH_NAMES[selectedMonth - 1]} ${selectedYear}</h2>
                     </div>
-                    <div class="month-navigation">
-                        <button class="month-button" data-schedule-action="previous" type="button" aria-label="Previous month">←</button>
-                        <button class="month-button month-button--today" data-schedule-action="today" type="button">Today</button>
-                        <button class="month-button" data-schedule-action="next" type="button" aria-label="Next month">→</button>
+                    <div class="schedule-heading-actions">
+                        <button class="secondary-button schedule-export-button" data-schedule-action="export" type="button">
+                            Export PDF
+                        </button>
+                        <div class="month-navigation">
+                            <button class="month-button" data-schedule-action="previous" type="button" aria-label="Previous month">←</button>
+                            <button class="month-button month-button--today" data-schedule-action="today" type="button">Today</button>
+                            <button class="month-button" data-schedule-action="next" type="button" aria-label="Next month">→</button>
+                        </div>
                     </div>
                 </div>
 
@@ -366,6 +275,19 @@ export function renderSchedulePage(container: HTMLElement): void {
                 selectedYear = current.getFullYear();
                 selectedMonth = current.getMonth() + 1;
                 render();
+            });
+        container.querySelector<HTMLButtonElement>('[data-schedule-action="export"]')
+            ?.addEventListener("click", () => {
+                void downloadSchedulePdf(buildScheduleExportDocument(
+                    shifts,
+                    employees,
+                    storeHours,
+                    selectedYear,
+                    selectedMonth,
+                    selectedEmployeeId
+                        ? { scope: "employee", employeeId: selectedEmployeeId }
+                        : { scope: "team" },
+                ));
             });
         container.querySelector<HTMLSelectElement>("#schedule-employee-filter")
             ?.addEventListener("change", (event) => {

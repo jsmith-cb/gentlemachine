@@ -59,6 +59,7 @@ export interface VacationPeriod {
     startDate: string;
     endDate: string;
 }
+export interface SicknessPeriod { id: string; employeeId: string; startDate: string; endDate: string; }
 
 export interface BreakRule {
     minimumShiftMinutes: number;
@@ -73,6 +74,7 @@ export interface PlannerState {
     employees: Employee[];
     shifts: Shift[];
     vacations: VacationPeriod[];
+    sicknesses: SicknessPeriod[];
 }
 
 export interface EmployeeMonthSummary {

@@ -1,0 +1,103 @@
+.employee-portal-shell {
+    min-height: 100%;
+    padding: clamp(18px, 4vw, 48px);
+    background: var(--color-background);
+}
+
+.employee-portal-card {
+    margin: min(8vh, 72px) auto;
+}
+
+.employee-portal-state h1 { margin: 0 0 14px; }
+.employee-portal-state > p:not(.section-label) { color: var(--color-text-secondary); line-height: 1.6; }
+
+.employee-portal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 18px;
+    max-width: 880px;
+    margin: 0 auto 34px;
+}
+
+.employee-portal-brand { display: flex; align-items: center; gap: 12px; }
+.employee-portal-brand img { width: 42px; height: 42px; object-fit: contain; }
+.employee-portal-brand span { display: grid; gap: 2px; }
+.employee-portal-brand strong { color: var(--color-text-strong); }
+.employee-portal-brand small { color: var(--color-text-muted); }
+.employee-portal-sign-out {
+    padding: 9px 13px;
+    border: 1px solid var(--color-border-control);
+    border-radius: 9px;
+    background: var(--color-surface);
+    color: var(--color-text-secondary);
+}
+
+.employee-schedule {
+    max-width: 880px;
+    margin: 0 auto;
+}
+.employee-schedule > h1 { margin: 5px 0 28px; font-size: clamp(2rem, 7vw, 3.5rem); }
+.employee-schedule-period {
+    display: grid;
+    grid-template-columns: 44px 1fr 44px;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 20px;
+}
+.employee-schedule-period h2 { margin: 0; text-align: center; font-size: clamp(1.15rem, 4vw, 1.6rem); }
+.employee-schedule-period button {
+    width: 44px; height: 44px;
+    border: 1px solid var(--color-border-control);
+    border-radius: 10px;
+    background: var(--color-surface);
+    color: var(--color-text-strong);
+}
+.employee-shift-list { display: grid; gap: 10px; }
+.employee-shift-day {
+    display: grid;
+    grid-template-columns: minmax(190px, 1fr) auto;
+    align-items: center;
+    gap: 20px;
+    padding: 18px 20px;
+    border: 1px solid var(--color-border);
+    border-radius: 14px;
+    background: var(--color-surface);
+}
+.employee-shift-day time { color: var(--color-text-strong); font-weight: 750; }
+.employee-shift-day p { margin: 0; color: var(--color-primary); }
+.employee-schedule-empty {
+    padding: 40px 24px;
+    border: 1px dashed var(--color-border-control);
+    border-radius: 14px;
+    text-align: center;
+}
+
+.employee-time-off { margin-top: 2rem; padding-top: 1.5rem; border-top: 1px solid var(--border-color); }
+.employee-time-off-form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)) auto; gap: .75rem; align-items: end; }
+.employee-time-off-form label { display: grid; gap: .4rem; color: var(--text-muted); font-weight: 700; }
+.employee-time-off-form input, .employee-time-off-form textarea { width: 100%; }
+.employee-time-off-note { grid-column: 1 / 3; }
+.employee-time-off-form button { grid-column: 3; grid-row: 1 / 3; align-self: stretch; }
+.employee-time-off-message { color: var(--accent-color); font-weight: 700; }
+.employee-time-off-list { display: grid; gap: .75rem; margin-top: 1rem; }
+.employee-time-off-list article { padding: 1rem; border: 1px solid var(--border-color); border-radius: 14px; background: var(--surface-muted); }
+.employee-time-off-list article > div { display: flex; justify-content: space-between; gap: 1rem; }
+.time-off-status { font-size: .75rem; font-weight: 800; text-transform: uppercase; letter-spacing: .08em; }
+.time-off-status--approved { color: var(--success-color, #3f9d68); }
+.time-off-status--declined { color: var(--danger-color, #d96872); }
+
+@media (max-width: 700px) {
+    .employee-time-off-form { grid-template-columns: 1fr; }
+    .employee-time-off-note, .employee-time-off-form button { grid-column: 1; grid-row: auto; }
+}
+.employee-schedule-empty h3 { margin: 0 0 8px; }
+.employee-schedule-empty p { margin: 0; color: var(--color-text-secondary); }
+
+@media (max-width: 560px) {
+    .employee-portal-shell { padding: 16px; }
+    .employee-portal-header { margin-bottom: 28px; }
+    .employee-portal-brand small { max-width: 170px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .employee-shift-day { grid-template-columns: 1fr; gap: 9px; }
+    .employee-shift-day div { display: flex; flex-wrap: wrap; gap: 10px; }
+}

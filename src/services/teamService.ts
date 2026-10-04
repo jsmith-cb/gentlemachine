@@ -6,7 +6,7 @@ export function activeEmployees(employees: Employee[]): Employee[] {
 
 export function createTeamMemberDraft(): Employee {
     return {
-        id: `employee-${crypto.randomUUID()}`,
+        id: crypto.randomUUID(),
         employeeNumber: "",
         status: "active",
         firstName: "",

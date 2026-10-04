@@ -4,6 +4,7 @@ import {
     setThemePreference,
     type ThemePreference,
 } from "../theme/Theme";
+import type { AuthenticatedManager } from "../auth/ManagerAuthController";
 
 export interface SidebarElements {
     readonly sidebar: HTMLElement;
@@ -14,11 +15,16 @@ interface BindSidebarOptions extends SidebarElements {
     readonly trigger: HTMLButtonElement;
 }
 
+export interface SidebarOptions {
+    readonly manager: AuthenticatedManager;
+    readonly onSignOut: () => Promise<void>;
+}
+
 export interface SidebarController {
     close(restoreFocus?: boolean): void;
 }
 
-export function createSidebar(): SidebarElements {
+export function createSidebar(options: SidebarOptions): SidebarElements {
     const sidebar = document.createElement("aside");
     sidebar.className = "sidebar";
     sidebar.id = "app-sidebar";
@@ -78,6 +84,13 @@ export function createSidebar(): SidebarElements {
         </nav>
 
         <footer class="sidebar-footer">
+            <div class="sidebar-account">
+                <span>Workspace</span>
+                <strong>${escapeHtml(options.manager.businessName)}</strong>
+                <small>${escapeHtml(options.manager.email)}</small>
+                <button type="button" id="sidebar-sign-out">Sign out</button>
+            </div>
+
             <label class="theme-selector">
                 <span>Theme</span>
                 <select aria-label="Application theme">
@@ -96,10 +109,23 @@ export function createSidebar(): SidebarElements {
     overlay.type = "button";
     overlay.setAttribute("aria-label", "Close navigation");
 
+    sidebar.querySelector<HTMLButtonElement>("#sidebar-sign-out")
+        ?.addEventListener("click", () => void options.onSignOut());
+
     return {
         sidebar,
         overlay,
     };
+}
+
+function escapeHtml(value: string): string {
+    return value.replace(/[&<>'"]/g, (character) => ({
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        "'": "&#39;",
+        '"': "&quot;",
+    })[character] ?? character);
 }
 
 function themeOption(value: ThemePreference, label: string): string {
