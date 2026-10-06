@@ -3,7 +3,6 @@ import {
     getAdjustedMonthlyTargetMinutes,
     getEmployeeDaysWorked,
     getEmployeeScheduledMinutes,
-    getEmployeeWeekSummaries,
     getMonthShifts,
     getShiftDurationMinutes,
     getWeekStartDate,
@@ -11,9 +10,6 @@ import {
     timeToMinutes,
 } from "./hoursService";
 
-import {
-    getCoverageGapsForMonth,
-} from "./coverageService";
 import { employeeFullName } from "./employeeIdentity";
 import { legalAvailabilityHours } from "./availabilityService";
 import { overlapsVacation } from "./vacationService";
@@ -124,17 +120,7 @@ export function validatePlannerState(
 
     validateDailyPaidMaximums(state, issues);
 
-    validateWeeklyTargets(
-        state,
-        issues,
-    );
-
     validateMonthlyTargets(state, issues);
-
-    validateCoverage(
-        state,
-        issues,
-    );
 
     return issues;
 }
@@ -412,110 +398,10 @@ function validateMaximumDaysPerWeek(
     }
 }
 
-function validateWeeklyTargets(
-    state: PlannerState,
-    issues: ValidationIssue[],
-): void {
-    const summaries =
-        getEmployeeWeekSummaries(
-            state,
-        );
-
-    for (
-        const summary
-        of summaries
-    ) {
-        if (
-            summary.partialMonthWeek
-        ) {
-            continue;
-        }
-
-        const employee =
-            state.employees.find(
-                ({ id }) =>
-                    id ===
-                    summary.employeeId,
-            );
-
-        if (
-            !employee || employee.status === "inactive" ||
-            isSingleDayEmployee(
-                employee.availability.days,
-            )
-        ) {
-            continue;
-        }
-
-        if (
-            summary.differenceMinutes ===
-            0
-        ) {
-            continue;
-        }
-
-        const direction =
-            summary.differenceMinutes <
-            0
-                ? "under"
-                : "over";
-
-        const difference =
-            Math.abs(
-                summary.differenceMinutes,
-            );
-
-        const hours =
-            Math.floor(
-                difference / 60,
-            );
-
-        const minutes =
-            difference % 60;
-
-        const formattedDifference =
-            `${hours}:${String(minutes).padStart(2, "0")}`;
-
-        issues.push({
-            severity: "warning",
-            category: "hours",
-            message:
-                `${employeeFullName(employee)} is ${formattedDifference} ${direction} ` +
-                `their weekly target for ${summary.weekStart}–${summary.weekEnd}.`,
-            employeeId:
-                employee.id,
-        });
-    }
-}
-
 function localTodayDateKey(): string {
     const now = new Date();
     return [now.getFullYear(), String(now.getMonth() + 1).padStart(2, "0"),
         String(now.getDate()).padStart(2, "0")].join("-");
-}
-
-function validateCoverage(
-    state: PlannerState,
-    issues: ValidationIssue[],
-): void {
-    const gaps =
-        getCoverageGapsForMonth(
-            state,
-        );
-
-    for (
-        const gap
-        of gaps
-    ) {
-        issues.push({
-            severity: "error",
-            category: "coverage",
-            message:
-                `No store coverage ${gap.start}–${gap.end}.`,
-            date:
-                gap.date,
-        });
-    }
 }
 
 function groupShiftsByWeek(
@@ -615,10 +501,4 @@ function weekIntersectsSelectedMonth(
     }
 
     return false;
-}
-
-function isSingleDayEmployee(
-    availableDays: number[],
-): boolean {
-    return availableDays.length === 1;
 }

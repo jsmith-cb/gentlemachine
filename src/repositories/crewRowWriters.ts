@@ -1,6 +1,6 @@
 import { hasValidAvailabilityHours } from "../services/availabilityService";
 import { isValidMaximumPaidMinutesPerDayOverride } from "../services/shiftRules";
-import { isValidSoftRuleSettings } from "../services/softRulesService";
+import { isValidSchedulingRuleSettings } from "../services/schedulingRulesService";
 import { isValidStoreHours } from "../services/storeHoursService";
 import { isValidVacationPeriod } from "../services/vacationService";
 import type { Employee, Shift, VacationPeriod } from "../types/planning";
@@ -68,13 +68,13 @@ export function settingsToRow(
     businessId: string,
     settings: CrewBusinessSettings,
 ): Record<string, unknown> {
-    if (!isValidStoreHours(settings.storeHours) || !isValidSoftRuleSettings(settings.softRules)) {
+    if (!isValidStoreHours(settings.storeHours) || !isValidSchedulingRuleSettings(settings.schedulingRules)) {
         invalid("business settings");
     }
     return {
         business_id: businessId,
         store_hours: structuredClone(settings.storeHours),
-        soft_rules: structuredClone(settings.softRules),
+        scheduling_rules: structuredClone(settings.schedulingRules),
     };
 }
 

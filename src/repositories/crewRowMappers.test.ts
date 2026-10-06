@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_SOFT_RULE_SETTINGS } from "../services/softRulesService";
+import { DEFAULT_SCHEDULING_RULE_SETTINGS } from "../services/schedulingRulesService";
 import { DEFAULT_STORE_HOURS } from "../services/storeHoursService";
 import { mapCanonicalWorkspaceRows } from "./crewRowMappers";
 
@@ -42,7 +42,7 @@ function canonicalRows() {
         settings: {
             business_id: BUSINESS_ID,
             store_hours: DEFAULT_STORE_HOURS,
-            soft_rules: DEFAULT_SOFT_RULE_SETTINGS,
+            scheduling_rules: DEFAULT_SCHEDULING_RULE_SETTINGS,
         },
     };
 }
@@ -67,7 +67,7 @@ describe("canonical Crew row mapping", () => {
             vacations: [{ employeeId: EMPLOYEE_ID }],
             settings: {
                 storeHours: DEFAULT_STORE_HOURS,
-                softRules: DEFAULT_SOFT_RULE_SETTINGS,
+                schedulingRules: DEFAULT_SCHEDULING_RULE_SETTINGS,
             },
         });
     });

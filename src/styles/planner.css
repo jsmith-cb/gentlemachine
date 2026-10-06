@@ -1092,6 +1092,11 @@ button {
     background: var(--color-danger-soft);
 }
 
+.status-count--requirement {
+    color: var(--color-warning);
+    background: var(--color-warning-soft, var(--color-background-soft));
+}
+
 .status-count--warning {
     color: var(--color-warning);
     background: var(--color-background-soft);
@@ -1126,6 +1131,12 @@ button {
     color: var(--color-danger-strong);
     background: var(--color-danger-soft);
     border: 1px solid var(--color-danger-border);
+}
+
+.schedule-issue--requirement {
+    color: var(--color-warning);
+    background: var(--color-warning-soft, var(--color-background-soft));
+    border: 1px solid var(--color-warning);
 }
 
 .schedule-issue--warning {

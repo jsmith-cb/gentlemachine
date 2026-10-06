@@ -20,7 +20,7 @@ import type {
 import { attachDayPlanningModal } from "./DayPlanningModal";
 import { applyDayPlanningChanges } from "../services/dayPlanningService";
 import { generateShifts } from "../services/generationService";
-import { evaluateSoftRules } from "../services/softRulesService";
+import { evaluatePlanningRules } from "../services/schedulingRulesService";
 
 import {
     renderPlannerCalendar,
@@ -88,7 +88,7 @@ export function generateDraftForEmptyPlanningPeriod(state: PlannerState): {
         state.selectedYear,
         state.selectedMonth,
         state.shifts,
-        state.softRules,
+        state.schedulingRules,
         state.sicknesses,
     );
 
@@ -110,7 +110,7 @@ export function renderPlannerPage(
 
     let state = createInitialPlannerState(
         [...canonical.shifts], [...canonical.employees], [...canonical.vacations],
-        canonical.settings.storeHours, canonical.settings.softRules,
+        canonical.settings.storeHours, canonical.settings.schedulingRules,
         [...canonical.sicknesses],
     );
 
@@ -138,10 +138,11 @@ export function renderPlannerPage(
 
         const scheduleIssues: ValidationIssue[] = [
             ...validatePlannerState(state),
-            ...evaluateSoftRules(state).map((guidance) => ({
-                severity: "warning" as const,
-                category: "soft-rule" as const,
+            ...evaluatePlanningRules(state).map((guidance) => ({
+                severity: guidance.level === "required" ? "requirement" as const : "warning" as const,
+                category: "planning-rule" as const,
                 employeeId: guidance.employeeId,
+                date: guidance.date,
                 message: guidance.message,
             })),
         ];

@@ -5,7 +5,7 @@ import type {
     CrewWorkspaceData,
 } from "../repositories/CrewRepository";
 import type { Employee, Shift, VacationPeriod } from "../types/planning";
-import { DEFAULT_SOFT_RULE_SETTINGS } from "../services/softRulesService";
+import { DEFAULT_SCHEDULING_RULE_SETTINGS } from "../services/schedulingRulesService";
 import { DEFAULT_STORE_HOURS } from "../services/storeHoursService";
 import { CrewApplicationStore } from "./CrewApplicationStore";
 
@@ -17,7 +17,7 @@ const WORKSPACE: CrewWorkspaceData = {
     sicknesses: [],
     settings: {
         storeHours: DEFAULT_STORE_HOURS,
-        softRules: DEFAULT_SOFT_RULE_SETTINGS,
+        schedulingRules: DEFAULT_SCHEDULING_RULE_SETTINGS,
     },
 };
 
@@ -115,7 +115,19 @@ describe("CrewApplicationStore", () => {
         };
         const settings: CrewBusinessSettings = {
             storeHours: DEFAULT_STORE_HOURS,
-            softRules: { oneWeekendOffPerMonth: true },
+            schedulingRules: {
+                minimumGeneratedShiftMinutes: 120,
+                modes: {
+                    "contracted-hours": "prefer",
+                    "opening-hours-coverage": "prefer",
+                    "one-saturday-off-per-month": "require",
+                },
+                preferredOrder: [
+                    "opening-hours-coverage", "contracted-hours", "overlapping-shifts",
+                    "one-saturday-off-per-month", "employee-preferred-hours",
+                    "minimize-fragmentation",
+                ],
+            },
         };
 
         await store.saveEmployee(employee);

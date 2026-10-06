@@ -1,6 +1,6 @@
 import { hasValidAvailabilityHours, isValidTime } from "../services/availabilityService";
 import { isValidMaximumPaidMinutesPerDayOverride } from "../services/shiftRules";
-import { isValidSoftRuleSettings } from "../services/softRulesService";
+import { isValidSchedulingRuleSettings } from "../services/schedulingRulesService";
 import { isValidStoreHours } from "../services/storeHoursService";
 import type {
     Employee,
@@ -50,8 +50,8 @@ export function mapCanonicalWorkspaceRows(
     if (!isValidStoreHours(settings.store_hours)) {
         fail("business_settings.store_hours is not valid Store Hours data");
     }
-    if (!isValidSoftRuleSettings(settings.soft_rules)) {
-        fail("business_settings.soft_rules is not valid Soft Rules data");
+    if (!isValidSchedulingRuleSettings(settings.scheduling_rules)) {
+        fail("business_settings.scheduling_rules is not valid Scheduling Rules data");
     }
 
     return {
@@ -62,7 +62,7 @@ export function mapCanonicalWorkspaceRows(
         sicknesses,
         settings: {
             storeHours: structuredClone(settings.store_hours),
-            softRules: structuredClone(settings.soft_rules),
+            schedulingRules: structuredClone(settings.scheduling_rules),
         },
     };
 }

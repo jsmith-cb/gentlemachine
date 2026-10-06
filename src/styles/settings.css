@@ -147,32 +147,131 @@
     border-top: 1px solid var(--color-border);
 }
 
-.soft-rules-settings {
+.scheduling-rules-settings {
     margin-top: 28px;
 }
 
-.soft-rule-option {
-    display: flex;
-    align-items: flex-start;
-    gap: 14px;
-    margin: 18px 24px;
-    padding: 18px;
-    border: 1px solid var(--color-border);
-    border-radius: 14px;
-    background: var(--color-surface-subtle);
-}
-
-.soft-rule-option input {
-    margin-top: 4px;
-}
-
-.soft-rule-option span {
+.scheduling-rule-section {
     display: grid;
-    gap: 5px;
+    gap: 16px;
+    padding: 22px 24px;
 }
 
-.soft-rule-option small {
+.scheduling-rule-section + .scheduling-rule-section {
+    border-top: 1px solid var(--color-border-subtle);
+}
+
+.scheduling-rule-section h4,
+.scheduling-rule-section p {
+    margin: 0;
+}
+
+.scheduling-rule-section h4 {
+    color: var(--color-text-strong);
+    font-size: 1rem;
+}
+
+.scheduling-rule-section p,
+.scheduling-rule-section small,
+.settings-context-note {
     color: var(--color-text-muted);
+}
+
+.scheduling-limit-field,
+.planning-rule-modes label {
+    display: grid;
+    grid-template-columns: minmax(220px, 1fr) minmax(150px, auto);
+    align-items: center;
+    gap: 8px 18px;
+    padding: 16px;
+    background: var(--color-surface-subtle);
+    border: 1px solid var(--color-border);
+    border-radius: 12px;
+    color: var(--color-text-strong);
+    font-weight: 750;
+}
+
+.scheduling-limit-field small {
+    grid-column: 1 / -1;
+    font-weight: 500;
+}
+
+.scheduling-duration-input {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--color-text-muted);
+    font-weight: 650;
+}
+
+.scheduling-duration-input input,
+.planning-rule-modes select {
+    min-height: 42px;
+    padding: 8px 10px;
+    color: var(--color-text);
+    background: var(--color-surface);
+    border: 1px solid var(--color-border-control);
+    border-radius: 8px;
+}
+
+.scheduling-duration-input input {
+    width: 92px;
+}
+
+.planning-rule-modes {
+    display: grid;
+    gap: 10px;
+}
+
+.planning-priority-list {
+    display: grid;
+    gap: 9px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    counter-reset: priority;
+}
+
+.planning-priority {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    align-items: center;
+    gap: 12px;
+    min-height: 54px;
+    padding: 10px 12px;
+    background: var(--color-surface-subtle);
+    border: 1px solid var(--color-border);
+    border-radius: 10px;
+    counter-increment: priority;
+    cursor: grab;
+}
+
+.planning-priority[hidden] {
+    display: none;
+}
+
+.planning-priority--dragging {
+    opacity: .5;
+}
+
+.planning-priority-handle::after {
+    content: " " counter(priority) ".";
+    color: var(--color-text-muted);
+}
+
+.planning-priority-actions {
+    display: flex;
+    gap: 6px;
+}
+
+.planning-priority-actions button {
+    width: 34px;
+    height: 34px;
+    color: var(--color-text);
+    background: var(--color-surface);
+    border: 1px solid var(--color-border-control);
+    border-radius: 8px;
+    cursor: pointer;
 }
 
 .settings-feedback {
@@ -202,5 +301,10 @@
     .settings-actions {
         align-items: stretch;
         flex-direction: column;
+    }
+
+    .scheduling-limit-field,
+    .planning-rule-modes label {
+        grid-template-columns: 1fr;
     }
 }

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { DEFAULT_SOFT_RULE_SETTINGS } from "../services/softRulesService";
+import { DEFAULT_SCHEDULING_RULE_SETTINGS } from "../services/schedulingRulesService";
 import { DEFAULT_STORE_HOURS } from "../services/storeHoursService";
 import { SupabaseCrewRepository } from "./SupabaseCrewRepository";
 
@@ -30,7 +30,7 @@ class FakeQuery implements PromiseLike<QueryResult> {
 function createLoadClient(settings: unknown = {
     business_id: BUSINESS_ID,
     store_hours: DEFAULT_STORE_HOURS,
-    soft_rules: DEFAULT_SOFT_RULE_SETTINGS,
+    scheduling_rules: DEFAULT_SCHEDULING_RULE_SETTINGS,
 }) {
     const queries = new Map<string, FakeQuery>();
     const values: Record<string, unknown> = {

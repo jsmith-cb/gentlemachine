@@ -65,7 +65,7 @@ export function renderEmployeePlanningPage(
 
     state = createInitialPlannerState(
         [...canonical.shifts], [...canonical.employees], [...canonical.vacations],
-        canonical.settings.storeHours, canonical.settings.softRules,
+        canonical.settings.storeHours, canonical.settings.schedulingRules,
         [...canonical.sicknesses],
     );
 

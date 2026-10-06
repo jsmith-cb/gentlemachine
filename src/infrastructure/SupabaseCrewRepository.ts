@@ -46,7 +46,7 @@ export class SupabaseCrewRepository implements CrewRepository {
                     .select("id, business_id, employee_id, start_date, end_date")
                     .eq("business_id", this.businessId).order("start_date").order("id"),
                 this.client.from("business_settings")
-                    .select("business_id, store_hours, soft_rules")
+                    .select("business_id, store_hours, scheduling_rules")
                     .eq("business_id", this.businessId)
                     .maybeSingle(),
             ]);

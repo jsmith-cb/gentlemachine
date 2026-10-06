@@ -3,6 +3,7 @@
 ## Architecture
 
 - [Employee access and absence architecture](architecture/EMPLOYEE_ACCESS_AND_ABSENCE.md)
+- [Scheduling rules architecture](architecture/SCHEDULING_RULES.md)
 - [Schedule behavior](SCHEDULE_BEHAVIOR.md)
 - [Schedule export behavior](SCHEDULE_EXPORT_BEHAVIOR.md)
 

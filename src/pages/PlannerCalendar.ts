@@ -100,11 +100,12 @@ function renderPlanningAssistant(
     generationFeedback: string | null,
 ): string {
     const errors = issues.filter(({ severity }) => severity === "error");
+    const requirements = issues.filter(({ severity }) => severity === "requirement");
     const warnings = issues.filter(({ severity }) => severity === "warning");
     const coverage = issues.filter(({ category }) => category === "coverage");
     const hours = issues.filter(({ category }) => category === "hours");
     const availability = issues.filter(({ category }) => category === "availability");
-    const softRules = issues.filter(({ category }) => category === "soft-rule");
+    const schedulingRules = issues.filter(({ category }) => category === "planning-rule");
 
     return `
         <aside class="planning-assistant-window" id="planning-assistant-window"
@@ -139,6 +140,7 @@ function renderPlanningAssistant(
                     : `
                 <div class="status-counts">
                     <span class="status-count status-count--error">${errors.length} errors</span>
+                    <span class="status-count status-count--requirement">${requirements.length} requirement conflicts</span>
                     <span class="status-count status-count--warning">${warnings.length} warnings</span>
                 </div>
 
@@ -153,11 +155,12 @@ function renderPlanningAssistant(
                         <div class="validation-filter-bar">
                             ${renderValidationFilter("all", "All", issues.length, true)}
                             ${renderValidationFilter("error", "Errors", errors.length)}
+                            ${renderValidationFilter("requirement", "Requirements", requirements.length)}
                             ${renderValidationFilter("warning", "Warnings", warnings.length)}
                             ${renderValidationFilter("coverage", "Coverage", coverage.length)}
                             ${renderValidationFilter("hours", "Hours", hours.length)}
                             ${renderValidationFilter("availability", "Availability", availability.length)}
-                            ${renderValidationFilter("soft-rule", "Soft Rules", softRules.length)}
+                            ${renderValidationFilter("planning-rule", "Planning Rules", schedulingRules.length)}
                         </div>
 
                         <div class="validation-results-heading">
@@ -212,7 +215,8 @@ function renderScheduleIssue(
             data-category="${issue.category}"
         >
             <strong>
-                ${issue.severity === "error" ? "Error" : "Warning"}
+                ${issue.severity === "error" ? "Error" : issue.severity === "requirement"
+                    ? "Requirement conflict" : "Guidance"}
             </strong>
 
             <span>

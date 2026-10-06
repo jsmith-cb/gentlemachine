@@ -163,17 +163,17 @@ values
         '2026-10-16'
     );
 
-insert into public.business_settings (business_id, store_hours, soft_rules)
+insert into public.business_settings (business_id, store_hours, scheduling_rules)
 values
     (
         '20000000-0000-0000-0000-000000000001',
         '{"days":[]}',
-        '{"oneWeekendOffPerMonth":false}'
+        '{"minimumGeneratedShiftMinutes":120,"modes":{"contracted-hours":"prefer","opening-hours-coverage":"prefer","one-saturday-off-per-month":"prefer"},"preferredOrder":["opening-hours-coverage","contracted-hours","overlapping-shifts","one-saturday-off-per-month","employee-preferred-hours","minimize-fragmentation"]}'
     ),
     (
         '20000000-0000-0000-0000-000000000002',
         '{"days":[]}',
-        '{"oneWeekendOffPerMonth":false}'
+        '{"minimumGeneratedShiftMinutes":120,"modes":{"contracted-hours":"prefer","opening-hours-coverage":"prefer","one-saturday-off-per-month":"prefer"},"preferredOrder":["opening-hours-coverage","contracted-hours","overlapping-shifts","one-saturday-off-per-month","employee-preferred-hours","minimize-fragmentation"]}'
     );
 
 set local role authenticated;

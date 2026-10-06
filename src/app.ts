@@ -26,6 +26,11 @@ import type { CrewApplicationStore } from "./state/CrewApplicationStore";
 import type { EmployeeAccessRepository } from "./repositories/EmployeeAccessRepository";
 import type { ManagerTimeOffRequestRepository } from "./repositories/TimeOffRequestRepository";
 import type { ManagerSickReportRepository } from "./repositories/SickReportRepository";
+import {
+    readManagerPagePreference,
+    writeManagerPagePreference,
+} from "./navigation/ManagerPagePreference";
+import type { ManagerPage } from "./navigation/ManagerPagePreference";
 
 export interface AppOptions {
     readonly manager: AuthenticatedManager;
@@ -108,7 +113,7 @@ export function renderApp(
         trigger: hamburgerButton,
     });
 
-    attachNavigationListeners(
+    initializeNavigation(
         sidebar,
         pageContent,
         () => sidebarController.close(),
@@ -118,13 +123,9 @@ export function renderApp(
         options.sickReportRepository,
     );
 
-    renderSchedulePage(
-        pageContent,
-        options.store,
-    );
 }
 
-function attachNavigationListeners(
+function initializeNavigation(
     sidebar: HTMLElement,
     pageContent: HTMLElement,
     closeSidebar: () => void,
@@ -170,10 +171,33 @@ function attachNavigationListeners(
         }
     };
 
+    const buttonForPage = (page: ManagerPage): HTMLButtonElement => ({
+        schedule: sidebarScheduleButton,
+        planner: sidebarPlannerButton,
+        team: sidebarEmployeePlanningButton,
+        settings: sidebarSettingsButton,
+    })[page];
+
+    const renderPage = (page: ManagerPage): PageChangeGuard | void => {
+        switch (page) {
+            case "schedule":
+                return renderSchedulePage(pageContent, store);
+            case "planner":
+                return renderPlannerPage(pageContent, store);
+            case "team":
+                return renderEmployeePlanningPage(
+                    pageContent, store, employeeAccessRepository,
+                    timeOffRequestRepository, sickReportRepository,
+                );
+            case "settings":
+                return renderSettingsPage(pageContent, store);
+        }
+    };
+
     const navigate = async (
-        active: HTMLButtonElement,
-        render: () => PageChangeGuard | void,
+        page: ManagerPage,
     ): Promise<void> => {
+        const active = buttonForPage(page);
         if (activeChangeGuard?.hasUnsavedChanges() &&
             !await activeChangeGuard.confirmLeave(active)) {
             closeSidebar();
@@ -181,7 +205,8 @@ function attachNavigationListeners(
         }
         setActive(active);
         closeSidebar();
-        activeChangeGuard = render() ?? null;
+        activeChangeGuard = renderPage(page) ?? null;
+        writeManagerPagePreference(window.localStorage, page);
     };
 
     window.addEventListener("beforeunload", (event) => {
@@ -192,23 +217,25 @@ function attachNavigationListeners(
 
     sidebarScheduleButton.addEventListener(
         "click",
-        () => void navigate(sidebarScheduleButton, () => renderSchedulePage(pageContent, store)),
+        () => void navigate("schedule"),
     );
 
     sidebarPlannerButton.addEventListener(
         "click",
-        () => void navigate(sidebarPlannerButton, () => renderPlannerPage(pageContent, store)),
+        () => void navigate("planner"),
     );
 
     sidebarEmployeePlanningButton.addEventListener(
         "click",
-        () => void navigate(sidebarEmployeePlanningButton, () => renderEmployeePlanningPage(
-            pageContent, store, employeeAccessRepository, timeOffRequestRepository, sickReportRepository,
-        )),
+        () => void navigate("team"),
     );
 
     sidebarSettingsButton.addEventListener(
         "click",
-        () => void navigate(sidebarSettingsButton, () => renderSettingsPage(pageContent, store)),
+        () => void navigate("settings"),
     );
+
+    const initialPage = readManagerPagePreference(window.localStorage);
+    setActive(buttonForPage(initialPage));
+    activeChangeGuard = renderPage(initialPage) ?? null;
 }

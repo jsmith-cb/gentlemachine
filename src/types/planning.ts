@@ -14,8 +14,25 @@ export interface StoreHours {
     days: StoreOperatingDay[];
 }
 
-export interface SoftRuleSettings {
-    oneWeekendOffPerMonth: boolean;
+export type PlanningRuleId =
+    | "contracted-hours"
+    | "opening-hours-coverage"
+    | "overlapping-shifts"
+    | "employee-preferred-hours"
+    | "one-saturday-off-per-month"
+    | "minimize-fragmentation";
+
+export type ConfigurablePlanningRuleId =
+    | "contracted-hours"
+    | "opening-hours-coverage"
+    | "one-saturday-off-per-month";
+
+export type PlanningRuleMode = "prefer" | "require";
+
+export interface SchedulingRuleSettings {
+    minimumGeneratedShiftMinutes: number;
+    modes: Record<ConfigurablePlanningRuleId, PlanningRuleMode>;
+    preferredOrder: PlanningRuleId[];
 }
 
 export interface EmployeeAvailability {
@@ -70,7 +87,7 @@ export interface PlannerState {
     selectedYear: number;
     selectedMonth: number;
     storeHours: StoreHours;
-    softRules: SoftRuleSettings;
+    schedulingRules: SchedulingRuleSettings;
     employees: Employee[];
     shifts: Shift[];
     vacations: VacationPeriod[];
@@ -103,6 +120,7 @@ export interface CoverageGap {
 
 export type ValidationSeverity =
     | "error"
+    | "requirement"
     | "warning";
 
 export type ValidationCategory =
@@ -110,7 +128,7 @@ export type ValidationCategory =
     | "availability"
     | "coverage"
     | "hours"
-    | "soft-rule";
+    | "planning-rule";
 
 export interface ValidationIssue {
     severity: ValidationSeverity;

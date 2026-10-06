@@ -1,7 +1,7 @@
 import type {
     Employee,
     Shift,
-    SoftRuleSettings,
+    SchedulingRuleSettings,
     StoreHours,
     SicknessPeriod,
     VacationPeriod,
@@ -14,7 +14,7 @@ export interface CrewWorkspaceIdentity {
 
 export interface CrewBusinessSettings {
     readonly storeHours: StoreHours;
-    readonly softRules: SoftRuleSettings;
+    readonly schedulingRules: SchedulingRuleSettings;
 }
 
 export interface CrewWorkspaceData {

@@ -6,7 +6,6 @@ import {
     orderEmployeesForGeneration,
 } from "./generationService";
 import {
-    getAdjustedMonthlyTargetMinutes,
     getAdjustedWeeklyTargetMinutes,
     getDayOfWeek,
     getPaidShiftMinutes,
@@ -16,7 +15,10 @@ import {
 } from "./hoursService";
 import type { Employee, StoreHours, VacationPeriod } from "../types/planning";
 import { createInitialPlannerState } from "../state/plannerState";
-import { evaluateSoftRules } from "./softRulesService";
+import {
+    DEFAULT_SCHEDULING_RULE_SETTINGS,
+    evaluatePlanningRules,
+} from "./schedulingRulesService";
 
 const STORE_OPEN = "10:00";
 const STORE_CLOSE = "20:00";
@@ -53,6 +55,129 @@ function makeEmployee(overrides: Partial<Employee> = {}): Employee {
 }
 
 describe("generateShifts", () => {
+    it("uses the configured minimum for new standalone generated shifts", () => {
+        const employee = makeEmployee({
+            weeklyTargetMinutes: 60,
+            maxDaysPerWeek: 1,
+            availability: { days: [1] },
+        });
+        const settings = structuredClone(DEFAULT_SCHEDULING_RULE_SETTINGS);
+        settings.minimumGeneratedShiftMinutes = 60;
+
+        const withOneHourMinimum = generateShifts(
+            [employee], [], STORE_HOURS, 2026, 3, [], settings,
+        );
+        const withDefaultMinimum = generateShifts(
+            [employee], [], STORE_HOURS, 2026, 3, [], DEFAULT_SCHEDULING_RULE_SETTINGS,
+        );
+
+        expect(withOneHourMinimum.shifts.some((shift) => getPaidShiftMinutes(shift) === 60))
+            .toBe(true);
+        expect(withDefaultMinimum.shifts).toEqual([]);
+    });
+
+    it("uses preferred-rule order lexicographically at a real placement choice", () => {
+        const configured: StoreHours = {
+            days: [
+                { dayOfWeek: 0, isOpen: false },
+                { dayOfWeek: 1, isOpen: true, openTime: "10:00", closeTime: "18:00" },
+                { dayOfWeek: 2, isOpen: false }, { dayOfWeek: 3, isOpen: false },
+                { dayOfWeek: 4, isOpen: false }, { dayOfWeek: 5, isOpen: false },
+                { dayOfWeek: 6, isOpen: false },
+            ],
+        };
+        const alreadyScheduled = makeEmployee({
+            id: "existing-employee", employeeNumber: "existing", weeklyTargetMinutes: 4 * 60,
+            maxDaysPerWeek: 1, availability: { days: [1] },
+        });
+        const candidate = makeEmployee({
+            id: "candidate", employeeNumber: "candidate", weeklyTargetMinutes: 4 * 60,
+            maxDaysPerWeek: 1, availability: { days: [1] },
+        });
+        const existing = [{
+            id: "existing", employeeId: alreadyScheduled.id, date: "2026-03-02",
+            start: "10:00", end: "14:00",
+        }];
+        const coverageFirst = structuredClone(DEFAULT_SCHEDULING_RULE_SETTINGS);
+        coverageFirst.preferredOrder = [
+            "opening-hours-coverage", "overlapping-shifts", "contracted-hours",
+            "one-saturday-off-per-month", "employee-preferred-hours", "minimize-fragmentation",
+        ];
+        const overlapFirst = structuredClone(coverageFirst);
+        overlapFirst.preferredOrder = [
+            "overlapping-shifts", "opening-hours-coverage", "contracted-hours",
+            "one-saturday-off-per-month", "employee-preferred-hours", "minimize-fragmentation",
+        ];
+
+        const coverageResult = generateShifts(
+            [alreadyScheduled, candidate], [], configured, 2026, 3, existing, coverageFirst,
+        );
+        const overlapResult = generateShifts(
+            [alreadyScheduled, candidate], [], configured, 2026, 3, existing, overlapFirst,
+        );
+
+        expect(coverageResult.shifts.find(({ employeeId }) => employeeId === candidate.id)?.start)
+            .toBe("14:00");
+        expect(overlapResult.shifts.find(({ employeeId }) => employeeId === candidate.id)?.start)
+            .toBe("10:30");
+    });
+
+    it("lets a preferred Saturday off yield to or outrank coverage according to saved order", () => {
+        const configured: StoreHours = {
+            days: [
+                { dayOfWeek: 0, isOpen: false },
+                { dayOfWeek: 1, isOpen: true, openTime: "10:00", closeTime: "14:00" },
+                { dayOfWeek: 2, isOpen: false }, { dayOfWeek: 3, isOpen: false },
+                { dayOfWeek: 4, isOpen: false }, { dayOfWeek: 5, isOpen: false },
+                { dayOfWeek: 6, isOpen: true, openTime: "10:00", closeTime: "14:00" },
+            ],
+        };
+        const fullSaturday = makeEmployee({
+            id: "a-full", employeeNumber: "a-full", weeklyTargetMinutes: 4 * 60,
+            maxDaysPerWeek: 1, availability: {
+                days: [1, 6], earliestStart: "10:00", latestEnd: "14:00",
+            },
+        });
+        const partialSaturday = makeEmployee({
+            id: "b-partial", employeeNumber: "b-partial", weeklyTargetMinutes: 2 * 60,
+            maxDaysPerWeek: 1, availability: {
+                days: [1, 6], earliestStart: "10:00", latestEnd: "12:00",
+            },
+        });
+        const existing = [{
+            id: "monday-cover", employeeId: "outside-schedule", date: "2026-03-02",
+            start: "10:00", end: "14:00",
+        }];
+        const coverageFirst = structuredClone(DEFAULT_SCHEDULING_RULE_SETTINGS);
+        coverageFirst.preferredOrder = [
+            "opening-hours-coverage", "contracted-hours", "one-saturday-off-per-month",
+            "overlapping-shifts", "employee-preferred-hours", "minimize-fragmentation",
+        ];
+        const saturdayFirst = structuredClone(coverageFirst);
+        saturdayFirst.preferredOrder = [
+            "one-saturday-off-per-month", "opening-hours-coverage", "contracted-hours",
+            "overlapping-shifts", "employee-preferred-hours", "minimize-fragmentation",
+        ];
+
+        const coverageResult = generateShifts(
+            [fullSaturday, partialSaturday], [], configured, 2026, 3, existing, coverageFirst,
+        );
+        const saturdayResult = generateShifts(
+            [fullSaturday, partialSaturday], [], configured, 2026, 3, existing, saturdayFirst,
+        );
+        const firstSaturday = "2026-03-07";
+
+        expect(coverageResult.shifts).toContainEqual(expect.objectContaining({
+            employeeId: fullSaturday.id, date: firstSaturday,
+        }));
+        expect(saturdayResult.shifts).not.toContainEqual(expect.objectContaining({
+            employeeId: fullSaturday.id, date: firstSaturday,
+        }));
+        expect(saturdayResult.shifts).toContainEqual(expect.objectContaining({
+            employeeId: partialSaturday.id, date: firstSaturday,
+        }));
+    });
+
     describe("employee daily paid-hours maximum", () => {
         it("counts existing scheduled time and does not add work beyond remaining daily capacity", () => {
             const employee = makeEmployee({
@@ -110,23 +235,23 @@ describe("generateShifts", () => {
         });
     });
 
-    it("uses the shared weekend rule to protect an applicable weekend when coverage permits", () => {
+    it("uses the shared Saturday rule to protect an applicable Saturday when coverage permits", () => {
         const configured: StoreHours = {
             days: [
-                { dayOfWeek: 0, isOpen: true, openTime: "10:00", closeTime: "12:00" },
-                ...([1, 2, 3, 4, 5] as const).map((dayOfWeek) => ({
-                    dayOfWeek, isOpen: false as const,
-                })),
+                { dayOfWeek: 0, isOpen: false },
+                { dayOfWeek: 1, isOpen: true, openTime: "10:00", closeTime: "12:00" },
+                ...([2, 3, 4, 5] as const).map((dayOfWeek) => ({ dayOfWeek, isOpen: false as const })),
                 { dayOfWeek: 6, isOpen: true, openTime: "10:00", closeTime: "12:00" },
             ],
         };
         const employees = [
             makeEmployee({ id: "a", employeeNumber: "a", weeklyTargetMinutes: 4 * 60,
-                availability: { days: [6, 0] } }),
+                availability: { days: [1, 6] } }),
             makeEmployee({ id: "b", employeeNumber: "b", weeklyTargetMinutes: 4 * 60,
-                availability: { days: [6, 0] } }),
+                availability: { days: [1, 6] } }),
         ];
-        const settings = { oneWeekendOffPerMonth: true };
+        const settings = structuredClone(DEFAULT_SCHEDULING_RULE_SETTINGS);
+        settings.modes["one-saturday-off-per-month"] = "require";
 
         const result = generateShifts(
             employees, [], configured, 2026, 3, [], settings,
@@ -136,7 +261,8 @@ describe("generateShifts", () => {
         );
         state.selectedYear = 2026; state.selectedMonth = 3;
 
-        expect(evaluateSoftRules(state)).toEqual([]);
+        expect(evaluatePlanningRules(state).filter(({ rule }) =>
+            rule === "one-saturday-off-per-month")).toEqual([]);
     });
 
     it("uses configured operating days and per-day hours", () => {
@@ -608,7 +734,7 @@ describe("generateShifts", () => {
                 .toBe(true);
         });
 
-        it("does not exceed the vacation-adjusted monthly target across partial weeks", () => {
+        it("uses vacation-adjusted full-week targets across partial month weeks", () => {
             const employee = makeEmployee({
                 weeklyTargetMinutes: 20 * 60,
                 maxDaysPerWeek: 5,
@@ -624,13 +750,21 @@ describe("generateShifts", () => {
             const result = generateShifts(
                 [employee], vacations, STORE_HOURS, 2026, 3, [],
             );
-            const generatedPaid = result.shifts.reduce(
-                (total, shift) => total + getPaidShiftMinutes(shift), 0,
-            );
-
-            expect(generatedPaid).toBeLessThanOrEqual(
-                getAdjustedMonthlyTargetMinutes(employee, vacations, 2026, 3),
-            );
+            const paidByWeek = new Map<string, number>();
+            for (const shift of result.shifts) {
+                const weekStart = getWeekStartDate(shift.date);
+                paidByWeek.set(
+                    weekStart,
+                    (paidByWeek.get(weekStart) ?? 0) + getPaidShiftMinutes(shift),
+                );
+            }
+            for (const [weekStart, paid] of paidByWeek) {
+                const weekEnd = new Date(`${weekStart}T00:00:00Z`);
+                weekEnd.setUTCDate(weekEnd.getUTCDate() + 6);
+                expect(paid).toBeLessThanOrEqual(getAdjustedWeeklyTargetMinutes(
+                    employee, vacations, weekStart, weekEnd.toISOString().slice(0, 10),
+                ));
+            }
         });
     });
 
