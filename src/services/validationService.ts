@@ -16,10 +16,10 @@ import { overlapsVacation } from "./vacationService";
 import { overlapsSickness } from "./sicknessService";
 import { activeEmployees } from "./teamService";
 import {
-    exceedsEmployeeDailyPaidMaximum,
+    exceedsEmployeeDailyScheduledMaximum,
     exceedsMaximumStandardShift,
-    getEmployeePaidMinutesForDate,
-    getEffectiveMaximumPaidMinutesPerDay,
+    getEmployeeScheduledMinutesForDate,
+    getEffectiveMaximumScheduledMinutesPerDay,
     MAXIMUM_STANDARD_SHIFT_MINUTES,
     shiftsWithCandidate,
 } from "./shiftRules";
@@ -56,7 +56,7 @@ export function validateShift(
         today,
     );
 
-    if (!existingShift) validateDailyPaidMaximum(
+    if (!existingShift) validateDailyScheduledMaximum(
         state, shift, shiftsWithCandidate(state.shifts, shift), issues,
     );
 
@@ -118,33 +118,33 @@ export function validatePlannerState(
         issues,
     );
 
-    validateDailyPaidMaximums(state, issues);
+    validateDailyScheduledMaximums(state, issues);
 
     validateMonthlyTargets(state, issues);
 
     return issues;
 }
 
-function validateDailyPaidMaximum(
+function validateDailyScheduledMaximum(
     state: PlannerState,
     shift: Shift,
     shifts: readonly Shift[],
     issues: ValidationIssue[],
 ): void {
     const employee = state.employees.find(({ id }) => id === shift.employeeId);
-    if (!employee || !exceedsEmployeeDailyPaidMaximum(employee, shifts, shift.date)) return;
-    const total = getEmployeePaidMinutesForDate(shifts, employee.id, shift.date);
+    if (!employee || !exceedsEmployeeDailyScheduledMaximum(employee, shifts, shift.date)) return;
+    const total = getEmployeeScheduledMinutesForDate(shifts, employee.id, shift.date);
     issues.push({
         severity: "error",
         category: "hours",
-        message: `${employeeFullName(employee)} has ${formatDuration(total)} paid hours on this day. ` +
-            `Maximum is ${formatDuration(getEffectiveMaximumPaidMinutesPerDay(employee))}.`,
+        message: `${employeeFullName(employee)} has ${formatDuration(total)} scheduled hours on this day. ` +
+            `Maximum is ${formatDuration(getEffectiveMaximumScheduledMinutesPerDay(employee))}.`,
         employeeId: employee.id,
         date: shift.date,
     });
 }
 
-function validateDailyPaidMaximums(
+function validateDailyScheduledMaximums(
     state: PlannerState,
     issues: ValidationIssue[],
 ): void {
@@ -155,7 +155,7 @@ function validateDailyPaidMaximums(
         const key = `${shift.employeeId}:${shift.date}`;
         if (seen.has(key)) continue;
         seen.add(key);
-        validateDailyPaidMaximum(state, shift, state.shifts, issues);
+        validateDailyScheduledMaximum(state, shift, state.shifts, issues);
     }
 }
 

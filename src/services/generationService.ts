@@ -2,7 +2,7 @@ import {
     createDateKey,
     getAdjustedWeeklyTargetMinutes,
     getDayOfWeek,
-    getPaidShiftMinutes,
+    getShiftDurationMinutes,
     getWeekStartsForMonth,
     getWeekStartDate,
     minutesToTime,
@@ -24,10 +24,10 @@ import {
 } from "./schedulingRulesService";
 import {
     exceedsMaximumStandardShift,
-    getEmployeePaidMinutesForDate,
-    getEffectiveMaximumPaidMinutesPerDay,
+    getEmployeeScheduledMinutesForDate,
+    getEffectiveMaximumScheduledMinutesPerDay,
     MAXIMUM_STANDARD_SHIFT_MINUTES,
-    remainingEmployeePaidMinutesForDate,
+    remainingEmployeeScheduledMinutesForDate,
 } from "./shiftRules";
 
 import type {
@@ -268,7 +268,7 @@ function bestShiftForEmployee(
     );
     if (plannedSlots === 0) return null;
 
-    const dailyPaidBudget = Math.min(
+    const dailyScheduledBudget = Math.min(
         remainingWeeklyMinutes,
         Math.ceil(remainingWeeklyMinutes / plannedSlots / GENERATION_SLOT_MINUTES) *
             GENERATION_SLOT_MINUTES,
@@ -292,8 +292,8 @@ function bestShiftForEmployee(
                 start: minutesToTime(start),
                 end: minutesToTime(end),
             };
-            const paid = getPaidShiftMinutes(candidate);
-            if (paid > dailyPaidBudget || paid > remainingWeeklyMinutes) continue;
+            const scheduled = getShiftDurationMinutes(candidate);
+            if (scheduled > dailyScheduledBudget || scheduled > remainingWeeklyMinutes) continue;
             const coverage = overlapMinutes(start, end, gaps);
             const preferredMinutes = intervalOverlapMinutes(start, end, preferred);
             if (coverage === 0) continue;
@@ -307,12 +307,12 @@ function bestShiftForEmployee(
                 legalEnd: windowEnd,
                 softRuleProtected: protectedSaturday,
                 scores: {
-                    "contracted-hours": paid,
+                    "contracted-hours": scheduled,
                     "opening-hours-coverage": coverage,
                     "overlapping-shifts": overlap,
                     "employee-preferred-hours": preferredMinutes,
                     "one-saturday-off-per-month": protectedSaturday ? -1 : 0,
-                    "minimize-fragmentation": paid,
+                    "minimize-fragmentation": scheduled,
                 },
             };
             if (!best || compareCandidateScores(proposed, best, ruleOrder) < 0 ||
@@ -391,17 +391,17 @@ function extendShiftForSmallCoverageGap(
                 [...existingShifts, ...generated], employee.id, weekStart,
             );
             const scheduled = employeeWeek.reduce(
-                (total, candidate) => total + getPaidShiftMinutes(candidate), 0,
+                (total, candidate) => total + getShiftDurationMinutes(candidate), 0,
             );
-            const proposed = scheduled - getPaidShiftMinutes(shift) + getPaidShiftMinutes(extended);
+            const proposed = scheduled - getShiftDurationMinutes(shift) + getShiftDurationMinutes(extended);
             const target = weeklyTargets.get(employee.id) ?? 0;
-            const proposedDay = getEmployeePaidMinutesForDate(
+            const proposedDay = getEmployeeScheduledMinutesForDate(
                 [...existingShifts, ...generated], employee.id, date,
-            ) - getPaidShiftMinutes(shift) + getPaidShiftMinutes(extended);
+            ) - getShiftDurationMinutes(shift) + getShiftDurationMinutes(extended);
             // Generated schedules may leave coverage unresolved, but they must
             // not create overtime above the vacation-adjusted weekly target.
             if (proposed > target ||
-                proposedDay > getEffectiveMaximumPaidMinutesPerDay(employee)) return [];
+                proposedDay > getEffectiveMaximumScheduledMinutesPerDay(employee)) return [];
 
             return [{
                 index,
@@ -494,9 +494,9 @@ export function findContractExtensionCandidate(
     if (!legal) return null;
     const legalStart = roundUpToSlot(timeToMinutes(legal.start));
     const legalEnd = roundDownToSlot(timeToMinutes(legal.end));
-    const originalPaid = getPaidShiftMinutes(shift);
+    const originalScheduled = getShiftDurationMinutes(shift);
     const preferred = preferredWindow(employee, getDayOfWeek(shift.date), legal);
-    let best: { shift: Shift; addedPaid: number; preferred: number } | null = null;
+    let best: { shift: Shift; addedScheduled: number; preferred: number } | null = null;
 
     for (
         let start = timeToMinutes(shift.start);
@@ -514,14 +514,14 @@ export function findContractExtensionCandidate(
                 end: minutesToTime(end),
             };
             if (exceedsMaximumStandardShift(candidate)) continue;
-            const addedPaid = getPaidShiftMinutes(candidate) - originalPaid;
-            if (addedPaid <= 0 || addedPaid > remainingTargetMinutes) continue;
+            const addedScheduled = getShiftDurationMinutes(candidate) - originalScheduled;
+            if (addedScheduled <= 0 || addedScheduled > remainingTargetMinutes) continue;
             const preferredMinutes = intervalOverlapMinutes(start, end, preferred);
-            if (!best || addedPaid > best.addedPaid ||
-                (addedPaid === best.addedPaid && preferredMinutes > best.preferred) ||
-                (addedPaid === best.addedPaid && preferredMinutes === best.preferred &&
+            if (!best || addedScheduled > best.addedScheduled ||
+                (addedScheduled === best.addedScheduled && preferredMinutes > best.preferred) ||
+                (addedScheduled === best.addedScheduled && preferredMinutes === best.preferred &&
                     start < timeToMinutes(best.shift.start))) {
-                best = { shift: candidate, addedPaid, preferred: preferredMinutes };
+                best = { shift: candidate, addedScheduled, preferred: preferredMinutes };
             }
         }
     }
@@ -539,33 +539,33 @@ function extendGeneratedShiftTowardTarget(
 ): boolean {
     if (remainingTargetMinutes <= 0) return false;
 
-    let best: { index: number; shift: Shift; addedPaid: number; preferred: number } | null = null;
+    let best: { index: number; shift: Shift; addedScheduled: number; preferred: number } | null = null;
     for (let index = 0; index < generated.length; index += 1) {
         const shift = generated[index];
         if (!shift) continue;
         if (shift.employeeId !== employee.id || getWeekStartDate(shift.date) !== weekStart) continue;
-        const originalPaid = getPaidShiftMinutes(shift);
+        const originalScheduled = getShiftDurationMinutes(shift);
         const legal = legalWindow(employee, storeHours, shift.date);
         if (!legal) continue;
         const preferred = preferredWindow(employee, getDayOfWeek(shift.date), legal);
         const candidate = findContractExtensionCandidate(
             employee, storeHours, shift, Math.min(
                 remainingTargetMinutes,
-                remainingEmployeePaidMinutesForDate(
+                remainingEmployeeScheduledMinutesForDate(
                     employee, [...existingShifts, ...generated], shift.date,
                 ),
             ),
         );
         if (!candidate) continue;
-        const addedPaid = getPaidShiftMinutes(candidate) - originalPaid;
+        const addedScheduled = getShiftDurationMinutes(candidate) - originalScheduled;
         const preferredMinutes = intervalOverlapMinutes(
             timeToMinutes(candidate.start), timeToMinutes(candidate.end), preferred,
         );
-        if (!best || addedPaid > best.addedPaid ||
-            (addedPaid === best.addedPaid && preferredMinutes > best.preferred) ||
-            (addedPaid === best.addedPaid && preferredMinutes === best.preferred &&
+        if (!best || addedScheduled > best.addedScheduled ||
+            (addedScheduled === best.addedScheduled && preferredMinutes > best.preferred) ||
+            (addedScheduled === best.addedScheduled && preferredMinutes === best.preferred &&
                 timeToMinutes(candidate.start) < timeToMinutes(best.shift.start))) {
-            best = { index, shift: candidate, addedPaid, preferred: preferredMinutes };
+            best = { index, shift: candidate, addedScheduled, preferred: preferredMinutes };
         }
     }
 
@@ -594,12 +594,12 @@ function fulfillWeeklyTargets(
         const flexibility = FLEXIBILITY_RANK[classifyGenerationFlexibility(left, storeHours)] -
             FLEXIBILITY_RANK[classifyGenerationFlexibility(right, storeHours)];
         const allShifts = [...existingShifts, ...generated];
-        const leftPaid = generatedForEmployeeInWeek(allShifts, left.id, weekStart)
-            .reduce((total, shift) => total + getPaidShiftMinutes(shift), 0);
-        const rightPaid = generatedForEmployeeInWeek(allShifts, right.id, weekStart)
-            .reduce((total, shift) => total + getPaidShiftMinutes(shift), 0);
-        const leftDeficit = (weeklyTargets.get(left.id) ?? 0) - leftPaid;
-        const rightDeficit = (weeklyTargets.get(right.id) ?? 0) - rightPaid;
+        const leftScheduled = generatedForEmployeeInWeek(allShifts, left.id, weekStart)
+            .reduce((total, shift) => total + getShiftDurationMinutes(shift), 0);
+        const rightScheduled = generatedForEmployeeInWeek(allShifts, right.id, weekStart)
+            .reduce((total, shift) => total + getShiftDurationMinutes(shift), 0);
+        const leftDeficit = (weeklyTargets.get(left.id) ?? 0) - leftScheduled;
+        const rightDeficit = (weeklyTargets.get(right.id) ?? 0) - rightScheduled;
         return flexibility || rightDeficit - leftDeficit || left.id.localeCompare(right.id);
     });
 
@@ -608,7 +608,7 @@ function fulfillWeeklyTargets(
             const allShifts = [...existingShifts, ...generated];
             const employeeWeek = generatedForEmployeeInWeek(allShifts, employee.id, weekStart);
             const scheduled = employeeWeek.reduce(
-                (total, shift) => total + getPaidShiftMinutes(shift), 0,
+                (total, shift) => total + getShiftDurationMinutes(shift), 0,
             );
             const remaining = (weeklyTargets.get(employee.id) ?? 0) - scheduled;
             if (remaining <= 0) break;
@@ -638,7 +638,7 @@ function fulfillWeeklyTargets(
                 [{ start: operating.open, end: operating.close }],
                 Math.min(
                     remaining,
-                    remainingEmployeePaidMinutesForDate(employee, allShifts, date),
+                    remainingEmployeeScheduledMinutesForDate(employee, allShifts, date),
                 ),
                 Math.min(availableDates.length, employee.maxDaysPerWeek - daysWorked),
                 settings.minimumGeneratedShiftMinutes,
@@ -727,11 +727,11 @@ export function generateShifts(
                     if (daysWorked >= employee.maxDaysPerWeek) return [];
                     const weeklyTarget = weeklyTargets.get(employee.id) ?? 0;
                     const scheduled = employeeWeek.reduce(
-                        (total, shift) => total + getPaidShiftMinutes(shift), 0,
+                        (total, shift) => total + getShiftDurationMinutes(shift), 0,
                     );
                     const remaining = Math.min(
                         weeklyTarget - scheduled,
-                        remainingEmployeePaidMinutesForDate(employee, allShifts, date),
+                        remainingEmployeeScheduledMinutesForDate(employee, allShifts, date),
                     );
                     const remainingDates = usableDatesRemaining(
                         employee, blockedPeriods, dates, date, daysWorked,

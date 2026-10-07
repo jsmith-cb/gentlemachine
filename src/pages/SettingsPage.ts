@@ -138,7 +138,7 @@ export function renderSettingsPage(
                             <small>Applies to new generated shifts. Managers may still create shorter shifts manually.</small>
                         </label>
                         <p class="settings-context-note">
-                            Employee availability, maximum paid hours per day, and maximum days per week remain configured in Team.
+                            Employee availability, maximum scheduled hours per day, and maximum days per week remain configured in Team.
                         </p>
                     </div>
 

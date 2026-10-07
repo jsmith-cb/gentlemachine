@@ -1,0 +1,46 @@
+22 issues
+Guidance
+Finn guy is 1:00 under their adjusted monthly target.
+Guidance
+Tina her is 5:26 over their adjusted monthly target.
+Guidance
+Wanda Her is 0:04 over their adjusted monthly target.
+Guidance
+Mini Job is 4:49 over their adjusted monthly target.
+Guidance
+Lacey Intern is 1:36 over their adjusted monthly target.
+Requirement conflict
+Finn guy remains 21:00 below their vacation-adjusted weekly target for 2026-09-28–2026-10-04. PP_Crew could not fully satisfy this requirement within the generated plan and configured scheduling boundaries.
+Requirement conflict
+Tina her remains 6:00 below their vacation-adjusted weekly target for 2026-09-28–2026-10-04. PP_Crew could not fully satisfy this requirement within the generated plan and configured scheduling boundaries.
+Requirement conflict
+Wanda Her remains 5:30 below their vacation-adjusted weekly target for 2026-09-28–2026-10-04. PP_Crew could not fully satisfy this requirement within the generated plan and configured scheduling boundaries.
+Requirement conflict
+Wanda Her remains 0:45 below their vacation-adjusted weekly target for 2026-10-05–2026-10-11. PP_Crew could not fully satisfy this requirement within the generated plan and configured scheduling boundaries.
+Requirement conflict
+Wanda Her remains 0:45 below their vacation-adjusted weekly target for 2026-10-12–2026-10-18. PP_Crew could not fully satisfy this requirement within the generated plan and configured scheduling boundaries.
+Requirement conflict
+Wanda Her remains 0:45 below their vacation-adjusted weekly target for 2026-10-19–2026-10-25. PP_Crew could not fully satisfy this requirement within the generated plan and configured scheduling boundaries.
+Requirement conflict
+Wanda Her remains 0:45 below their vacation-adjusted weekly target for 2026-10-26–2026-11-01. PP_Crew could not fully satisfy this requirement within the generated plan and configured scheduling boundaries.
+Requirement conflict
+Mini Job remains 0:45 below their vacation-adjusted weekly target for 2026-09-28–2026-10-04. PP_Crew could not fully satisfy this requirement within the generated plan and configured scheduling boundaries.
+Requirement conflict
+Mini Job remains 0:45 below their vacation-adjusted weekly target for 2026-10-05–2026-10-11. PP_Crew could not fully satisfy this requirement within the generated plan and configured scheduling boundaries.
+Requirement conflict
+Mini Job remains 0:45 below their vacation-adjusted weekly target for 2026-10-12–2026-10-18. PP_Crew could not fully satisfy this requirement within the generated plan and configured scheduling boundaries.
+Requirement conflict
+Mini Job remains 0:45 below their vacation-adjusted weekly target for 2026-10-19–2026-10-25. PP_Crew could not fully satisfy this requirement within the generated plan and configured scheduling boundaries.
+Requirement conflict
+Mini Job remains 0:45 below their vacation-adjusted weekly target for 2026-10-26–2026-11-01. PP_Crew could not fully satisfy this requirement within the generated plan and configured scheduling boundaries.
+Requirement conflict
+Lacey Intern remains 0:15 below their vacation-adjusted weekly target for 2026-09-28–2026-10-04. PP_Crew could not fully satisfy this requirement within the generated plan and configured scheduling boundaries.
+Requirement conflict
+Lacey Intern remains 0:15 below their vacation-adjusted weekly target for 2026-10-05–2026-10-11. PP_Crew could not fully satisfy this requirement within the generated plan and configured scheduling boundaries.
+Requirement conflict
+Lacey Intern remains 0:15 below their vacation-adjusted weekly target for 2026-10-12–2026-10-18. PP_Crew could not fully satisfy this requirement within the generated plan and configured scheduling boundaries.
+Requirement conflict
+Lacey Intern remains 0:15 below their vacation-adjusted weekly target for 2026-10-19–2026-10-25. PP_Crew could not fully satisfy this requirement within the generated plan and configured scheduling boundaries.
+Requirement conflict
+Lacey Intern remains 0:15 below their vacation-adjusted weekly target for 2026-10-26–2026-11-01. PP_Crew could not fully satisfy this requirement within the generated plan and configured scheduling boundaries.
+Coverage currently checks scheduled shift spans. Break coverage is not yet included.

@@ -1,0 +1,7 @@
+import type { PlanningRuleId, PlanningRuleMode, Shift } from "../../types/planning";
+export interface SolverCandidate { id:string; employeeId:string; date:string; weekStart:string; start:string; end:string; spanMinutes:number; scheduledMinutes:number; preferredSpanMinutes:number; coverageSlots:string[]; }
+export interface SolverEmployee { id:string; name:string; weeklyTargetMinutes:number; maxDaysPerWeek:number; maxScheduledMinutesPerDay:number; applicableSaturdays:string[]; }
+export interface SolverWeekTarget { employeeId:string; weekStart:string; targetMinutes:number; fixedScheduledMinutes:number; fixedDates:string[]; }
+export interface SolverInput { label:string; year:number; month:number; timeoutSeconds:number; seed:number; modes:Record<"contracted-hours"|"opening-hours-coverage"|"one-saturday-off-per-month",PlanningRuleMode>; preferredOrder:PlanningRuleId[]; employees:SolverEmployee[]; candidates:SolverCandidate[]; weekTargets:SolverWeekTarget[]; openSlots:string[]; fixedSlotOccupancy:Record<string,number>; fixedShifts:Shift[]; }
+export interface SolverStageResult { rule:string; direction:"min"|"max"; status:string; value?:number; seconds:number; }
+export interface SolverOutput { label:string; status:"OPTIMAL"|"FEASIBLE"|"INFEASIBLE"|"UNKNOWN"|"MODEL_INVALID"; selectedCandidateIds:string[]; stages:SolverStageResult[]; infeasibilityDiagnostics?:string[]; wallSeconds:number; }

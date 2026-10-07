@@ -3,7 +3,7 @@ import { employeeFullName } from "./employeeIdentity";
 import {
     getAdjustedWeeklyTargetMinutes,
     getDayOfWeek,
-    getPaidShiftMinutes,
+    getShiftDurationMinutes,
     getWeekStartDate,
 } from "./hoursService";
 import { activeEmployees } from "./teamService";
@@ -178,11 +178,11 @@ function evaluateContractedHours(state: PlannerState): PlanningRuleGuidance[] {
             const target = getAdjustedWeeklyTargetMinutes(
                 employee, state.vacations, weekStart, weekEnd,
             );
-            const paid = state.shifts.filter((shift) =>
+            const scheduled = state.shifts.filter((shift) =>
                 shift.employeeId === employee.id && getWeekStartDate(shift.date) === weekStart)
-                .reduce((total, shift) => total + getPaidShiftMinutes(shift), 0);
-            if (paid >= target) return [];
-            const deficit = target - paid;
+                .reduce((total, shift) => total + getShiftDurationMinutes(shift), 0);
+            if (scheduled >= target) return [];
+            const deficit = target - scheduled;
             return [{
                 rule: "contracted-hours" as const,
                 level,

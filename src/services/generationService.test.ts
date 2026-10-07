@@ -71,7 +71,7 @@ describe("generateShifts", () => {
             [employee], [], STORE_HOURS, 2026, 3, [], DEFAULT_SCHEDULING_RULE_SETTINGS,
         );
 
-        expect(withOneHourMinimum.shifts.some((shift) => getPaidShiftMinutes(shift) === 60))
+        expect(withOneHourMinimum.shifts.some((shift) => getShiftDurationMinutes(shift) === 60))
             .toBe(true);
         expect(withDefaultMinimum.shifts).toEqual([]);
     });
@@ -195,7 +195,7 @@ describe("generateShifts", () => {
             );
             const mondayPaid = [...existing, ...result.shifts]
                 .filter(({ date }) => date === "2026-03-02")
-                .reduce((total, shift) => total + getPaidShiftMinutes(shift), 0);
+                .reduce((total, shift) => total + getShiftDurationMinutes(shift), 0);
 
             expect(mondayPaid).toBeLessThanOrEqual(employee.maximumPaidMinutesPerDay!);
         });
@@ -211,7 +211,7 @@ describe("generateShifts", () => {
             );
             const firstMonday = result.shifts.filter(({ date }) => date === "2026-03-02");
             expect(firstMonday.reduce(
-                (total, shift) => total + getPaidShiftMinutes(shift), 0,
+                (total, shift) => total + getShiftDurationMinutes(shift), 0,
             )).toBeLessThanOrEqual(2 * 60);
             expect(firstMonday.some(({ end }) => end === EIGHT_HOUR_STORE_CLOSE)).toBe(false);
         });
@@ -228,7 +228,7 @@ describe("generateShifts", () => {
             for (const shift of result.shifts) {
                 paidByDate.set(
                     shift.date,
-                    (paidByDate.get(shift.date) ?? 0) + getPaidShiftMinutes(shift),
+                    (paidByDate.get(shift.date) ?? 0) + getShiftDurationMinutes(shift),
                 );
             }
             expect([...paidByDate.values()].every((minutes) => minutes <= 3 * 60)).toBe(true);
@@ -633,7 +633,7 @@ describe("generateShifts", () => {
                 const weekEnd = weekEndDate.toISOString().slice(0, 10);
                 const paid = result.shifts
                     .filter(({ date }) => getWeekStartDate(date) === weekStart)
-                    .reduce((sum, shift) => sum + getPaidShiftMinutes(shift), 0);
+                    .reduce((sum, shift) => sum + getShiftDurationMinutes(shift), 0);
                 expect(paid).toBeLessThanOrEqual(
                     getAdjustedWeeklyTargetMinutes(employee, vacations, weekStart, weekEnd),
                 );
@@ -670,12 +670,26 @@ describe("generateShifts", () => {
             expect(result.shifts.every((shift) =>
                 timeToMinutes(shift.start) % 30 === 0 &&
                 timeToMinutes(shift.end) % 30 === 0 &&
-                getPaidShiftMinutes(shift) >= 120,
+                getShiftDurationMinutes(shift) >= 120,
             )).toBe(true);
         });
     });
 
     describe("generated weekly target ceiling", () => {
+        it("counts a five-hour shift as five scheduled hours despite dormant break calculation", () => {
+            const employee = makeEmployee({
+                weeklyTargetMinutes: 5 * 60,
+                maxDaysPerWeek: 1,
+                availability: { days: [1] },
+            });
+
+            const result = generateShifts([employee], [], EIGHT_HOUR_STORE_HOURS, 2026, 3, []);
+            const shift = result.shifts.find(({ date }) => date === "2026-03-02");
+
+            expect(getShiftDurationMinutes(shift!)).toBe(5 * 60);
+            expect(getPaidShiftMinutes(shift!)).toBe(4 * 60 + 45);
+        });
+
         it("leaves coverage unresolved rather than exceeding the adjusted weekly target", () => {
             const employee = makeEmployee({
                 weeklyTargetMinutes: 6 * 60,
@@ -687,7 +701,7 @@ describe("generateShifts", () => {
             const firstMonday = result.shifts.find(({ date }) => date === "2026-03-02");
 
             expect(firstMonday).toBeDefined();
-            expect(getPaidShiftMinutes(firstMonday!)).toBeLessThanOrEqual(
+            expect(getShiftDurationMinutes(firstMonday!)).toBeLessThanOrEqual(
                 employee.weeklyTargetMinutes,
             );
             expect(firstMonday?.end).not.toBe(EIGHT_HOUR_STORE_CLOSE);
@@ -703,8 +717,8 @@ describe("generateShifts", () => {
             const result = generateShifts([employee], [], EIGHT_HOUR_STORE_HOURS, 2026, 3, []);
             const shift = result.shifts.find(({ date }) => date === "2026-03-02");
 
-            expect(shift).toMatchObject({ start: "10:00", end: "18:00" });
-            expect(getPaidShiftMinutes(shift!)).toBe(employee.weeklyTargetMinutes);
+            expect(shift).toMatchObject({ start: "10:00", end: "17:00" });
+            expect(getShiftDurationMinutes(shift!)).toBe(employee.weeklyTargetMinutes);
         });
 
         it("does not use target overage to close a substantial coverage gap", () => {
@@ -718,7 +732,7 @@ describe("generateShifts", () => {
             const shift = result.shifts.find(({ date }) => date === "2026-03-02");
 
             expect(shift?.end).not.toBe(EIGHT_HOUR_STORE_CLOSE);
-            expect(getPaidShiftMinutes(shift!)).toBeLessThanOrEqual(employee.weeklyTargetMinutes);
+            expect(getShiftDurationMinutes(shift!)).toBeLessThanOrEqual(employee.weeklyTargetMinutes);
         });
 
         it("never extends beyond legal availability", () => {
@@ -755,7 +769,7 @@ describe("generateShifts", () => {
                 const weekStart = getWeekStartDate(shift.date);
                 paidByWeek.set(
                     weekStart,
-                    (paidByWeek.get(weekStart) ?? 0) + getPaidShiftMinutes(shift),
+                    (paidByWeek.get(weekStart) ?? 0) + getShiftDurationMinutes(shift),
                 );
             }
             for (const [weekStart, paid] of paidByWeek) {
@@ -784,7 +798,7 @@ describe("generateShifts", () => {
             const result = generateShifts([employee], [], STORE_HOURS, 2026, 3, []);
             const shift = result.shifts.find(({ date }) => date === "2026-03-02");
 
-            expect(shift).toMatchObject({ start: "12:00", end: "18:00" });
+            expect(shift).toMatchObject({ start: "12:00", end: "17:30" });
         });
 
         it("clips preferred placement to legal availability", () => {
@@ -918,7 +932,7 @@ describe("generateShifts", () => {
             );
 
             expect(candidate).not.toBeNull();
-            expect(getPaidShiftMinutes(candidate!) - getPaidShiftMinutes(shift)).toBe(30);
+            expect(getShiftDurationMinutes(candidate!) - getShiftDurationMinutes(shift)).toBe(30);
         });
 
         it("extends an existing shift for a 60-minute remaining target", () => {
@@ -936,10 +950,10 @@ describe("generateShifts", () => {
             );
 
             expect(candidate).not.toBeNull();
-            expect(getPaidShiftMinutes(candidate!) - getPaidShiftMinutes(shift)).toBe(60);
+            expect(getShiftDurationMinutes(candidate!) - getShiftDurationMinutes(shift)).toBe(60);
         });
 
-        it("uses authoritative paid time when an extension crosses a break threshold", () => {
+        it("does not infer break credit when extending toward a scheduling target", () => {
             const employee = makeEmployee();
             const shift = {
                 id: "generated",
@@ -953,8 +967,10 @@ describe("generateShifts", () => {
                 employee, STORE_HOURS, shift, 15,
             );
 
-            expect(candidate).toMatchObject({ start: "10:00", end: "15:00" });
-            expect(getPaidShiftMinutes(candidate!) - getPaidShiftMinutes(shift)).toBe(15);
+            expect(candidate).toBeNull();
+            const halfHour = findContractExtensionCandidate(employee, STORE_HOURS, shift, 30);
+            expect(halfHour).toMatchObject({ start: "10:00", end: "15:00" });
+            expect(getShiftDurationMinutes(halfHour!) - getShiftDurationMinutes(shift)).toBe(30);
         });
 
         it("does not extend past the remaining target, legal window, or eight-hour limit", () => {
@@ -979,7 +995,7 @@ describe("generateShifts", () => {
 
             expect(candidate).toMatchObject({ start: "10:00", end: "18:00" });
             expect(getShiftDurationMinutes(candidate!)).toBe(8 * 60);
-            expect(getPaidShiftMinutes(candidate!) - getPaidShiftMinutes(shift)).toBeLessThanOrEqual(30);
+            expect(getShiftDurationMinutes(candidate!) - getShiftDurationMinutes(shift)).toBeLessThanOrEqual(30);
             expect(findContractExtensionCandidate(employee, STORE_HOURS, candidate!, 30)).toBeNull();
         });
 
@@ -1032,7 +1048,7 @@ describe("generateShifts", () => {
 
             expect(new Set(week.map(({ date }) => date))).toHaveLength(1);
             expect(week.every((shift) => getShiftDurationMinutes(shift) <= 8 * 60)).toBe(true);
-            expect(week.reduce((total, shift) => total + getPaidShiftMinutes(shift), 0))
+            expect(week.reduce((total, shift) => total + getShiftDurationMinutes(shift), 0))
                 .toBeLessThan(employee.weeklyTargetMinutes);
         });
     });

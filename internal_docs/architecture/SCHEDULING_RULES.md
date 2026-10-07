@@ -38,7 +38,7 @@ Boundaries are never traded away for a planning objective. Their authoritative o
 |---|---|
 | Store/planning hours | Store Hours |
 | Default/legal availability | Team Employee configuration |
-| Maximum paid hours per day | Crew default plus lower Team Employee override |
+| Maximum scheduled hours per day | Crew default plus lower Team Employee override |
 | Maximum days per week | Team Employee configuration |
 | Vacation | Canonical Vacation data |
 | Sickness | Canonical SickReport data |
@@ -99,10 +99,10 @@ During a concrete candidate choice, the initial comparison measures are:
 
 | Preferred rule | Initial deterministic comparison |
 |---|---|
-| Schedule contracted hours | Most useful paid minutes toward the applicable weekly target |
+| Schedule contracted hours | Most useful scheduled minutes toward the applicable weekly target |
 | Opening-hours coverage | Most covered configured opening minutes |
 | Provide overlapping shifts | Most useful minutes with at least two Employees scheduled |
-| Prefer employee hours | Most paid minutes within day-specific preferred windows |
+| Prefer employee hours | Most scheduled-span minutes within day-specific preferred windows |
 | One Saturday off per month | Avoid work on the deterministically protected applicable Saturday |
 | Prefer longer, consolidated shifts | Prefer a longer useful candidate when a shift is already being placed |
 
@@ -140,6 +140,11 @@ accounting includes canonical shifts outside the selected month when a week cros
 boundary, while newly generated shifts remain inside the selected month. Monthly totals are an
 aggregate Guidance/reporting view rather than a simultaneous exact generation requirement.
 
+Scheduling targets and daily limits use full scheduled Shift duration. PP_Crew does not currently
+infer a break and subtract it from scheduling totals: a 10:30–15:30 Shift contributes exactly five
+hours. The existing break-calculation helpers remain available for a future explicit break-planning
+or time-clock capability, but they are dormant from current scheduling decisions.
+
 ## Guidance and manual planning
 
 Hard boundary violations remain validation errors. Unfulfilled required rules are displayed as
@@ -148,7 +153,8 @@ Hard boundary violations remain validation errors. Unfulfilled required rules ar
 Planning rules primarily govern Generate Planner. They do not turn preferences into manual-edit
 blockers. Guidance may still compare a manually edited schedule with configured objectives.
 
-Coverage currently evaluates scheduled Shift spans; break coverage is not yet included.
+Coverage and contracted-hours accounting both evaluate scheduled Shift spans. Break deductions are
+not inferred by the current scheduling model.
 
 ## Implementation locations
 

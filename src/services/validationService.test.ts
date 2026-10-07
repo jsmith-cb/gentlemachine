@@ -112,7 +112,7 @@ describe("standard shift duration validation", () => {
     });
 });
 
-describe("employee maximum paid hours per day", () => {
+describe("employee maximum scheduled hours per day", () => {
     function dailyState(maximumPaidMinutesPerDay?: number) {
         const state = createInitialPlannerState();
         state.selectedYear = 2026;
@@ -130,16 +130,16 @@ describe("employee maximum paid hours per day", () => {
             { id: "afternoon", employeeId: "a", date: "2026-09-07", start: "15:00", end: "19:00" },
         ];
         expect(validatePlannerState(state).some(({ message }) =>
-            message.includes("paid hours on this day"),
+            message.includes("scheduled hours on this day"),
         )).toBe(false);
 
         state.shifts[1] = { ...state.shifts[1]!, end: "18:30" };
         expect(validatePlannerState(state).some(({ message }) =>
-            message.includes("paid hours on this day"),
+            message.includes("scheduled hours on this day"),
         )).toBe(false);
     });
 
-    it("rejects multiple shifts whose combined paid time exceeds the maximum", () => {
+    it("rejects multiple shifts whose combined scheduled time exceeds the maximum", () => {
         const state = dailyState(8 * 60);
         state.shifts = [
             { id: "morning", employeeId: "a", date: "2026-09-07", start: "10:30", end: "14:30" },
@@ -147,19 +147,19 @@ describe("employee maximum paid hours per day", () => {
         ];
         expect(validatePlannerState(state)).toContainEqual(expect.objectContaining({
             severity: "error", category: "hours", employeeId: "a",
-            message: expect.stringContaining("8:30 paid hours"),
+            message: expect.stringContaining("8:30 scheduled hours"),
         }));
     });
 
-    it("uses paid time after breaks instead of raw shift span", () => {
+    it("uses full scheduled span without inferred break deductions", () => {
         const state = dailyState(5.5 * 60);
         state.shifts = [{
             id: "break-adjusted", employeeId: "a", date: "2026-09-07",
             start: "10:30", end: "16:30",
         }];
         expect(validatePlannerState(state).some(({ message }) =>
-            message.includes("paid hours on this day"),
-        )).toBe(false);
+            message.includes("scheduled hours on this day"),
+        )).toBe(true);
     });
 
     it("applies employee-specific overrides while retaining the eight-hour default", () => {
@@ -174,7 +174,7 @@ describe("employee maximum paid hours per day", () => {
             { id: "b", employeeId: "b", date: "2026-09-07", start: "10:30", end: "15:30" },
         ];
         const issues = validatePlannerState(state).filter(({ message }) =>
-            message.includes("paid hours on this day"),
+            message.includes("scheduled hours on this day"),
         );
         expect(issues).toHaveLength(1);
         expect(issues[0]?.employeeId).toBe("a");

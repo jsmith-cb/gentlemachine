@@ -11,7 +11,7 @@ import { employeeSelectOptions } from "../services/employeeIdentity";
 import { activeEmployees, createTeamMemberDraft, deactivateTeamMember } from "../services/teamService";
 import { hasValidAvailabilityHours } from "../services/availabilityService";
 import { isValidVacationPeriod, overlapsVacation } from "../services/vacationService";
-import { isValidMaximumPaidMinutesPerDayOverride } from "../services/shiftRules";
+import { isValidMaximumScheduledMinutesPerDayOverride } from "../services/shiftRules";
 
 import type { Employee, PlannerState } from "../types/planning";
 import {
@@ -289,7 +289,7 @@ export function renderEmployeePlanningPage(
                         <input type="number" id="emp-maximum-hours-per-day" name="maximumHoursPerDay"
                             value="${maximumHoursPerDay}" step="0.5" min="0.5" max="8"
                             placeholder="8" />
-                        <small>Leave blank to use Crew's default maximum of 8 paid hours.</small>
+                        <small>Leave blank to use Crew's default maximum of 8 scheduled hours.</small>
                     </div>
 
                     <div class="form-group">
@@ -664,7 +664,7 @@ export function renderEmployeePlanningPage(
             const maxDays = parseInt(maxDaysSelect?.value ?? "5", 10);
 
             if (maximumPaidMinutesPerDay !== undefined &&
-                !isValidMaximumPaidMinutesPerDayOverride(maximumPaidMinutesPerDay)) {
+                !isValidMaximumScheduledMinutesPerDayOverride(maximumPaidMinutesPerDay)) {
                 if (saveStatus) saveStatus.textContent = "Maximum hours per day must be between 0.5 and 8 hours in 30-minute increments, or left blank.";
                 return;
             }

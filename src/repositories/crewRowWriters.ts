@@ -1,5 +1,5 @@
 import { hasValidAvailabilityHours } from "../services/availabilityService";
-import { isValidMaximumPaidMinutesPerDayOverride } from "../services/shiftRules";
+import { isValidMaximumScheduledMinutesPerDayOverride } from "../services/shiftRules";
 import { isValidSchedulingRuleSettings } from "../services/schedulingRulesService";
 import { isValidStoreHours } from "../services/storeHoursService";
 import { isValidVacationPeriod } from "../services/vacationService";
@@ -14,7 +14,7 @@ export function employeeToRow(businessId: string, employee: Employee): Record<st
         !Number.isInteger(employee.maxDaysPerWeek) || employee.maxDaysPerWeek < 1 ||
         employee.maxDaysPerWeek > 7 || !isValidAvailability(employee.availability) ||
         (employee.maximumPaidMinutesPerDay !== undefined &&
-            !isValidMaximumPaidMinutesPerDayOverride(employee.maximumPaidMinutesPerDay))) {
+            !isValidMaximumScheduledMinutesPerDayOverride(employee.maximumPaidMinutesPerDay))) {
         invalid("employee");
     }
 

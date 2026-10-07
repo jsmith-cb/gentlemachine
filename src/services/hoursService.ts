@@ -108,7 +108,7 @@ export function getEmployeeScheduledMinutes(
         .reduce(
             (total, shift) =>
                 total +
-                getPaidShiftMinutes(
+                getShiftDurationMinutes(
                     shift,
                 ),
             0,

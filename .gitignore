@@ -33,50 +33,12 @@ pnpm-debug.log*
 # Local archives
 *.zip
 
-<<<<<<< HEAD
-# Generated review artifacts
-.review-package/
-pricepocket-review*.zip
-
-# Dependencies
-node_modules/
-
-# Build output
-dist/
-
-# Environment files
-.env
-.env.*
-!.env.example
-
-# Logs
-*.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
-
-# TypeScript
-*.tsbuildinfo
-
-# Editors
-.vscode/
-.idea/
-
-# macOS
-.DS_Store
-
-# Local archives
-*.zip
-
-=======
->>>>>>> feat/export_schedule
 temp_styles/
 
 # Supabase local runtime state
 supabase/.branches/
 supabase/.temp/
-<<<<<<< HEAD
-temp_styles/
-=======
->>>>>>> feat/export_schedule
+
+# Isolated CP-SAT spike runtime/output
+experiments/cp_sat/.venv/
+experiments/cp_sat/output/

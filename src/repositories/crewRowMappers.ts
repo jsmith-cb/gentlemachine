@@ -1,5 +1,5 @@
 import { hasValidAvailabilityHours, isValidTime } from "../services/availabilityService";
-import { isValidMaximumPaidMinutesPerDayOverride } from "../services/shiftRules";
+import { isValidMaximumScheduledMinutesPerDayOverride } from "../services/shiftRules";
 import { isValidSchedulingRuleSettings } from "../services/schedulingRulesService";
 import { isValidStoreHours } from "../services/storeHoursService";
 import type {
@@ -86,7 +86,7 @@ function mapEmployee(businessId: string, value: unknown, index: number): Employe
     if (!isIntegerAtLeast(row.weekly_target_minutes, 0)) fail(`${path}.weekly_target_minutes is invalid`);
     if (!isIntegerBetween(row.max_days_per_week, 1, 7)) fail(`${path}.max_days_per_week is invalid`);
     if (row.maximum_paid_minutes_per_day !== null &&
-        !isValidMaximumPaidMinutesPerDayOverride(row.maximum_paid_minutes_per_day)) {
+        !isValidMaximumScheduledMinutesPerDayOverride(row.maximum_paid_minutes_per_day)) {
         fail(`${path}.maximum_paid_minutes_per_day is invalid`);
     }
     if (row.email !== null && typeof row.email !== "string") fail(`${path}.email is invalid`);
